@@ -1,0 +1,150 @@
+@page
+@model TINWorkspaceTemp.Pages.Tin200.IndexModel
+@{
+    ViewData["Title"] = "TIN200 Records";
+}
+
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h1>TIN200 Records</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <a asp-page="./Create" class="btn btn-primary">
+                <i class="bi bi-plus-circle"></i> Add New Record
+            </a>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <form method="get" class="d-flex">
+                <label class="me-2 align-self-center">Filter Year:</label>
+                <select name="year" class="form-select me-2" aria-label="Financial Year">
+                    <option value="">All</option>
+                    @foreach (var y in Model.Years)
+                    {
+                        <option value="@y" selected="@(Model.SelectedYear == y ? "selected" : null)">@y</option>
+                    }
+                </select>
+                <button class="btn btn-outline-primary" type="submit">Apply</button>
+                <button class="btn btn-success ms-2" type="submit" formaction="@Url.Page("./Export")">Export</button>
+                <a class="btn btn-link ms-2" href="@Url.Page("./Index")">Clear</a>
+            </form>
+        </div>
+    </div>
+
+    @if (Model.Records.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-striped table-hover tin200-table">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="sortable" data-type="number">ID</th>
+                        <th class="sortable" data-type="string">Company Name</th>
+                        <th class="sortable" data-type="string">CEO Name</th>
+                        <th class="sortable" data-type="string">Email</th>
+                        <th class="sortable" data-type="string">External ID</th>
+                        <th class="sortable" data-type="number">FYE 2025</th>
+                        <th class="sortable" data-type="number">FYE 2024</th>
+                        <th class="sortable" data-type="number">FYE 2023</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var record in Model.Records)
+                    {
+                        <tr>
+                            <td>@record.Id</td>
+                            <td>@record.CompanyName</td>
+                            <td>@record.CeoFirstName @record.CeoLastName</td>
+                            <td>@record.Email</td>
+                            <td>@record.ExternalId</td>
+                            <td>@(record.Fye2025.HasValue ? record.Fye2025.Value.ToString("C0") : "")</td>
+                            <td>@(record.Fye2024.HasValue ? record.Fye2024.Value.ToString("C0") : "")</td>
+                            <td>@(record.Fye2023.HasValue ? record.Fye2023.Value.ToString("C0") : "")</td>
+                            <td>
+                                <a asp-page="./Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
+                                <a asp-page="./Edit" asp-route-id="@record.Id" class="btn btn-sm btn-warning">Edit</a>
+                                <a asp-page="./Delete" asp-route-id="@record.Id" class="btn btn-sm btn-danger">Delete</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info" role="alert">
+            <strong>No records found.</strong> <a asp-page="./Create">Create the first record</a>
+        </div>
+    }
+</div>
+
+<style>
+    .table-hover tbody tr:hover {
+        background-color: #f5f5f5;
+    }
+</style>
+<style>
+    .sortable { cursor: pointer; }
+    .sortable:after { content: '\25B4\25BE'; font-size: 0.6rem; color: #ddd; padding-left: 6px; }
+    .sortable.sorted-asc:after { content: '\25B4'; color: #444; }
+    .sortable.sorted-desc:after { content: '\25BE'; color: #444; }
+</style>
+
+<script>
+    (function(){
+        function parseValue(val, type){
+            if (!val) return null;
+            val = val.trim();
+            if (type === 'number'){
+                var n = parseFloat(val.replace(/,/g,''));
+                return isNaN(n) ? null : n;
+            }
+            return val.toLowerCase();
+        }
+
+        function sortTable(table, colIndex, type, asc){
+            var tbody = table.tBodies[0];
+            var rows = Array.from(tbody.querySelectorAll('tr'));
+            rows.sort(function(a,b){
+                var aText = a.children[colIndex].innerText || '';
+                var bText = b.children[colIndex].innerText || '';
+                var aVal = parseValue(aText, type);
+                var bVal = parseValue(bText, type);
+                if (aVal === null && bVal === null) return 0;
+                if (aVal === null) return 1;
+                if (bVal === null) return -1;
+                if (aVal < bVal) return asc ? -1 : 1;
+                if (aVal > bVal) return asc ? 1 : -1;
+                return 0;
+            });
+            rows.forEach(function(r){ tbody.appendChild(r); });
+        }
+
+        document.addEventListener('DOMContentLoaded', function(){
+            var table = document.querySelector('.tin200-table');
+            if (!table) return;
+            var headers = table.querySelectorAll('th.sortable');
+            headers.forEach(function(h){
+                var colIndex = Array.prototype.indexOf.call(h.parentNode.children, h);
+                var type = h.getAttribute('data-type') || 'string';
+                var asc = true;
+                h.addEventListener('click', function(){
+                    headers.forEach(function(h2){ h2.classList.remove('sorted-asc','sorted-desc'); });
+                    sortTable(table, colIndex, type, asc);
+                    h.classList.add(asc ? 'sorted-asc' : 'sorted-desc');
+                    asc = !asc;
+                });
+            });
+        });
+    })();
+</script>
+<style>
+    .tin200-table { font-size: 0.85rem; }
+    @@media (max-width: 768px) {
+        .tin200-table { font-size: 0.75rem; }
+    }
+</style>

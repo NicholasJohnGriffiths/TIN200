@@ -1,0 +1,84 @@
+@page "{id}"
+@model TINWorkspaceTemp.Pages.Tin200.EditModel
+@{
+    ViewData["Title"] = "Edit TIN200 Record";
+}
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8">
+            <h1>Edit TIN200 Record</h1>
+            <hr />
+            <form method="post">
+                <input type="hidden" asp-for="Record.Id" />
+
+                <div class="form-group mb-3">
+                    <label asp-for="Record.CeoFirstName" class="form-label"></label>
+                    <input asp-for="Record.CeoFirstName" class="form-control" />
+                    <span asp-validation-for="Record.CeoFirstName" class="text-danger"></span>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label asp-for="Record.CeoLastName" class="form-label"></label>
+                    <input asp-for="Record.CeoLastName" class="form-control" />
+                    <span asp-validation-for="Record.CeoLastName" class="text-danger"></span>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label asp-for="Record.Email" class="form-label"></label>
+                    <input asp-for="Record.Email" type="email" class="form-control" />
+                    <span asp-validation-for="Record.Email" class="text-danger"></span>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label asp-for="Record.ExternalId" class="form-label"></label>
+                    <input asp-for="Record.ExternalId" class="form-control" />
+                    <span asp-validation-for="Record.ExternalId" class="text-danger"></span>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label asp-for="Record.CompanyName" class="form-label"></label>
+                    <input asp-for="Record.CompanyName" class="form-control" />
+                    <span asp-validation-for="Record.CompanyName" class="text-danger"></span>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label asp-for="Record.CompanyDescription" class="form-label"></label>
+                    <textarea asp-for="Record.CompanyDescription" class="form-control" rows="3"></textarea>
+                    <span asp-validation-for="Record.CompanyDescription" class="text-danger"></span>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label asp-for="Record.Fye2025" class="form-label"></label>
+                    <input asp-for="Record.Fye2025" type="number" class="form-control" />
+                    <span asp-validation-for="Record.Fye2025" class="text-danger"></span>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label asp-for="Record.Fye2024" class="form-label"></label>
+                    <input asp-for="Record.Fye2024" type="number" class="form-control" />
+                    <span asp-validation-for="Record.Fye2024" class="text-danger"></span>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label asp-for="Record.Fye2023" class="form-label"></label>
+                    <input asp-for="Record.Fye2023" type="number" class="form-control" />
+                    <span asp-validation-for="Record.Fye2023" class="text-danger"></span>
+                </div>
+
+                <!-- TIN200 identity column removed from edit form -->
+
+                <div class="form-group">
+                    <button type="submit" class="btn btn-success">Save Changes</button>
+                    <a asp-page="./Index" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

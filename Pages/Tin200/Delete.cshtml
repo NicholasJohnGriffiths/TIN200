@@ -1,0 +1,43 @@
+@page "{id}"
+@model TINWorkspaceTemp.Pages.Tin200.DeleteModel
+@{
+    ViewData["Title"] = "Delete TIN200 Record";
+}
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-6">
+            <h1>Delete TIN200 Record</h1>
+            <hr />
+
+            @if (Model.Record != null)
+            {
+                <div class="alert alert-warning" role="alert">
+                    <strong>Warning!</strong> You are about to delete this record. This action cannot be undone.
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h5 class="card-title">@Model.Record.CompanyName</h5>
+                        <p class="card-text">
+                            <strong>CEO:</strong> @Model.Record.CeoFirstName @Model.Record.CeoLastName<br />
+                            <strong>Email:</strong> @Model.Record.Email
+                        </p>
+                    </div>
+                </div>
+
+                <form method="post">
+                    <input type="hidden" asp-for="Record.Id" />
+                    <button type="submit" class="btn btn-danger me-2">Confirm Delete</button>
+                    <a asp-page="./Index" class="btn btn-secondary">Cancel</a>
+                </form>
+            }
+            else
+            {
+                <div class="alert alert-danger" role="alert">
+                    Record not found.
+                </div>
+            }
+        </div>
+    </div>
+</div>

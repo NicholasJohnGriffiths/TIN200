@@ -1,0 +1,16 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+Debug/
+Release/
+*.db
+appsettings.Development.json
+*.log
+*.pid
+thumbs.db
+node_modules/
+wwwroot/lib/

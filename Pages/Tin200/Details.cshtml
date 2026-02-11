@@ -1,0 +1,86 @@
+@page "{id}"
+@model TINWorkspaceTemp.Pages.Tin200.DetailsModel
+@{
+    ViewData["Title"] = "TIN200 Record Details";
+}
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8">
+            <h1>TIN200 Record Details</h1>
+            <hr />
+
+            @if (Model.Record != null)
+            {
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <h6 class="text-muted">CEO First Name</h6>
+                                <p>@(Model.Record.CeoFirstName ?? "N/A")</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-muted">CEO Last Name</h6>
+                                <p>@(Model.Record.CeoLastName ?? "N/A")</p>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <h6 class="text-muted">Email</h6>
+                                <p>@(Model.Record.Email ?? "N/A")</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-muted">External ID</h6>
+                                <p>@(Model.Record.ExternalId ?? "N/A")</p>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <h6 class="text-muted">Company Name</h6>
+                                <p>@(Model.Record.CompanyName ?? "N/A")</p>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <h6 class="text-muted">Company Description</h6>
+                                <p>@(Model.Record.CompanyDescription ?? "N/A")</p>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <h6 class="text-muted">FYE 2025</h6>
+                                <p>@(Model.Record.Fye2025.HasValue ? Model.Record.Fye2025.Value.ToString("C0") : "N/A")</p>
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="text-muted">FYE 2024</h6>
+                                <p>@(Model.Record.Fye2024.HasValue ? Model.Record.Fye2024.Value.ToString("C0") : "N/A")</p>
+                            </div>
+                            <div class="col-md-4">
+                                <h6 class="text-muted">FYE 2023</h6>
+                                <p>@(Model.Record.Fye2023.HasValue ? Model.Record.Fye2023.Value.ToString("C0") : "N/A")</p>
+                            </div>
+                        </div>
+
+                        <!-- TIN200 field intentionally not displayed -->
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <a asp-page="./Edit" asp-route-id="@Model.Record.Id" class="btn btn-warning">Edit</a>
+                    <a asp-page="./Delete" asp-route-id="@Model.Record.Id" class="btn btn-danger">Delete</a>
+                    <a asp-page="./Index" class="btn btn-secondary">Back to List</a>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-danger" role="alert">
+                    Record not found.
+                </div>
+            }
+        </div>
+    </div>
+</div>
