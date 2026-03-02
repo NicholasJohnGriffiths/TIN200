@@ -9,8 +9,11 @@ on:
 env:
   DOTNET_VERSION: '9.0.x'
   PROJECT_PATH: 'TINWorkspaceTemp.csproj'
-  AZURE_WEBAPP_PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-  AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+  AZURE_WEBAPP_NAME: ${{ vars.AZURE_WEBAPP_NAME }}
+  AZURE_WEBAPP_PUBLISH_PROFILE_SECRET: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+  AZURE_WEBAPP_PUBLISH_PROFILE_VAR: ${{ vars.AZURE_WEBAPP_PUBLISH_PROFILE }}
+  AZURE_CREDENTIALS_SECRET: ${{ secrets.AZURE_CREDENTIALS }}
+  AZURE_CREDENTIALS_VAR: ${{ vars.AZURE_CREDENTIALS }}
 
 jobs:
   build-and-deploy:
@@ -34,30 +37,54 @@ jobs:
       - name: Publish
         run: dotnet publish ${{ env.PROJECT_PATH }} --configuration Release --no-build --output ./publish
 
+      - name: Resolve deploy inputs
+        shell: bash
+        run: |
+          if [ -n "${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_SECRET }}" ]; then
+            echo "AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE=${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_SECRET }}" >> "$GITHUB_ENV"
+          elif [ -n "${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_VAR }}" ]; then
+            echo "AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE=${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_VAR }}" >> "$GITHUB_ENV"
+          else
+            echo "AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE=" >> "$GITHUB_ENV"
+          fi
+
+          if [ -n "${{ env.AZURE_CREDENTIALS_SECRET }}" ]; then
+            echo "AZURE_CREDENTIALS_EFFECTIVE=${{ env.AZURE_CREDENTIALS_SECRET }}" >> "$GITHUB_ENV"
+          elif [ -n "${{ env.AZURE_CREDENTIALS_VAR }}" ]; then
+            echo "AZURE_CREDENTIALS_EFFECTIVE=${{ env.AZURE_CREDENTIALS_VAR }}" >> "$GITHUB_ENV"
+          else
+            echo "AZURE_CREDENTIALS_EFFECTIVE=" >> "$GITHUB_ENV"
+          fi
+
       - name: Validate deploy credentials
         run: |
-          if [ -z "${{ env.AZURE_WEBAPP_PUBLISH_PROFILE }}" ] && [ -z "${{ env.AZURE_CREDENTIALS }}" ]; then
-            echo "No deploy credentials found. Configure AZURE_WEBAPP_PUBLISH_PROFILE or AZURE_CREDENTIALS in GitHub Secrets."
+          if [ -z "${{ env.AZURE_WEBAPP_NAME }}" ]; then
+            echo "Missing required repository variable: AZURE_WEBAPP_NAME"
+            exit 1
+          fi
+
+          if [ -z "${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE }}" ] && [ -z "${{ env.AZURE_CREDENTIALS_EFFECTIVE }}" ]; then
+            echo "No deploy credentials found. Configure AZURE_WEBAPP_PUBLISH_PROFILE or AZURE_CREDENTIALS as repository Secrets (preferred) or Variables."
             exit 1
           fi
 
       - name: Azure Login (Service Principal)
-        if: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE == '' && env.AZURE_CREDENTIALS != '' }}
+        if: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE == '' && env.AZURE_CREDENTIALS_EFFECTIVE != '' }}
         uses: azure/login@v2
         with:
-          creds: ${{ env.AZURE_CREDENTIALS }}
+          creds: ${{ env.AZURE_CREDENTIALS_EFFECTIVE }}
 
       - name: Deploy to Azure Web App (Publish Profile)
-        if: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE != '' }}
+        if: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE != '' }}
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE }}
           package: ./publish
 
       - name: Deploy to Azure Web App (Azure Login)
-        if: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE == '' && env.AZURE_CREDENTIALS != '' }}
+        if: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE == '' && env.AZURE_CREDENTIALS_EFFECTIVE != '' }}
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
           package: ./publish
