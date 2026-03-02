@@ -28,6 +28,8 @@ namespace TINWorkspaceTemp.Pages.Tin200
 
         public List<SurveyClientRow> AvailableClients { get; set; } = new();
 
+        public bool HasQueryPreselection { get; set; }
+
         [TempData]
         public string? StatusMessage { get; set; }
 
@@ -46,9 +48,19 @@ namespace TINWorkspaceTemp.Pages.Tin200
         [TempData]
         public string? BulkLastRunAt { get; set; }
 
-        public async Task<IActionResult> OnGetAsync()
+        public async Task<IActionResult> OnGetAsync(int? id)
         {
             await LoadAvailableClientsAsync();
+
+            if (id.HasValue)
+            {
+                var selectedClient = AvailableClients.FirstOrDefault(c => c.Id == id.Value);
+                if (selectedClient != null && !string.IsNullOrWhiteSpace(selectedClient.Email))
+                {
+                    SelectedClientIds = new List<int> { id.Value };
+                    HasQueryPreselection = true;
+                }
+            }
 
             return Page();
         }

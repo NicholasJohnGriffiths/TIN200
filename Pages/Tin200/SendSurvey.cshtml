@@ -66,9 +66,15 @@
                                 <thead class="table-light">
                                     <tr>
                                         <th style="width: 80px;">Select</th>
-                                        <th style="width: 80px;">ID</th>
-                                        <th>Company</th>
-                                        <th>Email</th>
+                                        <th style="width: 80px;">
+                                            <button type="button" class="btn btn-link p-0 sort-header" data-sort-key="id">ID</button>
+                                        </th>
+                                        <th>
+                                            <button type="button" class="btn btn-link p-0 sort-header" data-sort-key="company">Company</button>
+                                        </th>
+                                        <th>
+                                            <button type="button" class="btn btn-link p-0 sort-header" data-sort-key="email">Email</button>
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -76,11 +82,13 @@
                                     {
                                         var hasEmail = !string.IsNullOrWhiteSpace(clientRow.Email);
                                         var searchText = $"{clientRow.Id} {clientRow.CompanyName} {clientRow.Email}".ToLowerInvariant();
-                                        <tr data-search="@searchText" data-has-email="@(hasEmail ? "true" : "false")">
+                                        var companySort = (clientRow.CompanyName ?? string.Empty).ToLowerInvariant();
+                                        var emailSort = (clientRow.Email ?? string.Empty).ToLowerInvariant();
+                                        <tr data-search="@searchText" data-has-email="@(hasEmail ? "true" : "false")" data-id="@clientRow.Id" data-company="@companySort" data-email="@emailSort">
                                             <td>
                                                 @if (hasEmail)
                                                 {
-                                                    <input class="form-check-input client-selector" type="checkbox" name="SelectedClientIds" value="@clientRow.Id" />
+                                                    <input class="form-check-input client-selector" type="checkbox" name="SelectedClientIds" value="@clientRow.Id" checked="@Model.SelectedClientIds.Contains(clientRow.Id)" />
                                                 }
                                                 else
                                                 {
@@ -127,13 +135,18 @@
             const sendToAllToggle = document.getElementById('SendToAllClients');
             const searchInput = document.getElementById('clientSearchInput');
             const filterButtons = Array.from(document.querySelectorAll('.client-filter-btn'));
+            const sortButtons = Array.from(document.querySelectorAll('.sort-header'));
             const selectableCheckboxes = Array.from(document.querySelectorAll('.client-selector:not([disabled])'));
+            const tbody = document.querySelector('tbody');
             const url = new URL(window.location.href);
             const storageKey = 'tin200_send_survey_selected_clients';
             const clearSavedSelectionsAfterSend = @Model.BulkSendSucceeded.ToString().ToLowerInvariant();
+            const hasQueryPreselection = @Model.HasQueryPreselection.ToString().ToLowerInvariant();
             let searchParam = null;
             let filterParam = null;
             let activeFilter = 'all';
+            let sortKey = 'company';
+            let sortDir = 'asc';
 
             if (!selectAllBtn || !clearAllBtn) {
                 return;
@@ -148,6 +161,15 @@
 
             searchParam = url.searchParams.get('search');
             filterParam = url.searchParams.get('filter');
+
+            const sortParam = (url.searchParams.get('sort') || '').toLowerCase();
+            const sortDirParam = (url.searchParams.get('dir') || '').toLowerCase();
+            if (['id', 'company', 'email'].includes(sortParam)) {
+                sortKey = sortParam;
+            }
+            if (['asc', 'desc'].includes(sortDirParam)) {
+                sortDir = sortDirParam;
+            }
 
             const getCheckboxes = () => Array.from(document.querySelectorAll('.client-selector:not([disabled])'));
             const getVisibleRows = () => Array.from(document.querySelectorAll('tbody tr')).filter(row => row.style.display !== 'none');
@@ -198,7 +220,69 @@
                     url.searchParams.delete('filter');
                 }
 
+                if (sortKey !== 'company') {
+                    url.searchParams.set('sort', sortKey);
+                } else {
+                    url.searchParams.delete('sort');
+                }
+
+                if (sortDir !== 'asc') {
+                    url.searchParams.set('dir', sortDir);
+                } else {
+                    url.searchParams.delete('dir');
+                }
+
                 window.history.replaceState({}, '', url.toString());
+            };
+
+            const setSortButtonText = () => {
+                sortButtons.forEach(function (btn) {
+                    const key = btn.getAttribute('data-sort-key');
+                    const baseLabel = (key || '').charAt(0).toUpperCase() + (key || '').slice(1);
+                    if (key === sortKey) {
+                        btn.textContent = `${baseLabel} ${sortDir === 'asc' ? '↑' : '↓'}`;
+                    } else {
+                        btn.textContent = baseLabel;
+                    }
+                });
+            };
+
+            const applySort = () => {
+                if (!tbody) {
+                    return;
+                }
+
+                const rows = Array.from(tbody.querySelectorAll('tr[data-search]'));
+                rows.sort(function (a, b) {
+                    let aVal;
+                    let bVal;
+
+                    if (sortKey === 'id') {
+                        aVal = parseInt(a.getAttribute('data-id') || '0', 10);
+                        bVal = parseInt(b.getAttribute('data-id') || '0', 10);
+                    } else if (sortKey === 'email') {
+                        aVal = a.getAttribute('data-email') || '';
+                        bVal = b.getAttribute('data-email') || '';
+                    } else {
+                        aVal = a.getAttribute('data-company') || '';
+                        bVal = b.getAttribute('data-company') || '';
+                    }
+
+                    if (aVal < bVal) {
+                        return sortDir === 'asc' ? -1 : 1;
+                    }
+                    if (aVal > bVal) {
+                        return sortDir === 'asc' ? 1 : -1;
+                    }
+                    return 0;
+                });
+
+                rows.forEach(function (row) {
+                    tbody.appendChild(row);
+                });
+
+                setSortButtonText();
+                syncUrlState();
             };
 
             const setActiveFilterButton = () => {
@@ -238,6 +322,8 @@
 
             setActiveFilterButton();
 
+            setSortButtonText();
+
             if (searchInput) {
                 searchInput.addEventListener('input', function () {
                     applyFilters();
@@ -252,9 +338,28 @@
                 });
             });
 
+            sortButtons.forEach(function (button) {
+                button.addEventListener('click', function () {
+                    const clickedKey = button.getAttribute('data-sort-key') || 'company';
+                    if (sortKey === clickedKey) {
+                        sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        sortKey = clickedKey;
+                        sortDir = 'asc';
+                    }
+                    applySort();
+                });
+            });
+
+            applySort();
+
             applyFilters();
 
-            restoreSelections();
+            if (hasQueryPreselection) {
+                saveSelections();
+            } else {
+                restoreSelections();
+            }
 
             selectAllBtn.addEventListener('click', function () {
                 getVisibleRows().forEach(function (row) {
