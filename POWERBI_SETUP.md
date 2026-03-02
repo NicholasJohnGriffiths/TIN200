@@ -7,8 +7,9 @@ This guide covers setting up the Power BI views and connecting Power BI Desktop 
 
 Run these scripts in this exact order against the target database:
 
-1. `Migrations/003_UpdateTin200FieldNames.sql`
-2. `Migrations/001_CreatePowerBIViews.sql`
+1. `Migrations/000_CreateTin200Table.sql`
+2. `Migrations/003_UpdateTin200FieldNames.sql`
+3. `Migrations/001_CreatePowerBIViews.sql`
 
 ## Database Views Created
 4 optimized SQL Server views have been created for Power BI analytics:
@@ -24,9 +25,10 @@ Run these scripts in this exact order against the target database:
 1. Open SQL Server Management Studio
 2. Connect to: `VivoTouchMar23\MSSQLSERVER01`
 3. Select database: `TIN`
-4. Open and execute: `Migrations/003_UpdateTin200FieldNames.sql`
-5. Open and execute: `Migrations/001_CreatePowerBIViews.sql`
-6. Verify views appear in Object Explorer → Views folder
+4. Open and execute: `Migrations/000_CreateTin200Table.sql`
+5. Open and execute: `Migrations/003_UpdateTin200FieldNames.sql`
+6. Open and execute: `Migrations/001_CreatePowerBIViews.sql`
+7. Verify table and views appear in Object Explorer
 
 ### Option B: Using Entity Framework (Recommended for .NET Integration)
 ```powershell

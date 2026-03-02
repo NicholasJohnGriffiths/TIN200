@@ -8,10 +8,12 @@ namespace TINWorkspaceTemp.Services
     public class Tin200Service
     {
         private readonly ApplicationDbContext _context;
+        private readonly ILogger<Tin200Service> _logger;
 
-        public Tin200Service(ApplicationDbContext context)
+        public Tin200Service(ApplicationDbContext context, ILogger<Tin200Service> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         public async Task<List<Tin200>> GetAllTin200Async(int? financialYear = null)
@@ -32,14 +34,16 @@ namespace TINWorkspaceTemp.Services
                 }
                 return await query.OrderByDescending(t => t.Id).ToListAsync();
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Primary TIN200 query failed.");
                 try
                 {
                     return await GetAllTin200FallbackAsync(financialYear);
                 }
-                catch
+                catch (Exception fallbackEx)
                 {
+                    _logger.LogError(fallbackEx, "Fallback TIN200 query failed.");
                     return new List<Tin200>();
                 }
             }
@@ -67,8 +71,9 @@ namespace TINWorkspaceTemp.Services
                 if (await _context.Tin200.AnyAsync(t => t.Fye2023 != null)) fallbackYears.Add(2023);
                 return fallbackYears;
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to read available financial years from TIN200.");
                 try
                 {
                     var rows = await GetAllTin200FallbackAsync();
@@ -78,8 +83,9 @@ namespace TINWorkspaceTemp.Services
                     if (rows.Any(r => r.Fye2023 != null)) years.Add(2023);
                     return years;
                 }
-                catch
+                catch (Exception fallbackEx)
                 {
+                    _logger.LogError(fallbackEx, "Fallback failed to derive financial years from TIN200.");
                     return new List<int>();
                 }
             }
@@ -91,15 +97,17 @@ namespace TINWorkspaceTemp.Services
             {
                 return await _context.Tin200.FindAsync(id);
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogError(ex, "Failed to load TIN200 record by id {Id}.", id);
                 try
                 {
                     var all = await GetAllTin200FallbackAsync();
                     return all.FirstOrDefault(x => x.Id == id);
                 }
-                catch
+                catch (Exception fallbackEx)
                 {
+                    _logger.LogError(fallbackEx, "Fallback failed to load TIN200 record by id {Id}.", id);
                     return null;
                 }
             }

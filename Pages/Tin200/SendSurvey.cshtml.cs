@@ -82,6 +82,7 @@ namespace TINWorkspaceTemp.Pages.Tin200
             var sentCount = 0;
             var skippedNoEmailCount = 0;
             var failedCount = 0;
+            string? firstFailureReason = null;
 
             foreach (var clientRow in selected)
             {
@@ -98,9 +99,10 @@ namespace TINWorkspaceTemp.Pages.Tin200
                     await _surveyEmailService.SendSurveyLinkAsync(clientRow.Email, surveyUrl, clientRow.CompanyName, clientRow.Id);
                     sentCount++;
                 }
-                catch
+                catch (Exception ex)
                 {
                     failedCount++;
+                    firstFailureReason ??= ex.Message;
                 }
             }
 
@@ -112,7 +114,10 @@ namespace TINWorkspaceTemp.Pages.Tin200
 
             if (failedCount > 0)
             {
-                ModelState.AddModelError(string.Empty, "Some emails could not be sent. Please check SMTP settings and retry.");
+                var detail = string.IsNullOrWhiteSpace(firstFailureReason)
+                    ? string.Empty
+                    : $" First error: {firstFailureReason}";
+                ModelState.AddModelError(string.Empty, $"Some emails could not be sent. Please check SMTP settings and retry.{detail}");
                 return Page();
             }
 
