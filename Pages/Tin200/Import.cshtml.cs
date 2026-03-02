@@ -167,7 +167,7 @@ namespace TINWorkspaceTemp.Pages.Tin200
                             {
                                 using var lookup = conn.CreateCommand();
                                 lookup.Transaction = tran;
-                                lookup.CommandText = "SELECT TOP (1) [Id] FROM [TIN200] WHERE [External ID] = @externalId";
+                                lookup.CommandText = "SELECT TOP (1) Id FROM TIN200 WHERE ExternalId = @externalId";
                                 lookup.Parameters.AddWithValue("@externalId", (object?)externalId ?? DBNull.Value);
                                 var r = await lookup.ExecuteScalarAsync();
                                 if (r != null && r != DBNull.Value) existingId = Convert.ToInt32(r);
@@ -177,7 +177,7 @@ namespace TINWorkspaceTemp.Pages.Tin200
                             {
                                 using var lookup2 = conn.CreateCommand();
                                 lookup2.Transaction = tran;
-                                lookup2.CommandText = "SELECT TOP (1) [Id] FROM [TIN200] WHERE [Company Name] = @companyName";
+                                lookup2.CommandText = "SELECT TOP (1) Id FROM TIN200 WHERE CompanyName = @companyName";
                                 lookup2.Parameters.AddWithValue("@companyName", (object?)companyName ?? DBNull.Value);
                                 var r2 = await lookup2.ExecuteScalarAsync();
                                 if (r2 != null && r2 != DBNull.Value) existingId = Convert.ToInt32(r2);
@@ -188,17 +188,17 @@ namespace TINWorkspaceTemp.Pages.Tin200
                                 using var cmd = conn.CreateCommand();
                                 cmd.Transaction = tran;
                                 cmd.CommandText = @"
-UPDATE [TIN200]
-SET [CEO First Name ] = @ceoFirst,
-    [CEO Last Name ] = @ceoLast,
-    [Email ] = @email,
-    [External ID] = @externalId,
-    [Company Name] = @companyName,
-    [Company Description] = @companyDesc,
-    [FYE 2025] = @fye2025,
-    [FYE 2024] = @fye2024,
-    [FYE 2023] = @fye2023
-WHERE [Id] = @id";
+UPDATE TIN200
+SET CeoFirstName = @ceoFirst,
+    CeoLastName = @ceoLast,
+    Email = @email,
+    ExternalId = @externalId,
+    CompanyName = @companyName,
+    CompanyDescription = @companyDesc,
+    Fye2025 = @fye2025,
+    Fye2024 = @fye2024,
+    Fye2023 = @fye2023
+WHERE Id = @id";
                                 cmd.Parameters.AddWithValue("@ceoFirst", (object?)ceoFirst ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@ceoLast", (object?)ceoLast ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@email", (object?)email ?? DBNull.Value);
@@ -218,7 +218,7 @@ WHERE [Id] = @id";
                                 using var cmd = conn.CreateCommand();
                                 cmd.Transaction = tran;
                                 cmd.CommandText = @"
-INSERT INTO [TIN200] ([CEO First Name ], [CEO Last Name ], [Email ], [External ID], [Company Name], [Company Description], [FYE 2025], [FYE 2024], [FYE 2023], [TIN200])
+INSERT INTO TIN200 (CeoFirstName, CeoLastName, Email, ExternalId, CompanyName, CompanyDescription, Fye2025, Fye2024, Fye2023, TIN200)
 VALUES (@ceoFirst, @ceoLast, @email, @externalId, @companyName, @companyDesc, @fye2025, @fye2024, @fye2023, @tin200)";
                                 cmd.Parameters.AddWithValue("@ceoFirst", (object?)ceoFirst ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@ceoLast", (object?)ceoLast ?? DBNull.Value);

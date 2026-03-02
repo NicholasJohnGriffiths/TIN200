@@ -17,8 +17,8 @@ This guide covers setting up the Power BI views and connecting Power BI Desktop 
 1. Open SQL Server Management Studio
 2. Connect to: `VivoTouchMar23\MSSQLSERVER01`
 3. Select database: `TIN`
-4. Open the migration file: `Migrations/001_CreatePowerBIViews.sql`
-5. Execute (F5) the entire script
+4. Open and execute: `Migrations/002_RenameTin200Columns_CleanNames.sql`
+5. Open and execute: `Migrations/001_CreatePowerBIViews.sql`
 6. Verify views appear in Object Explorer → Views folder
 
 ### Option B: Using Entity Framework (Recommended for .NET Integration)

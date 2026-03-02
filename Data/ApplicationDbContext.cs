@@ -29,12 +29,12 @@ namespace TINWorkspaceTemp.Data
                     .ValueGeneratedOnAdd();
                 
                 entity.Property(e => e.CeoFirstName)
-                    .HasColumnName("CEO First Name")
+                    .HasColumnName("CeoFirstName")
                     .HasColumnType("varchar(255)")
                     .HasMaxLength(255);
                 
                 entity.Property(e => e.CeoLastName)
-                    .HasColumnName("CEO Last Name")
+                    .HasColumnName("CeoLastName")
                     .HasColumnType("varchar(255)")
                     .HasMaxLength(255);
                 
@@ -44,30 +44,30 @@ namespace TINWorkspaceTemp.Data
                     .HasMaxLength(255);
                 
                 entity.Property(e => e.ExternalId)
-                    .HasColumnName("External ID")
+                    .HasColumnName("ExternalId")
                     .HasColumnType("varchar(50)")
                     .HasMaxLength(50);
                 
                 entity.Property(e => e.CompanyName)
-                    .HasColumnName("Company Name")
+                    .HasColumnName("CompanyName")
                     .HasColumnType("varchar(255)")
                     .HasMaxLength(255);
                 
                 entity.Property(e => e.CompanyDescription)
-                    .HasColumnName("Company Description")
+                    .HasColumnName("CompanyDescription")
                     .HasColumnType("varchar(255)")
                     .HasMaxLength(255);
                 
                 entity.Property(e => e.Fye2025)
-                    .HasColumnName("FYE 2025")
+                    .HasColumnName("Fye2025")
                     .HasColumnType("decimal(18, 0)");
                 
                 entity.Property(e => e.Fye2024)
-                    .HasColumnName("FYE 2024")
+                    .HasColumnName("Fye2024")
                     .HasColumnType("decimal(18, 0)");
                 
                 entity.Property(e => e.Fye2023)
-                    .HasColumnName("FYE 2023")
+                    .HasColumnName("Fye2023")
                     .HasColumnType("decimal(18, 0)");
 
                 // TIN200 column exists in the database but is intentionally not mapped to the model
