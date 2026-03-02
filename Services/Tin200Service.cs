@@ -18,19 +18,37 @@ namespace TINWorkspaceTemp.Services
             var query = _context.Tin200.AsQueryable();
             if (financialYear.HasValue)
             {
-                query = query.Where(t => t.FinancialYear == financialYear.Value);
+                query = financialYear.Value switch
+                {
+                    2025 => query.Where(t => t.Fye2025 != null),
+                    2024 => query.Where(t => t.Fye2024 != null),
+                    2023 => query.Where(t => t.Fye2023 != null),
+                    _ => query
+                };
             }
             return await query.OrderByDescending(t => t.Id).ToListAsync();
         }
 
         public async Task<List<int>> GetAvailableFinancialYearsAsync()
         {
-            return await _context.Tin200
-                .Where(t => t.FinancialYear != null)
-                .Select(t => t.FinancialYear!.Value)
-                .Distinct()
-                .OrderByDescending(y => y)
-                .ToListAsync();
+            var years = new List<int>();
+
+            if (await _context.Tin200.AnyAsync(t => t.Fye2025 != null))
+            {
+                years.Add(2025);
+            }
+
+            if (await _context.Tin200.AnyAsync(t => t.Fye2024 != null))
+            {
+                years.Add(2024);
+            }
+
+            if (await _context.Tin200.AnyAsync(t => t.Fye2023 != null))
+            {
+                years.Add(2023);
+            }
+
+            return years;
         }
 
         public async Task<Tin200?> GetTin200ByIdAsync(int id)

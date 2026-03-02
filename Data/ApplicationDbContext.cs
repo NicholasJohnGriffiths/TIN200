@@ -70,10 +70,6 @@ namespace TINWorkspaceTemp.Data
                     .HasColumnName("FYE 2023")
                     .HasColumnType("decimal(18, 0)");
 
-                entity.Property(e => e.FinancialYear)
-                    .HasColumnName("FinancialYear")
-                    .HasColumnType("int");
-                
                 // TIN200 column exists in the database but is intentionally not mapped to the model
             });
 
