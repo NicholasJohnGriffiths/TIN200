@@ -4,7 +4,7 @@
     ViewData["Title"] = "TIN200 Records";
 }
 
-<div class="container mt-4">
+<div class="container-fluid px-0 mt-3">
     <div class="row mb-4">
         <div class="col-md-8">
             <h1>TIN200 Records</h1>
@@ -17,7 +17,7 @@
     </div>
 
     <div class="row mb-3">
-        <div class="col-md-4">
+        <div class="col-12">
             <form method="get" class="d-flex">
                 <label class="me-2 align-self-center">Filter Year:</label>
                 <select name="year" class="form-select me-2" aria-label="Financial Year">
@@ -65,10 +65,10 @@
                             <td>@(record.Fye2024.HasValue ? record.Fye2024.Value.ToString("C0") : "")</td>
                             <td>@(record.Fye2023.HasValue ? record.Fye2023.Value.ToString("C0") : "")</td>
                             <td>@record.FinancialYear</td>
-                            <td>
+                            <td class="actions-col">
                                 <a asp-page="./Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
                                 <a asp-page="./Edit" asp-route-id="@record.Id" class="btn btn-sm btn-warning">Edit</a>
-                                <a asp-page="./SendSurvey" asp-route-id="@record.Id" class="btn btn-sm btn-primary">Send Survey</a>
+                                <a asp-page="./SendSurvey" asp-route-id="@record.Id" class="btn btn-sm btn-primary">Survey</a>
                                 <a asp-page="./Delete" asp-route-id="@record.Id" class="btn btn-sm btn-danger">Delete</a>
                             </td>
                         </tr>
@@ -146,8 +146,12 @@
     })();
 </script>
 <style>
-    .tin200-table { font-size: 0.85rem; }
+    .tin200-table { font-size: 0.8rem; }
+    .tin200-table th,
+    .tin200-table td { padding: 0.35rem 0.45rem; }
+    .tin200-table td.actions-col { white-space: nowrap; min-width: 260px; }
     @@media (max-width: 768px) {
-        .tin200-table { font-size: 0.75rem; }
+        .tin200-table { font-size: 0.72rem; }
+        .tin200-table td.actions-col { min-width: 230px; }
     }
 </style>
