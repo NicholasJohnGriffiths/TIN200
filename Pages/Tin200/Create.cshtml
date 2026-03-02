@@ -64,6 +64,12 @@
                     <span asp-validation-for="Record.Fye2023" class="text-danger"></span>
                 </div>
 
+                <div class="form-group mb-3">
+                    <label asp-for="Record.FinancialYear" class="form-label"></label>
+                    <input asp-for="Record.FinancialYear" type="number" class="form-control" />
+                    <span asp-validation-for="Record.FinancialYear" class="text-danger"></span>
+                </div>
+
                 <!-- TIN200 identity column removed from create form -->
 
                 <div class="form-group">

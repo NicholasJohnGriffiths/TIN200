@@ -48,6 +48,7 @@
                         <th class="sortable" data-type="number">FYE 2025</th>
                         <th class="sortable" data-type="number">FYE 2024</th>
                         <th class="sortable" data-type="number">FYE 2023</th>
+                        <th class="sortable" data-type="number">Financial Year</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -63,6 +64,7 @@
                             <td>@(record.Fye2025.HasValue ? record.Fye2025.Value.ToString("C0") : "")</td>
                             <td>@(record.Fye2024.HasValue ? record.Fye2024.Value.ToString("C0") : "")</td>
                             <td>@(record.Fye2023.HasValue ? record.Fye2023.Value.ToString("C0") : "")</td>
+                            <td>@record.FinancialYear</td>
                             <td>
                                 <a asp-page="./Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
                                 <a asp-page="./Edit" asp-route-id="@record.Id" class="btn btn-sm btn-warning">Edit</a>
