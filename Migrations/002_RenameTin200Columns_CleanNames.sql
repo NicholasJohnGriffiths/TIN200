@@ -3,20 +3,20 @@
 
 SET NOCOUNT ON;
 
-IF COL_LENGTH('dbo.TIN200', 'CeoFirstName') IS NULL
+IF COL_LENGTH('dbo.TIN200', 'CEOFirstName') IS NULL
 BEGIN
     IF COL_LENGTH('dbo.TIN200', 'CEO First Name ') IS NOT NULL
-        EXEC sp_rename 'dbo.TIN200.[CEO First Name ]', 'CeoFirstName', 'COLUMN';
+        EXEC sp_rename 'dbo.TIN200.[CEO First Name ]', 'CEOFirstName', 'COLUMN';
     ELSE IF COL_LENGTH('dbo.TIN200', 'CEO First Name') IS NOT NULL
-        EXEC sp_rename 'dbo.TIN200.[CEO First Name]', 'CeoFirstName', 'COLUMN';
+        EXEC sp_rename 'dbo.TIN200.[CEO First Name]', 'CEOFirstName', 'COLUMN';
 END;
 
-IF COL_LENGTH('dbo.TIN200', 'CeoLastName') IS NULL
+IF COL_LENGTH('dbo.TIN200', 'CEOLastName') IS NULL
 BEGIN
     IF COL_LENGTH('dbo.TIN200', 'CEO Last Name ') IS NOT NULL
-        EXEC sp_rename 'dbo.TIN200.[CEO Last Name ]', 'CeoLastName', 'COLUMN';
+        EXEC sp_rename 'dbo.TIN200.[CEO Last Name ]', 'CEOLastName', 'COLUMN';
     ELSE IF COL_LENGTH('dbo.TIN200', 'CEO Last Name') IS NOT NULL
-        EXEC sp_rename 'dbo.TIN200.[CEO Last Name]', 'CeoLastName', 'COLUMN';
+        EXEC sp_rename 'dbo.TIN200.[CEO Last Name]', 'CEOLastName', 'COLUMN';
 END;
 
 IF COL_LENGTH('dbo.TIN200', 'Email') IS NULL
@@ -25,10 +25,10 @@ BEGIN
         EXEC sp_rename 'dbo.TIN200.[Email ]', 'Email', 'COLUMN';
 END;
 
-IF COL_LENGTH('dbo.TIN200', 'ExternalId') IS NULL
+IF COL_LENGTH('dbo.TIN200', 'ExternalID') IS NULL
 BEGIN
     IF COL_LENGTH('dbo.TIN200', 'External ID') IS NOT NULL
-        EXEC sp_rename 'dbo.TIN200.[External ID]', 'ExternalId', 'COLUMN';
+    EXEC sp_rename 'dbo.TIN200.[External ID]', 'ExternalID', 'COLUMN';
 END;
 
 IF COL_LENGTH('dbo.TIN200', 'CompanyName') IS NULL
@@ -43,22 +43,22 @@ BEGIN
         EXEC sp_rename 'dbo.TIN200.[Company Description]', 'CompanyDescription', 'COLUMN';
 END;
 
-IF COL_LENGTH('dbo.TIN200', 'Fye2025') IS NULL
+IF COL_LENGTH('dbo.TIN200', 'FYE2025') IS NULL
 BEGIN
     IF COL_LENGTH('dbo.TIN200', 'FYE 2025') IS NOT NULL
-        EXEC sp_rename 'dbo.TIN200.[FYE 2025]', 'Fye2025', 'COLUMN';
+    EXEC sp_rename 'dbo.TIN200.[FYE 2025]', 'FYE2025', 'COLUMN';
 END;
 
-IF COL_LENGTH('dbo.TIN200', 'Fye2024') IS NULL
+IF COL_LENGTH('dbo.TIN200', 'FYE2024') IS NULL
 BEGIN
     IF COL_LENGTH('dbo.TIN200', 'FYE 2024') IS NOT NULL
-        EXEC sp_rename 'dbo.TIN200.[FYE 2024]', 'Fye2024', 'COLUMN';
+    EXEC sp_rename 'dbo.TIN200.[FYE 2024]', 'FYE2024', 'COLUMN';
 END;
 
-IF COL_LENGTH('dbo.TIN200', 'Fye2023') IS NULL
+IF COL_LENGTH('dbo.TIN200', 'FYE2023') IS NULL
 BEGIN
     IF COL_LENGTH('dbo.TIN200', 'FYE 2023') IS NOT NULL
-        EXEC sp_rename 'dbo.TIN200.[FYE 2023]', 'Fye2023', 'COLUMN';
+    EXEC sp_rename 'dbo.TIN200.[FYE 2023]', 'FYE2023', 'COLUMN';
 END;
 
 -- After running this script, run 001_CreatePowerBIViews.sql to recreate views

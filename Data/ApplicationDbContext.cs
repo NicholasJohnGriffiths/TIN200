@@ -29,12 +29,12 @@ namespace TINWorkspaceTemp.Data
                     .ValueGeneratedOnAdd();
                 
                 entity.Property(e => e.CeoFirstName)
-                    .HasColumnName("CeoFirstName")
+                    .HasColumnName("CEOFirstName")
                     .HasColumnType("varchar(255)")
                     .HasMaxLength(255);
                 
                 entity.Property(e => e.CeoLastName)
-                    .HasColumnName("CeoLastName")
+                    .HasColumnName("CEOLastName")
                     .HasColumnType("varchar(255)")
                     .HasMaxLength(255);
                 
@@ -44,7 +44,7 @@ namespace TINWorkspaceTemp.Data
                     .HasMaxLength(255);
                 
                 entity.Property(e => e.ExternalId)
-                    .HasColumnName("ExternalId")
+                    .HasColumnName("ExternalID")
                     .HasColumnType("varchar(50)")
                     .HasMaxLength(50);
                 
@@ -59,15 +59,15 @@ namespace TINWorkspaceTemp.Data
                     .HasMaxLength(255);
                 
                 entity.Property(e => e.Fye2025)
-                    .HasColumnName("Fye2025")
+                    .HasColumnName("FYE2025")
                     .HasColumnType("decimal(18, 0)");
                 
                 entity.Property(e => e.Fye2024)
-                    .HasColumnName("Fye2024")
+                    .HasColumnName("FYE2024")
                     .HasColumnType("decimal(18, 0)");
                 
                 entity.Property(e => e.Fye2023)
-                    .HasColumnName("Fye2023")
+                    .HasColumnName("FYE2023")
                     .HasColumnType("decimal(18, 0)");
 
                 // TIN200 column exists in the database but is intentionally not mapped to the model
