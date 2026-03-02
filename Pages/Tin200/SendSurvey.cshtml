@@ -8,7 +8,7 @@
     <div class="row">
         <div class="col-md-10">
             <h1>Send Client Survey</h1>
-            <p class="text-muted">Send a secure data update survey link to one client, selected clients, or all clients.</p>
+            <p class="text-muted">Send a secure data update survey link to selected clients or all clients.</p>
             <hr />
 
             @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
@@ -35,44 +35,6 @@
             }
 
             <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
-
-            <div class="card mb-4">
-                <div class="card-header">Send to One Client</div>
-                <div class="card-body">
-                    <form method="post" asp-page-handler="Single">
-                        <div class="form-group mb-3">
-                            <label asp-for="ClientId" class="form-label">Client ID</label>
-                            <input asp-for="ClientId" class="form-control" type="number" min="1" />
-                            <span asp-validation-for="ClientId" class="text-danger"></span>
-                        </div>
-
-                        <div class="form-group mb-3">
-                            <label asp-for="RecipientEmail" class="form-label">Recipient Email</label>
-                            <input asp-for="RecipientEmail" class="form-control" type="email" />
-                            <small class="form-text text-muted">Leave blank to use the email stored for this client.</small>
-                            <span asp-validation-for="RecipientEmail" class="text-danger"></span>
-                        </div>
-
-                        @if (Model.Client != null)
-                        {
-                            <div class="alert alert-info" role="alert">
-                                <strong>Client:</strong> @Model.Client.CompanyName (ID: @Model.Client.Id)<br />
-                                <strong>Current Email:</strong> @Model.Client.Email
-                            </div>
-                        }
-
-                        @if (!string.IsNullOrWhiteSpace(Model.SurveyUrl))
-                        {
-                            <div class="mb-3">
-                                <label class="form-label">Survey Link</label>
-                                <input class="form-control" value="@Model.SurveyUrl" readonly />
-                            </div>
-                        }
-
-                        <button type="submit" class="btn btn-primary">Send Survey Email</button>
-                    </form>
-                </div>
-            </div>
 
             <div class="card mb-3">
                 <div class="card-header">Bulk Send</div>
@@ -162,6 +124,7 @@
         (function () {
             const selectAllBtn = document.getElementById('selectAllClientsBtn');
             const clearAllBtn = document.getElementById('clearAllClientsBtn');
+            const sendToAllToggle = document.getElementById('SendToAllClients');
             const searchInput = document.getElementById('clientSearchInput');
             const filterButtons = Array.from(document.querySelectorAll('.client-filter-btn'));
             const selectableCheckboxes = Array.from(document.querySelectorAll('.client-selector:not([disabled])'));
@@ -305,8 +268,26 @@
 
             clearAllBtn.addEventListener('click', function () {
                 getCheckboxes().forEach(cb => cb.checked = false);
+                if (sendToAllToggle) {
+                    sendToAllToggle.checked = false;
+                }
                 saveSelections();
             });
+
+            if (sendToAllToggle) {
+                const applySendToAllSelection = () => {
+                    getCheckboxes().forEach(function (cb) {
+                        cb.checked = sendToAllToggle.checked;
+                    });
+                    saveSelections();
+                };
+
+                sendToAllToggle.addEventListener('change', applySendToAllSelection);
+
+                if (sendToAllToggle.checked) {
+                    applySendToAllSelection();
+                }
+            }
 
             selectableCheckboxes.forEach(function (checkbox) {
                 checkbox.addEventListener('change', function () {

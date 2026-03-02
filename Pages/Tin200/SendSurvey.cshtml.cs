@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using System.ComponentModel.DataAnnotations;
-using TINWorkspaceTemp.Models;
 using TINWorkspaceTemp.Services;
 
 namespace TINWorkspaceTemp.Pages.Tin200
@@ -23,23 +21,12 @@ namespace TINWorkspaceTemp.Pages.Tin200
         }
 
         [BindProperty]
-        public int ClientId { get; set; }
-
-        [BindProperty]
-        [EmailAddress]
-        public string? RecipientEmail { get; set; }
-
-        [BindProperty]
         public List<int> SelectedClientIds { get; set; } = new();
 
         [BindProperty]
         public bool SendToAllClients { get; set; }
 
-        public Models.Tin200? Client { get; set; }
-
         public List<SurveyClientRow> AvailableClients { get; set; } = new();
-
-        public string? SurveyUrl { get; set; }
 
         [TempData]
         public string? StatusMessage { get; set; }
@@ -59,71 +46,11 @@ namespace TINWorkspaceTemp.Pages.Tin200
         [TempData]
         public string? BulkLastRunAt { get; set; }
 
-        public async Task<IActionResult> OnGetAsync(int? id)
+        public async Task<IActionResult> OnGetAsync()
         {
             await LoadAvailableClientsAsync();
-
-            if (!id.HasValue)
-            {
-                return Page();
-            }
-
-            ClientId = id.Value;
-            Client = await _tin200Service.GetTin200ByIdAsync(ClientId);
-            if (Client == null)
-            {
-                ModelState.AddModelError(string.Empty, "Client not found.");
-                return Page();
-            }
-
-            RecipientEmail = Client.Email;
-            SurveyUrl = BuildSurveyUrl(Client.Id);
 
             return Page();
-        }
-
-        public async Task<IActionResult> OnPostSingleAsync()
-        {
-            await LoadAvailableClientsAsync();
-
-            if (ClientId <= 0)
-            {
-                ModelState.AddModelError(nameof(ClientId), "Please enter a valid client ID.");
-                return Page();
-            }
-
-            Client = await _tin200Service.GetTin200ByIdAsync(ClientId);
-            if (Client == null)
-            {
-                ModelState.AddModelError(string.Empty, "Client not found.");
-                return Page();
-            }
-
-            RecipientEmail = string.IsNullOrWhiteSpace(RecipientEmail)
-                ? Client.Email
-                : RecipientEmail;
-
-            if (string.IsNullOrWhiteSpace(RecipientEmail))
-            {
-                ModelState.AddModelError(nameof(RecipientEmail), "No recipient email is available. Enter an email address.");
-                SurveyUrl = BuildSurveyUrl(ClientId);
-                return Page();
-            }
-
-            SurveyUrl = BuildSurveyUrl(ClientId);
-
-            try
-            {
-                await _surveyEmailService.SendSurveyLinkAsync(RecipientEmail, SurveyUrl, Client.CompanyName, Client.Id);
-                StatusMessage = $"Survey email sent to {RecipientEmail}.";
-            }
-            catch (Exception ex)
-            {
-                ModelState.AddModelError(string.Empty, $"Could not send email: {ex.Message}");
-                return Page();
-            }
-
-            return RedirectToPage(new { id = ClientId });
         }
 
         public async Task<IActionResult> OnPostBulkAsync()
