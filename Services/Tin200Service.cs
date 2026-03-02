@@ -50,7 +50,7 @@ namespace TINWorkspaceTemp.Services
             try
             {
                 var years = await _context.Tin200
-                    .Where(t => t.FinancialYear.HasValue)
+                    .Where(t => t.FinancialYear.HasValue && t.FinancialYear.Value > 0)
                     .Select(t => t.FinancialYear!.Value)
                     .Distinct()
                     .OrderByDescending(y => y)
