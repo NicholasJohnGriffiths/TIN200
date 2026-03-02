@@ -58,20 +58,56 @@ jobs:
 
       - name: Normalize Azure credentials JSON
         if: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE == '' && env.AZURE_CREDENTIALS_EFFECTIVE != '' }}
-        shell: bash
+        shell: python
         run: |
-          creds='${{ env.AZURE_CREDENTIALS_EFFECTIVE }}'
-          if [[ "$creds" == "'"*"'" ]]; then
-            creds="${creds:1:${#creds}-2}"
-          fi
+          import codecs
+          import json
+          import os
 
-          python -c "import json,sys; json.loads(sys.argv[1])" "$creds"
+          raw = os.environ.get("AZURE_CREDENTIALS_EFFECTIVE", "")
 
-          {
-            echo "AZURE_CREDENTIALS_EFFECTIVE<<EOF"
-            echo "$creds"
-            echo "EOF"
-          } >> "$GITHUB_ENV"
+          def try_parse(value: str):
+            try:
+              obj = json.loads(value)
+              if isinstance(obj, str):
+                obj = json.loads(obj)
+              if isinstance(obj, dict):
+                required = {"clientId", "clientSecret", "subscriptionId", "tenantId"}
+                if required.issubset(obj.keys()):
+                  return json.dumps(obj, separators=(",", ":"))
+            except Exception:
+              pass
+            return None
+
+          candidates = [raw, raw.strip()]
+
+          stripped = raw.strip()
+          if len(stripped) >= 2 and ((stripped[0] == "'" and stripped[-1] == "'") or (stripped[0] == '"' and stripped[-1] == '"')):
+            inner = stripped[1:-1]
+            candidates.extend([inner, inner.strip()])
+
+          try:
+            unescaped = codecs.decode(stripped, "unicode_escape")
+            candidates.extend([unescaped, unescaped.strip()])
+          except Exception:
+            pass
+
+          if "'" in stripped and '"' not in stripped:
+            candidates.extend([stripped.replace("'", '"')])
+
+          normalized = None
+          for candidate in candidates:
+            normalized = try_parse(candidate)
+            if normalized:
+              break
+
+          if not normalized:
+            raise SystemExit("AZURE_CREDENTIALS is not valid JSON auth. Recreate with: az ad sp create-for-rbac --json-auth")
+
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as f:
+            f.write("AZURE_CREDENTIALS_EFFECTIVE<<EOF\n")
+            f.write(normalized + "\n")
+            f.write("EOF\n")
 
       - name: Validate deploy credentials
         run: |
