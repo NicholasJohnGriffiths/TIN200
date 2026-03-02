@@ -19,14 +19,15 @@ namespace TINWorkspaceTemp.Services
             try
             {
                 var query = _context.Tin200.AsQueryable();
-                if (financialYear.HasValue)
+                if (financialYear.HasValue && financialYear.Value > 0)
                 {
-                    query = financialYear.Value switch
+                    var year = financialYear.Value;
+                    query = year switch
                     {
-                        2025 => query.Where(t => t.Fye2025 != null),
-                        2024 => query.Where(t => t.Fye2024 != null),
-                        2023 => query.Where(t => t.Fye2023 != null),
-                        _ => query
+                        2025 => query.Where(t => t.FinancialYear == year || (!t.FinancialYear.HasValue && t.Fye2025 != null)),
+                        2024 => query.Where(t => t.FinancialYear == year || (!t.FinancialYear.HasValue && t.Fye2024 != null)),
+                        2023 => query.Where(t => t.FinancialYear == year || (!t.FinancialYear.HasValue && t.Fye2023 != null)),
+                        _ => query.Where(t => t.FinancialYear == year)
                     };
                 }
                 return await query.OrderByDescending(t => t.Id).ToListAsync();
@@ -48,24 +49,23 @@ namespace TINWorkspaceTemp.Services
         {
             try
             {
-                var years = new List<int>();
+                var years = await _context.Tin200
+                    .Where(t => t.FinancialYear.HasValue)
+                    .Select(t => t.FinancialYear!.Value)
+                    .Distinct()
+                    .OrderByDescending(y => y)
+                    .ToListAsync();
 
-                if (await _context.Tin200.AnyAsync(t => t.Fye2025 != null))
+                if (years.Any())
                 {
-                    years.Add(2025);
+                    return years;
                 }
 
-                if (await _context.Tin200.AnyAsync(t => t.Fye2024 != null))
-                {
-                    years.Add(2024);
-                }
-
-                if (await _context.Tin200.AnyAsync(t => t.Fye2023 != null))
-                {
-                    years.Add(2023);
-                }
-
-                return years;
+                var fallbackYears = new List<int>();
+                if (await _context.Tin200.AnyAsync(t => t.Fye2025 != null)) fallbackYears.Add(2025);
+                if (await _context.Tin200.AnyAsync(t => t.Fye2024 != null)) fallbackYears.Add(2024);
+                if (await _context.Tin200.AnyAsync(t => t.Fye2023 != null)) fallbackYears.Add(2023);
+                return fallbackYears;
             }
             catch
             {

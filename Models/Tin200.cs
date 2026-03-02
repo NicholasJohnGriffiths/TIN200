@@ -47,7 +47,6 @@ namespace TINWorkspaceTemp.Models
         public decimal? Fye2023 { get; set; }
 
         [Display(Name = "Financial Year")]
-        [NotMapped]
         public int? FinancialYear { get; set; }
 
         // TIN200 identity/data column intentionally not exposed in the model

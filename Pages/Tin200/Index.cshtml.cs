@@ -27,7 +27,7 @@ namespace TINWorkspaceTemp.Pages.Tin200
             else
             {
                 // default to latest available year when not provided
-                SelectedYear = Years.FirstOrDefault();
+                SelectedYear = Years.Any() ? Years.First() : null;
             }
 
             Records = await _service.GetAllTin200Async(SelectedYear);
