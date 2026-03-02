@@ -56,6 +56,23 @@ jobs:
             echo "AZURE_CREDENTIALS_EFFECTIVE=" >> "$GITHUB_ENV"
           fi
 
+      - name: Normalize Azure credentials JSON
+        if: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE == '' && env.AZURE_CREDENTIALS_EFFECTIVE != '' }}
+        shell: bash
+        run: |
+          creds='${{ env.AZURE_CREDENTIALS_EFFECTIVE }}'
+          if [[ "$creds" == "'"*"'" ]]; then
+            creds="${creds:1:${#creds}-2}"
+          fi
+
+          python -c "import json,sys; json.loads(sys.argv[1])" "$creds"
+
+          {
+            echo "AZURE_CREDENTIALS_EFFECTIVE<<EOF"
+            echo "$creds"
+            echo "EOF"
+          } >> "$GITHUB_ENV"
+
       - name: Validate deploy credentials
         run: |
           if [ -z "${{ env.AZURE_WEBAPP_NAME }}" ]; then
