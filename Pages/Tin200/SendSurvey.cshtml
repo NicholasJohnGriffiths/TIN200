@@ -435,6 +435,9 @@
                     }
 
                     const selectedCount = getCheckboxes().filter(cb => cb.checked).length;
+                    const recipientCount = sendToAllToggle && sendToAllToggle.checked
+                        ? getCheckboxes().length
+                        : selectedCount;
                     const selectedMessage = sendToAllToggle && sendToAllToggle.checked
                         ? 'all clients with an email address'
                         : `${selectedCount} selected client${selectedCount === 1 ? '' : 's'}`;
@@ -443,6 +446,10 @@
 
                     if (warningTarget) {
                         warningTarget.textContent = selectedMessage;
+                    }
+
+                    if (confirmBulkSendBtn) {
+                        confirmBulkSendBtn.textContent = `Send to ${recipientCount} Client${recipientCount === 1 ? '' : 's'}`;
                     }
 
                     if (warningModal) {
