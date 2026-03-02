@@ -1,0 +1,318 @@
+@page
+@model TINWorkspaceTemp.Pages.Tin200.SendSurveyModel
+@{
+    ViewData["Title"] = "Send Client Survey";
+}
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-10">
+            <h1>Send Client Survey</h1>
+            <p class="text-muted">Send a secure data update survey link to one client, selected clients, or all clients.</p>
+            <hr />
+
+            @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+            {
+                <div class="alert alert-success" role="alert">
+                    @Model.StatusMessage
+                </div>
+            }
+
+            @if (Model.BulkSentCount.HasValue || Model.BulkSkippedCount.HasValue || Model.BulkFailedCount.HasValue)
+            {
+                <div class="card mb-3">
+                    <div class="card-header">Last Bulk Send Summary</div>
+                    <div class="card-body py-2">
+                        @if (!string.IsNullOrWhiteSpace(Model.BulkLastRunAt))
+                        {
+                            <div><strong>Last run:</strong> @Model.BulkLastRunAt</div>
+                        }
+                        <div><strong>Sent:</strong> @(Model.BulkSentCount ?? 0)</div>
+                        <div><strong>Skipped (no email):</strong> @(Model.BulkSkippedCount ?? 0)</div>
+                        <div><strong>Failed:</strong> @(Model.BulkFailedCount ?? 0)</div>
+                    </div>
+                </div>
+            }
+
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+            <div class="card mb-4">
+                <div class="card-header">Send to One Client</div>
+                <div class="card-body">
+                    <form method="post" asp-page-handler="Single">
+                        <div class="form-group mb-3">
+                            <label asp-for="ClientId" class="form-label">Client ID</label>
+                            <input asp-for="ClientId" class="form-control" type="number" min="1" />
+                            <span asp-validation-for="ClientId" class="text-danger"></span>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label asp-for="RecipientEmail" class="form-label">Recipient Email</label>
+                            <input asp-for="RecipientEmail" class="form-control" type="email" />
+                            <small class="form-text text-muted">Leave blank to use the email stored for this client.</small>
+                            <span asp-validation-for="RecipientEmail" class="text-danger"></span>
+                        </div>
+
+                        @if (Model.Client != null)
+                        {
+                            <div class="alert alert-info" role="alert">
+                                <strong>Client:</strong> @Model.Client.CompanyName (ID: @Model.Client.Id)<br />
+                                <strong>Current Email:</strong> @Model.Client.Email
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrWhiteSpace(Model.SurveyUrl))
+                        {
+                            <div class="mb-3">
+                                <label class="form-label">Survey Link</label>
+                                <input class="form-control" value="@Model.SurveyUrl" readonly />
+                            </div>
+                        }
+
+                        <button type="submit" class="btn btn-primary">Send Survey Email</button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mb-3">
+                <div class="card-header">Bulk Send</div>
+                <div class="card-body">
+                    <form method="post" asp-page-handler="Bulk">
+                        <div class="form-check mb-3">
+                            <input asp-for="SendToAllClients" class="form-check-input" />
+                            <label asp-for="SendToAllClients" class="form-check-label">Send to all clients with an email address</label>
+                        </div>
+
+                        <div class="mb-2">
+                            <button type="button" id="selectAllClientsBtn" class="btn btn-outline-secondary btn-sm">Select All Listed</button>
+                            <button type="button" id="clearAllClientsBtn" class="btn btn-outline-secondary btn-sm">Clear Selection</button>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label for="clientSearchInput" class="form-label">Search clients</label>
+                            <input id="clientSearchInput" class="form-control" type="text" placeholder="Search by ID, company, or email" />
+                        </div>
+
+                        <div class="mb-3" role="group" aria-label="Client email filters">
+                            <button type="button" class="btn btn-outline-secondary btn-sm client-filter-btn active" data-filter="all">All</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm client-filter-btn" data-filter="has-email">Has Email Only</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm client-filter-btn" data-filter="missing-email">Missing Email</button>
+                        </div>
+
+                        <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
+                            <table class="table table-sm table-striped align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 80px;">Select</th>
+                                        <th style="width: 80px;">ID</th>
+                                        <th>Company</th>
+                                        <th>Email</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var clientRow in Model.AvailableClients)
+                                    {
+                                        var hasEmail = !string.IsNullOrWhiteSpace(clientRow.Email);
+                                        var searchText = $"{clientRow.Id} {clientRow.CompanyName} {clientRow.Email}".ToLowerInvariant();
+                                        <tr data-search="@searchText" data-has-email="@(hasEmail ? "true" : "false")">
+                                            <td>
+                                                @if (hasEmail)
+                                                {
+                                                    <input class="form-check-input client-selector" type="checkbox" name="SelectedClientIds" value="@clientRow.Id" />
+                                                }
+                                                else
+                                                {
+                                                    <input class="form-check-input client-selector" type="checkbox" name="SelectedClientIds" value="@clientRow.Id" disabled />
+                                                }
+                                            </td>
+                                            <td>@clientRow.Id</td>
+                                            <td>@clientRow.CompanyName</td>
+                                            <td>
+                                                @if (hasEmail)
+                                                {
+                                                    @clientRow.Email
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">No email</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary mt-3">Send Survey Emails</button>
+                    </form>
+                </div>
+            </div>
+
+            <a asp-page="./Index" class="btn btn-secondary">Back to Records</a>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+
+    <script>
+        (function () {
+            const selectAllBtn = document.getElementById('selectAllClientsBtn');
+            const clearAllBtn = document.getElementById('clearAllClientsBtn');
+            const searchInput = document.getElementById('clientSearchInput');
+            const filterButtons = Array.from(document.querySelectorAll('.client-filter-btn'));
+            const selectableCheckboxes = Array.from(document.querySelectorAll('.client-selector:not([disabled])'));
+            const url = new URL(window.location.href);
+            const storageKey = 'tin200_send_survey_selected_clients';
+            const clearSavedSelectionsAfterSend = @Model.BulkSendSucceeded.ToString().ToLowerInvariant();
+            let searchParam = null;
+            let filterParam = null;
+            let activeFilter = 'all';
+
+            if (!selectAllBtn || !clearAllBtn) {
+                return;
+            }
+
+            if (clearSavedSelectionsAfterSend) {
+                localStorage.removeItem(storageKey);
+                url.searchParams.delete('search');
+                url.searchParams.delete('filter');
+                window.history.replaceState({}, '', url.toString());
+            }
+
+            searchParam = url.searchParams.get('search');
+            filterParam = url.searchParams.get('filter');
+
+            const getCheckboxes = () => Array.from(document.querySelectorAll('.client-selector:not([disabled])'));
+            const getVisibleRows = () => Array.from(document.querySelectorAll('tbody tr')).filter(row => row.style.display !== 'none');
+            const getSearchRows = () => Array.from(document.querySelectorAll('tbody tr[data-search]'));
+
+            const saveSelections = () => {
+                const selectedIds = getCheckboxes()
+                    .filter(cb => cb.checked)
+                    .map(cb => cb.value);
+                localStorage.setItem(storageKey, JSON.stringify(selectedIds));
+            };
+
+            const restoreSelections = () => {
+                const raw = localStorage.getItem(storageKey);
+                if (!raw) {
+                    return;
+                }
+
+                let selectedIds;
+                try {
+                    selectedIds = JSON.parse(raw);
+                } catch {
+                    return;
+                }
+
+                if (!Array.isArray(selectedIds)) {
+                    return;
+                }
+
+                const selectedSet = new Set(selectedIds.map(String));
+                getCheckboxes().forEach(function (cb) {
+                    cb.checked = selectedSet.has(String(cb.value));
+                });
+            };
+
+            const syncUrlState = () => {
+                const term = ((searchInput && searchInput.value) || '').trim();
+
+                if (term) {
+                    url.searchParams.set('search', term);
+                } else {
+                    url.searchParams.delete('search');
+                }
+
+                if (activeFilter && activeFilter !== 'all') {
+                    url.searchParams.set('filter', activeFilter);
+                } else {
+                    url.searchParams.delete('filter');
+                }
+
+                window.history.replaceState({}, '', url.toString());
+            };
+
+            const setActiveFilterButton = () => {
+                filterButtons.forEach(function (btn) {
+                    const btnFilter = btn.getAttribute('data-filter') || 'all';
+                    btn.classList.toggle('active', btnFilter === activeFilter);
+                });
+            };
+
+            const applyFilters = () => {
+                const term = ((searchInput && searchInput.value) || '').toLowerCase().trim();
+                const rows = getSearchRows();
+
+                rows.forEach(function (row) {
+                    const haystack = row.getAttribute('data-search') || '';
+                    const hasEmail = (row.getAttribute('data-has-email') || 'false') === 'true';
+
+                    const matchesSearch = !term || haystack.includes(term);
+                    const matchesEmailFilter =
+                        activeFilter === 'all' ||
+                        (activeFilter === 'has-email' && hasEmail) ||
+                        (activeFilter === 'missing-email' && !hasEmail);
+
+                    row.style.display = matchesSearch && matchesEmailFilter ? '' : 'none';
+                });
+
+                syncUrlState();
+            };
+
+            if (searchInput && searchParam) {
+                searchInput.value = searchParam;
+            }
+
+            if (filterParam && ['all', 'has-email', 'missing-email'].includes(filterParam)) {
+                activeFilter = filterParam;
+            }
+
+            setActiveFilterButton();
+
+            if (searchInput) {
+                searchInput.addEventListener('input', function () {
+                    applyFilters();
+                });
+            }
+
+            filterButtons.forEach(function (button) {
+                button.addEventListener('click', function () {
+                    activeFilter = button.getAttribute('data-filter') || 'all';
+                    setActiveFilterButton();
+                    applyFilters();
+                });
+            });
+
+            applyFilters();
+
+            restoreSelections();
+
+            selectAllBtn.addEventListener('click', function () {
+                getVisibleRows().forEach(function (row) {
+                    const checkbox = row.querySelector('.client-selector:not([disabled])');
+                    if (checkbox) {
+                        checkbox.checked = true;
+                    }
+                });
+                saveSelections();
+            });
+
+            clearAllBtn.addEventListener('click', function () {
+                getCheckboxes().forEach(cb => cb.checked = false);
+                saveSelections();
+            });
+
+            selectableCheckboxes.forEach(function (checkbox) {
+                checkbox.addEventListener('change', function () {
+                    saveSelections();
+                });
+            });
+        })();
+    </script>
+}

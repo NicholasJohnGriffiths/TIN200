@@ -1,0 +1,101 @@
+@page "{id:int}"
+@model TINWorkspaceTemp.Pages.Tin200.SurveyUpdateModel
+@{
+    ViewData["Title"] = "Client Data Update Survey";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <h1>Client Data Update Survey</h1>
+            <p class="text-muted">Please review and update your company information.</p>
+            <hr />
+
+            @if (Model.Submitted)
+            {
+                <div class="alert alert-success" role="alert">
+                    Thank you. Your updates have been submitted successfully.
+                </div>
+            }
+            else if (Model.Saved)
+            {
+                <div class="alert alert-info" role="alert">
+                    Your progress has been saved. You can reopen this link later to continue and submit.
+                </div>
+            }
+
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+            <form method="post">
+                <input type="hidden" asp-for="Record.Id" />
+                <input type="hidden" asp-for="Token" />
+
+                <div class="form-group mb-3">
+                    <label asp-for="Record.CompanyName" class="form-label"></label>
+                    <input asp-for="Record.CompanyName" class="form-control" />
+                    <span asp-validation-for="Record.CompanyName" class="text-danger"></span>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label asp-for="Record.CompanyDescription" class="form-label"></label>
+                    <textarea asp-for="Record.CompanyDescription" class="form-control" rows="3"></textarea>
+                    <span asp-validation-for="Record.CompanyDescription" class="text-danger"></span>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 form-group mb-3">
+                        <label asp-for="Record.CeoFirstName" class="form-label"></label>
+                        <input asp-for="Record.CeoFirstName" class="form-control" />
+                        <span asp-validation-for="Record.CeoFirstName" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6 form-group mb-3">
+                        <label asp-for="Record.CeoLastName" class="form-label"></label>
+                        <input asp-for="Record.CeoLastName" class="form-control" />
+                        <span asp-validation-for="Record.CeoLastName" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label asp-for="Record.Email" class="form-label"></label>
+                    <input asp-for="Record.Email" class="form-control" type="email" />
+                    <span asp-validation-for="Record.Email" class="text-danger"></span>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label asp-for="Record.ExternalId" class="form-label"></label>
+                    <input asp-for="Record.ExternalId" class="form-control" />
+                    <span asp-validation-for="Record.ExternalId" class="text-danger"></span>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-4 form-group mb-3">
+                        <label asp-for="Record.Fye2025" class="form-label"></label>
+                        <input asp-for="Record.Fye2025" class="form-control" type="number" />
+                        <span asp-validation-for="Record.Fye2025" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-4 form-group mb-3">
+                        <label asp-for="Record.Fye2024" class="form-label"></label>
+                        <input asp-for="Record.Fye2024" class="form-control" type="number" />
+                        <span asp-validation-for="Record.Fye2024" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-4 form-group mb-3">
+                        <label asp-for="Record.Fye2023" class="form-label"></label>
+                        <input asp-for="Record.Fye2023" class="form-control" type="number" />
+                        <span asp-validation-for="Record.Fye2023" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" name="FormAction" value="save" class="btn btn-secondary">Save for Later</button>
+                    <button type="submit" name="FormAction" value="submit" class="btn btn-primary">Submit Final</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

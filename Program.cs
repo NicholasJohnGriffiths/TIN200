@@ -6,6 +6,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
+builder.Services.AddHealthChecks();
 
 // Add DbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -13,6 +14,10 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 // Add custom services
 builder.Services.AddScoped<Tin200Service>();
+builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("SmtpSettings"));
+builder.Services.Configure<SurveyLinkSettings>(builder.Configuration.GetSection("SurveyLinkSettings"));
+builder.Services.AddScoped<ISurveyEmailService, SurveyEmailService>();
+builder.Services.AddScoped<ISurveyLinkTokenService, SurveyLinkTokenService>();
 
 var app = builder.Build();
 
@@ -29,6 +34,8 @@ app.UseHttpsRedirection();
 app.UseRouting();
 
 app.UseAuthorization();
+
+app.MapHealthChecks("/health");
 
 app.MapStaticAssets();
 app.MapRazorPages()
