@@ -3,6 +3,13 @@
 ## Overview
 This guide covers setting up the Power BI views and connecting Power BI Desktop to your SQL Server database for real-time financial analytics dashboards.
 
+## Canonical Run Order (Database)
+
+Run these scripts in this exact order against the target database:
+
+1. `Migrations/003_UpdateTin200FieldNames.sql`
+2. `Migrations/001_CreatePowerBIViews.sql`
+
 ## Database Views Created
 4 optimized SQL Server views have been created for Power BI analytics:
 
@@ -17,7 +24,7 @@ This guide covers setting up the Power BI views and connecting Power BI Desktop 
 1. Open SQL Server Management Studio
 2. Connect to: `VivoTouchMar23\MSSQLSERVER01`
 3. Select database: `TIN`
-4. Open and execute: `Migrations/002_RenameTin200Columns_CleanNames.sql`
+4. Open and execute: `Migrations/003_UpdateTin200FieldNames.sql`
 5. Open and execute: `Migrations/001_CreatePowerBIViews.sql`
 6. Verify views appear in Object Explorer → Views folder
 
@@ -178,4 +185,4 @@ Create a new Razor Page to display analytics data alongside Power BI dashboards.
 6. ☐ Embed reports in ASP.NET dashboard (optional)
 
 ---
-*Last updated: 2026-02-13*
+*Last updated: 2026-03-02*
