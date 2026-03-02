@@ -29,17 +29,17 @@ namespace TINWorkspaceTemp.Data
                     .ValueGeneratedOnAdd();
                 
                 entity.Property(e => e.CeoFirstName)
-                    .HasColumnName("CEO First Name ")
+                    .HasColumnName("CEO First Name")
                     .HasColumnType("varchar(255)")
                     .HasMaxLength(255);
                 
                 entity.Property(e => e.CeoLastName)
-                    .HasColumnName("CEO Last Name ")
+                    .HasColumnName("CEO Last Name")
                     .HasColumnType("varchar(255)")
                     .HasMaxLength(255);
                 
                 entity.Property(e => e.Email)
-                    .HasColumnName("Email ")
+                    .HasColumnName("Email")
                     .HasColumnType("varchar(255)")
                     .HasMaxLength(255);
                 
