@@ -123,6 +123,26 @@
     </div>
 </div>
 
+<div class="modal fade" id="bulkSendWarningModal" tabindex="-1" aria-labelledby="bulkSendWarningModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bulkSendWarningModalLabel">Confirm Bulk Email Send</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning mb-0" role="alert">
+                    You are about to send survey emails to <strong id="bulkSendWarningTarget">selected clients</strong>. Please confirm to continue.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="confirmBulkSendBtn" class="btn btn-danger">Send Emails</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     @{
         await Html.RenderPartialAsync("_ValidationScriptsPartial");
@@ -139,10 +159,17 @@
             const selectableCheckboxes = Array.from(document.querySelectorAll('.client-selector:not([disabled])'));
             const tbody = document.querySelector('tbody');
             const bulkSendForm = document.getElementById('bulkSendForm');
+            const warningModalElement = document.getElementById('bulkSendWarningModal');
+            const warningTarget = document.getElementById('bulkSendWarningTarget');
+            const confirmBulkSendBtn = document.getElementById('confirmBulkSendBtn');
+            const warningModal = warningModalElement && window.bootstrap && window.bootstrap.Modal
+                ? new window.bootstrap.Modal(warningModalElement)
+                : null;
             const url = new URL(window.location.href);
             const storageKey = 'tin200_send_survey_selected_clients';
             const clearSavedSelectionsAfterSend = @Model.BulkSendSucceeded.ToString().ToLowerInvariant();
             const hasQueryPreselection = @Model.HasQueryPreselection.ToString().ToLowerInvariant();
+            let bulkSendConfirmed = false;
             let searchParam = null;
             let filterParam = null;
             let activeFilter = 'all';
@@ -403,15 +430,43 @@
 
             if (bulkSendForm) {
                 bulkSendForm.addEventListener('submit', function (event) {
+                    if (bulkSendConfirmed) {
+                        return;
+                    }
+
                     const selectedCount = getCheckboxes().filter(cb => cb.checked).length;
                     const selectedMessage = sendToAllToggle && sendToAllToggle.checked
                         ? 'all clients with an email address'
                         : `${selectedCount} selected client${selectedCount === 1 ? '' : 's'}`;
 
+                    event.preventDefault();
+
+                    if (warningTarget) {
+                        warningTarget.textContent = selectedMessage;
+                    }
+
+                    if (warningModal) {
+                        warningModal.show();
+                        return;
+                    }
+
                     const confirmed = window.confirm(`Warning: You are about to send survey emails to ${selectedMessage}. Do you want to continue?`);
                     if (!confirmed) {
-                        event.preventDefault();
+                        return;
                     }
+
+                    bulkSendConfirmed = true;
+                    bulkSendForm.submit();
+                });
+            }
+
+            if (confirmBulkSendBtn && bulkSendForm) {
+                confirmBulkSendBtn.addEventListener('click', function () {
+                    bulkSendConfirmed = true;
+                    if (warningModal) {
+                        warningModal.hide();
+                    }
+                    bulkSendForm.submit();
                 });
             }
         })();
