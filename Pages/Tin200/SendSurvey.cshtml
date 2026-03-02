@@ -39,7 +39,7 @@
             <div class="card mb-3">
                 <div class="card-header">Bulk Send</div>
                 <div class="card-body">
-                    <form method="post" asp-page-handler="Bulk">
+                    <form id="bulkSendForm" method="post" asp-page-handler="Bulk">
                         <div class="form-check mb-3">
                             <input asp-for="SendToAllClients" class="form-check-input" />
                             <label asp-for="SendToAllClients" class="form-check-label">Send to all clients with an email address</label>
@@ -138,6 +138,7 @@
             const sortButtons = Array.from(document.querySelectorAll('.sort-header'));
             const selectableCheckboxes = Array.from(document.querySelectorAll('.client-selector:not([disabled])'));
             const tbody = document.querySelector('tbody');
+            const bulkSendForm = document.getElementById('bulkSendForm');
             const url = new URL(window.location.href);
             const storageKey = 'tin200_send_survey_selected_clients';
             const clearSavedSelectionsAfterSend = @Model.BulkSendSucceeded.ToString().ToLowerInvariant();
@@ -399,6 +400,20 @@
                     saveSelections();
                 });
             });
+
+            if (bulkSendForm) {
+                bulkSendForm.addEventListener('submit', function (event) {
+                    const selectedCount = getCheckboxes().filter(cb => cb.checked).length;
+                    const selectedMessage = sendToAllToggle && sendToAllToggle.checked
+                        ? 'all clients with an email address'
+                        : `${selectedCount} selected client${selectedCount === 1 ? '' : 's'}`;
+
+                    const confirmed = window.confirm(`Warning: You are about to send survey emails to ${selectedMessage}. Do you want to continue?`);
+                    if (!confirmed) {
+                        event.preventDefault();
+                    }
+                });
+            }
         })();
     </script>
 }
