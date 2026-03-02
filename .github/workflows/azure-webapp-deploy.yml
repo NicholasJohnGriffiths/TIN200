@@ -12,8 +12,7 @@ env:
   AZURE_WEBAPP_NAME: ${{ vars.AZURE_WEBAPP_NAME }}
   AZURE_WEBAPP_PUBLISH_PROFILE_SECRET: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
   AZURE_WEBAPP_PUBLISH_PROFILE_VAR: ${{ vars.AZURE_WEBAPP_PUBLISH_PROFILE }}
-  AZURE_CREDENTIALS_SECRET: ${{ secrets.AZURE_CREDENTIALS }}
-  AZURE_CREDENTIALS_VAR: ${{ vars.AZURE_CREDENTIALS }}
+  AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
 
 jobs:
   build-and-deploy:
@@ -48,14 +47,6 @@ jobs:
             echo "AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE=" >> "$GITHUB_ENV"
           fi
 
-          if [ -n "${{ env.AZURE_CREDENTIALS_SECRET }}" ]; then
-            echo "AZURE_CREDENTIALS_EFFECTIVE=${{ env.AZURE_CREDENTIALS_SECRET }}" >> "$GITHUB_ENV"
-          elif [ -n "${{ env.AZURE_CREDENTIALS_VAR }}" ]; then
-            echo "AZURE_CREDENTIALS_EFFECTIVE=${{ env.AZURE_CREDENTIALS_VAR }}" >> "$GITHUB_ENV"
-          else
-            echo "AZURE_CREDENTIALS_EFFECTIVE=" >> "$GITHUB_ENV"
-          fi
-
       - name: Validate deploy credentials
         run: |
           if [ -z "${{ env.AZURE_WEBAPP_NAME }}" ]; then
@@ -63,16 +54,16 @@ jobs:
             exit 1
           fi
 
-          if [ -z "${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE }}" ] && [ -z "${{ env.AZURE_CREDENTIALS_EFFECTIVE }}" ]; then
-            echo "No deploy credentials found. Configure AZURE_WEBAPP_PUBLISH_PROFILE or AZURE_CREDENTIALS as repository Secrets (preferred) or Variables."
+          if [ -z "${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE }}" ] && [ -z "${{ env.AZURE_CREDENTIALS }}" ]; then
+            echo "No deploy credentials found. Configure AZURE_WEBAPP_PUBLISH_PROFILE or AZURE_CREDENTIALS in GitHub repository Secrets."
             exit 1
           fi
 
       - name: Azure Login (Service Principal)
-        if: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE == '' && env.AZURE_CREDENTIALS_EFFECTIVE != '' }}
+        if: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE == '' && env.AZURE_CREDENTIALS != '' }}
         uses: azure/login@v2
         with:
-          creds: ${{ env.AZURE_CREDENTIALS_EFFECTIVE }}
+          creds: ${{ env.AZURE_CREDENTIALS }}
 
       - name: Deploy to Azure Web App (Publish Profile)
         if: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE != '' }}
@@ -83,7 +74,7 @@ jobs:
           package: ./publish
 
       - name: Deploy to Azure Web App (Azure Login)
-        if: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE == '' && env.AZURE_CREDENTIALS_EFFECTIVE != '' }}
+        if: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE == '' && env.AZURE_CREDENTIALS != '' }}
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
