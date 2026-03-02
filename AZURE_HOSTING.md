@@ -18,6 +18,8 @@ az account set --subscription "<YOUR_SUBSCRIPTION_ID_OR_NAME>"
 
 From the workspace root:
 
+> Important: Do not commit publish artifacts (for example `deploy/publish` or zip outputs). The repository is configured to ignore these build outputs.
+
 ```powershell
 Set-Location .\deploy
 .\deploy-azure.ps1 `

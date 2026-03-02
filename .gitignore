@@ -14,3 +14,6 @@ appsettings.Development.json
 thumbs.db
 node_modules/
 wwwroot/lib/
+deploy/publish/
+deploy/publish.zip
+deploy/*.zip
