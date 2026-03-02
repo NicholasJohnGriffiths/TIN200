@@ -33,7 +33,14 @@ namespace TINWorkspaceTemp.Services
             }
             catch
             {
-                return await GetAllTin200FallbackAsync(financialYear);
+                try
+                {
+                    return await GetAllTin200FallbackAsync(financialYear);
+                }
+                catch
+                {
+                    return new List<Tin200>();
+                }
             }
         }
 
@@ -62,12 +69,19 @@ namespace TINWorkspaceTemp.Services
             }
             catch
             {
-                var rows = await GetAllTin200FallbackAsync();
-                var years = new List<int>();
-                if (rows.Any(r => r.Fye2025 != null)) years.Add(2025);
-                if (rows.Any(r => r.Fye2024 != null)) years.Add(2024);
-                if (rows.Any(r => r.Fye2023 != null)) years.Add(2023);
-                return years;
+                try
+                {
+                    var rows = await GetAllTin200FallbackAsync();
+                    var years = new List<int>();
+                    if (rows.Any(r => r.Fye2025 != null)) years.Add(2025);
+                    if (rows.Any(r => r.Fye2024 != null)) years.Add(2024);
+                    if (rows.Any(r => r.Fye2023 != null)) years.Add(2023);
+                    return years;
+                }
+                catch
+                {
+                    return new List<int>();
+                }
             }
         }
 
@@ -79,8 +93,15 @@ namespace TINWorkspaceTemp.Services
             }
             catch
             {
-                var all = await GetAllTin200FallbackAsync();
-                return all.FirstOrDefault(x => x.Id == id);
+                try
+                {
+                    var all = await GetAllTin200FallbackAsync();
+                    return all.FirstOrDefault(x => x.Id == id);
+                }
+                catch
+                {
+                    return null;
+                }
             }
         }
 
