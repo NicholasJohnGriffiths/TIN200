@@ -8,6 +8,7 @@ on:
 
 env:
   DOTNET_VERSION: '9.0.x'
+  PROJECT_PATH: 'TINWorkspaceTemp.csproj'
 
 jobs:
   build-and-deploy:
@@ -29,11 +30,32 @@ jobs:
         run: dotnet build --configuration Release --no-restore
 
       - name: Publish
-        run: dotnet publish --configuration Release --no-build --output ./publish
+        run: dotnet publish ${{ env.PROJECT_PATH }} --configuration Release --no-build --output ./publish
 
-      - name: Deploy to Azure Web App
+      - name: Validate deploy credentials
+        run: |
+          if [ -z "${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}" ] && [ -z "${{ secrets.AZURE_CREDENTIALS }}" ]; then
+            echo "No deploy credentials found. Configure AZURE_WEBAPP_PUBLISH_PROFILE or AZURE_CREDENTIALS in GitHub Secrets."
+            exit 1
+          fi
+
+      - name: Azure Login (Service Principal)
+        if: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE == '' && secrets.AZURE_CREDENTIALS != '' }}
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Azure Web App (Publish Profile)
+        if: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE != '' }}
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ vars.AZURE_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ./publish
+
+      - name: Deploy to Azure Web App (Azure Login)
+        if: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE == '' && secrets.AZURE_CREDENTIALS != '' }}
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
           package: ./publish

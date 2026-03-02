@@ -94,12 +94,18 @@ Configure these in GitHub:
 - **Repository Variable**
   - `AZURE_WEBAPP_NAME` = your Azure Web App name (e.g. `tin200-app-prod-001`)
 
-- **Repository Secret**
+- **Repository Secret (choose one auth option)**
   - `AZURE_WEBAPP_PUBLISH_PROFILE` = publish profile XML from Azure Portal
+  - or `AZURE_CREDENTIALS` = Azure service principal JSON for `azure/login`
 
 How to get publish profile:
 1. Azure Portal → your Web App
 2. Overview → **Get publish profile**
 3. Copy the file contents into the GitHub secret
+
+How to get AZURE_CREDENTIALS JSON (optional alternative):
+1. Create a service principal with access to your resource group
+2. Capture JSON in this format: `{"clientId":"...","clientSecret":"...","subscriptionId":"...","tenantId":"..."}`
+3. Save it as `AZURE_CREDENTIALS` GitHub secret
 
 After that, pushing to `main` will deploy automatically.
