@@ -61,7 +61,7 @@
                             <button type="button" class="btn btn-outline-secondary btn-sm client-filter-btn" data-filter="missing-email">Missing Email</button>
                         </div>
 
-                        <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
+                        <div id="clientListContainer" class="table-responsive" style="max-height: 420px; overflow-y: auto;">
                             <table class="table table-sm table-striped align-middle">
                                 <thead class="table-light">
                                     <tr>
@@ -84,7 +84,7 @@
                                         var searchText = $"{clientRow.Id} {clientRow.CompanyName} {clientRow.Email}".ToLowerInvariant();
                                         var companySort = (clientRow.CompanyName ?? string.Empty).ToLowerInvariant();
                                         var emailSort = (clientRow.Email ?? string.Empty).ToLowerInvariant();
-                                        <tr data-search="@searchText" data-has-email="@(hasEmail ? "true" : "false")" data-id="@clientRow.Id" data-company="@companySort" data-email="@emailSort">
+                                        <tr class="@(Model.SelectedClientIds.Contains(clientRow.Id) ? "preselected-client-row" : string.Empty)" data-search="@searchText" data-has-email="@(hasEmail ? "true" : "false")" data-id="@clientRow.Id" data-company="@companySort" data-email="@emailSort">
                                             <td>
                                                 @if (hasEmail)
                                                 {
@@ -158,6 +158,7 @@
             const sortButtons = Array.from(document.querySelectorAll('.sort-header'));
             const selectableCheckboxes = Array.from(document.querySelectorAll('.client-selector:not([disabled])'));
             const tbody = document.querySelector('tbody');
+            const clientListContainer = document.getElementById('clientListContainer');
             const bulkSendForm = document.getElementById('bulkSendForm');
             const warningModalElement = document.getElementById('bulkSendWarningModal');
             const warningTarget = document.getElementById('bulkSendWarningTarget');
@@ -231,6 +232,35 @@
                 getCheckboxes().forEach(function (cb) {
                     cb.checked = selectedSet.has(String(cb.value));
                 });
+            };
+
+            const revealPreselectedClient = () => {
+                if (!hasQueryPreselection) {
+                    return;
+                }
+
+                const selectedCheckbox = document.querySelector('tbody .client-selector:checked');
+                if (!selectedCheckbox) {
+                    return;
+                }
+
+                const selectedRow = selectedCheckbox.closest('tr');
+                if (!selectedRow || selectedRow.style.display === 'none') {
+                    return;
+                }
+
+                selectedRow.classList.add('table-warning');
+
+                if (clientListContainer) {
+                    const rowTop = selectedRow.offsetTop;
+                    const rowHeight = selectedRow.offsetHeight;
+                    const containerHeight = clientListContainer.clientHeight;
+                    const targetTop = Math.max(0, rowTop - (containerHeight / 2) + (rowHeight / 2));
+                    clientListContainer.scrollTop = targetTop;
+                    return;
+                }
+
+                selectedRow.scrollIntoView({ behavior: 'auto', block: 'center' });
             };
 
             const syncUrlState = () => {
@@ -388,6 +418,8 @@
             } else {
                 restoreSelections();
             }
+
+            revealPreselectedClient();
 
             selectAllBtn.addEventListener('click', function () {
                 getVisibleRows().forEach(function (row) {

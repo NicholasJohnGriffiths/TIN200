@@ -2,6 +2,7 @@
 @model TINWorkspaceTemp.Pages.Tin200.SurveyUpdateModel
 @{
     ViewData["Title"] = "Client Data Update Survey";
+    Layout = "_SurveyLayout";
 }
 
 <div class="container mt-4">
@@ -57,13 +58,13 @@
 
                 <div class="form-group mb-3">
                     <label asp-for="Record.Email" class="form-label"></label>
-                    <input asp-for="Record.Email" class="form-control" type="email" />
+                    <input asp-for="Record.Email" class="form-control bg-light" type="email" readonly />
                     <span asp-validation-for="Record.Email" class="text-danger"></span>
                 </div>
 
                 <div class="form-group mb-3">
                     <label asp-for="Record.ExternalId" class="form-label"></label>
-                    <input asp-for="Record.ExternalId" class="form-control" />
+                    <input asp-for="Record.ExternalId" class="form-control bg-light" readonly />
                     <span asp-validation-for="Record.ExternalId" class="text-danger"></span>
                 </div>
 
