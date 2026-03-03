@@ -68,8 +68,6 @@ namespace TINWorkspaceTemp.Pages.Tin200
 
             existing.CeoFirstName = Record.CeoFirstName;
             existing.CeoLastName = Record.CeoLastName;
-            existing.Email = Record.Email;
-            existing.ExternalId = Record.ExternalId;
             existing.CompanyName = Record.CompanyName;
             existing.CompanyDescription = Record.CompanyDescription;
             existing.Fye2025 = Record.Fye2025;
