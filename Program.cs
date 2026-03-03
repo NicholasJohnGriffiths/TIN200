@@ -33,6 +33,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // Add custom services
 builder.Services.AddScoped<Tin200Service>();
 builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("SmtpSettings"));
+builder.Services.Configure<AzureCommunicationEmailSettings>(builder.Configuration.GetSection("AzureCommunicationEmail"));
 builder.Services.Configure<SurveyLinkSettings>(builder.Configuration.GetSection("SurveyLinkSettings"));
 builder.Services.AddScoped<ISurveyEmailService, SurveyEmailService>();
 builder.Services.AddScoped<ISurveyLinkTokenService, SurveyLinkTokenService>();

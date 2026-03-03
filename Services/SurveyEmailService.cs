@@ -1,25 +1,24 @@
-using System.Net;
-using System.Net.Mail;
+using Azure;
+using Azure.Communication.Email;
 using Microsoft.Extensions.Options;
 
 namespace TINWorkspaceTemp.Services
 {
     public class SurveyEmailService : ISurveyEmailService
     {
-        private readonly SmtpSettings _smtpSettings;
+        private readonly AzureCommunicationEmailSettings _emailSettings;
 
-        public SurveyEmailService(IOptions<SmtpSettings> smtpOptions)
+        public SurveyEmailService(IOptions<AzureCommunicationEmailSettings> emailOptions)
         {
-            _smtpSettings = smtpOptions.Value;
+            _emailSettings = emailOptions.Value;
         }
 
         public async Task SendSurveyLinkAsync(string recipientEmail, string surveyUrl, string? companyName, int clientId)
         {
-            if (string.IsNullOrWhiteSpace(_smtpSettings.Host)
-                || _smtpSettings.Port <= 0
-                || string.IsNullOrWhiteSpace(_smtpSettings.FromEmail))
+            if (string.IsNullOrWhiteSpace(_emailSettings.ConnectionString)
+                || string.IsNullOrWhiteSpace(_emailSettings.FromEmail))
             {
-                throw new InvalidOperationException("SMTP settings are not configured. Please configure SmtpSettings in appsettings.json.");
+                throw new InvalidOperationException("Azure Communication Email settings are not configured. Please configure AzureCommunicationEmail in appsettings or environment settings.");
             }
 
             var subject = $"Please update your company details (Client ID: {clientId})";
@@ -32,28 +31,25 @@ If you did not expect this email, you can ignore it.
 
 Thank you.";
 
-            using var message = new MailMessage
-            {
-                From = new MailAddress(_smtpSettings.FromEmail, _smtpSettings.FromName),
-                Subject = subject,
-                Body = body,
-                IsBodyHtml = false
-            };
+            var emailClient = new EmailClient(_emailSettings.ConnectionString);
 
-            message.To.Add(recipientEmail);
+            var emailMessage = new EmailMessage(
+                senderAddress: _emailSettings.FromEmail,
+                content: new EmailContent(subject)
+                {
+                    PlainText = body
+                },
+                recipients: new EmailRecipients(new List<EmailAddress>
+                {
+                    new(recipientEmail)
+                }));
 
-            using var smtpClient = new SmtpClient(_smtpSettings.Host, _smtpSettings.Port)
-            {
-                EnableSsl = _smtpSettings.EnableSsl,
-                DeliveryMethod = SmtpDeliveryMethod.Network
-            };
+            EmailSendOperation operation = await emailClient.SendAsync(WaitUntil.Completed, emailMessage);
 
-            if (!string.IsNullOrWhiteSpace(_smtpSettings.Username))
+            if (operation.HasCompleted && operation.Value.Status != EmailSendStatus.Succeeded)
             {
-                smtpClient.Credentials = new NetworkCredential(_smtpSettings.Username, _smtpSettings.Password);
+                throw new InvalidOperationException($"Email send failed with status: {operation.Value.Status}");
             }
-
-            await smtpClient.SendMailAsync(message);
         }
     }
 }
