@@ -25,18 +25,29 @@ namespace TINWorkspaceTemp.Services
             .ToListAsync();
         }
 
+        public async Task<int?> GetCurrentSurveyFinancialYearAsync()
+        {
+            return await _context.Survey
+                .Where(s => s.CurrentSurvey)
+                .Select(s => (int?)s.FinancialYear)
+                .OrderByDescending(y => y)
+                .FirstOrDefaultAsync();
+        }
+
         public async Task<List<CompanySurveyOption>> GetCompanySurveyOptionsAsync(int? financialYear)
         {
             var query =
                 from companySurvey in _context.CompanySurvey
                 join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
                 join company in _context.Tin200 on companySurvey.CompanyId equals company.Id
+                join answer in _context.Answer on companySurvey.Id equals answer.ClientSurveyId into answerJoin
                 select new CompanySurveyOption
                 {
                     CompanySurveyId = companySurvey.Id,
                     CompanyId = company.Id,
                     CompanyName = company.CompanyName,
-                    FinancialYear = survey.FinancialYear
+                    FinancialYear = survey.FinancialYear,
+                    AnswerCount = answerJoin.Count()
                 };
 
             if (financialYear.HasValue)
@@ -164,6 +175,7 @@ namespace TINWorkspaceTemp.Services
             public int CompanyId { get; set; }
             public string? CompanyName { get; set; }
             public int FinancialYear { get; set; }
+            public int AnswerCount { get; set; }
         }
     }
 }

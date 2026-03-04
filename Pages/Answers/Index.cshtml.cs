@@ -21,17 +21,32 @@ namespace TINWorkspaceTemp.Pages.Answers
         public async Task OnGetAsync(int? financialYear, int? companySurveyId)
         {
             FinancialYears = await _answerService.GetAvailableFinancialYearsAsync();
-            SelectedFinancialYear = financialYear;
-            CompanySurveyOptions = await _answerService.GetCompanySurveyOptionsAsync(financialYear);
+            SelectedFinancialYear = financialYear ?? await _answerService.GetCurrentSurveyFinancialYearAsync();
+
+            if (!SelectedFinancialYear.HasValue && FinancialYears.Any())
+            {
+                SelectedFinancialYear = FinancialYears.First();
+            }
+
+            CompanySurveyOptions = await _answerService.GetCompanySurveyOptionsAsync(SelectedFinancialYear);
             SelectedCompanySurveyId = companySurveyId;
 
-            if (!companySurveyId.HasValue)
+            if (!SelectedCompanySurveyId.HasValue)
+            {
+                SelectedCompanySurveyId = CompanySurveyOptions
+                    .OrderByDescending(x => x.AnswerCount)
+                    .ThenBy(x => x.CompanyName)
+                    .Select(x => (int?)x.CompanySurveyId)
+                    .FirstOrDefault();
+            }
+
+            if (!SelectedCompanySurveyId.HasValue)
             {
                 Rows = new List<AnswerService.AnswerListRow>();
                 return;
             }
 
-            Rows = await _answerService.GetAnswerRowsAsync(companySurveyId.Value);
+            Rows = await _answerService.GetAnswerRowsAsync(SelectedCompanySurveyId.Value);
         }
     }
 }

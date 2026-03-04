@@ -48,7 +48,7 @@ namespace TINWorkspaceTemp.Pages.Tin200
             }
 
             var bytes = Encoding.UTF8.GetBytes(sb.ToString());
-            var fileName = year.HasValue ? $"TIN200_export_{year.Value}.tsv" : "TIN200_export_all.tsv";
+            var fileName = year.HasValue ? $"Company_export_{year.Value}.tsv" : "Company_export_all.tsv";
             return File(bytes, "text/tab-separated-values; charset=utf-8", fileName);
         }
     }

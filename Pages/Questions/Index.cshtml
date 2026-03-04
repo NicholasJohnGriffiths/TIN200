@@ -37,10 +37,12 @@
                         <td>@record.Title</td>
                         <td>@record.QuestionText</td>
                         <td>@record.AnswerType</td>
-                        <td>
-                            <a asp-page="./Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
-                            <a asp-page="./Edit" asp-route-id="@record.Id" class="btn btn-sm btn-warning">Edit</a>
-                            <a asp-page="./Delete" asp-route-id="@record.Id" class="btn btn-sm btn-danger">Delete</a>
+                        <td class="actions-col">
+                            <div class="d-inline-flex gap-1 flex-nowrap">
+                                <a asp-page="./Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
+                                <a asp-page="./Edit" asp-route-id="@record.Id" class="btn btn-sm btn-warning">Edit</a>
+                                <a asp-page="./Delete" asp-route-id="@record.Id" class="btn btn-sm btn-danger">Delete</a>
+                            </div>
                         </td>
                     </tr>
                 }
@@ -53,3 +55,10 @@
         <div class="alert alert-info">No question records found.</div>
     }
 </div>
+
+<style>
+    .actions-col {
+        white-space: nowrap;
+        min-width: 200px;
+    }
+</style>

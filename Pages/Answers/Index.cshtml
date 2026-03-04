@@ -30,7 +30,7 @@
                     @foreach (var option in Model.CompanySurveyOptions)
                     {
                         <option value="@option.CompanySurveyId" selected="@(Model.SelectedCompanySurveyId == option.CompanySurveyId ? "selected" : null)">
-                            #@option.CompanySurveyId - @option.CompanyName (FY @option.FinancialYear)
+                            #@option.CompanySurveyId - @option.CompanyName (FY @option.FinancialYear, Answers: @option.AnswerCount)
                         </option>
                     }
                 </select>
