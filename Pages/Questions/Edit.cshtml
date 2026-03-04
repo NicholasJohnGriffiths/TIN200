@@ -68,9 +68,9 @@
             const multichoiceFields = document.getElementById('multichoiceFields');
 
             function toggleMultichoiceFields() {
-                const isMultichoice = answerTypeSelect && answerTypeSelect.value === 'Multichoice';
+                const isChoiceType = answerTypeSelect && (answerTypeSelect.value === 'SingleChoice' || answerTypeSelect.value === 'Multichoice');
                 if (multichoiceFields) {
-                    multichoiceFields.style.display = isMultichoice ? '' : 'none';
+                    multichoiceFields.style.display = isChoiceType ? '' : 'none';
                 }
             }
 

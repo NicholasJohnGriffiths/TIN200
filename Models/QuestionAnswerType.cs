@@ -5,6 +5,7 @@ namespace TINWorkspaceTemp.Models
         Text,
         Currency,
         Number,
+        SingleChoice,
         Multichoice
     }
 }

@@ -34,10 +34,16 @@
 
         <div class="form-group mb-3">
             <label asp-for="Record.AnswerType" class="form-label"></label>
-            <input asp-for="Record.AnswerType" class="form-control" />
+            <select asp-for="Record.AnswerType" class="form-select" id="answerTypeSelect">
+                @foreach (var option in Model.AnswerTypeOptions)
+                {
+                    <option value="@option">@option</option>
+                }
+            </select>
+            <span asp-validation-for="Record.AnswerType" class="text-danger"></span>
         </div>
 
-        <div class="row">
+        <div class="row" id="multichoiceFields">
             <div class="col-md-3 mb-3"><input asp-for="Record.Multi1" class="form-control" placeholder="Multi 1" /></div>
             <div class="col-md-3 mb-3"><input asp-for="Record.Multi2" class="form-control" placeholder="Multi 2" /></div>
             <div class="col-md-3 mb-3"><input asp-for="Record.Multi3" class="form-control" placeholder="Multi 3" /></div>
@@ -55,4 +61,23 @@
 
 @section Scripts {
     @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+    <script>
+        (function () {
+            const answerTypeSelect = document.getElementById('answerTypeSelect');
+            const multichoiceFields = document.getElementById('multichoiceFields');
+
+            function toggleMultichoiceFields() {
+                const isChoiceType = answerTypeSelect && (answerTypeSelect.value === 'SingleChoice' || answerTypeSelect.value === 'Multichoice');
+                if (multichoiceFields) {
+                    multichoiceFields.style.display = isChoiceType ? '' : 'none';
+                }
+            }
+
+            if (answerTypeSelect) {
+                answerTypeSelect.addEventListener('change', toggleMultichoiceFields);
+            }
+
+            toggleMultichoiceFields();
+        })();
+    </script>
 }

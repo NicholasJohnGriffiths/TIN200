@@ -35,7 +35,7 @@ namespace TINWorkspaceTemp.Pages.Questions
         {
             if (!Enum.TryParse<QuestionAnswerType>(Record.AnswerType, out _))
             {
-                ModelState.AddModelError("Record.AnswerType", "Answer Type must be one of: Text, Currency, Number, Multichoice.");
+                ModelState.AddModelError("Record.AnswerType", "Answer Type must be one of: Text, Currency, Number, SingleChoice, Multichoice.");
             }
 
             if (!ModelState.IsValid)
