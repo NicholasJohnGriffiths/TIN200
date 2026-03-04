@@ -20,7 +20,7 @@
     <form method="post">
         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
         <input type="hidden" asp-for="Input.Id" />
-        <input type="hidden" asp-for="Input.ClientSurveyId" />
+        <input type="hidden" asp-for="Input.CompanySurveyId" />
 
         <div class="form-group mb-3">
             <label asp-for="Input.AnswerText" class="form-label">Answer Text</label>
@@ -41,7 +41,7 @@
         </div>
 
         <button type="submit" class="btn btn-primary">Save</button>
-        <a asp-page="./Index" asp-route-companySurveyId="@Model.Input.ClientSurveyId" class="btn btn-secondary">Back to List</a>
+        <a asp-page="./Index" asp-route-companySurveyId="@Model.Input.CompanySurveyId" class="btn btn-secondary">Back to List</a>
     </form>
 </div>
 

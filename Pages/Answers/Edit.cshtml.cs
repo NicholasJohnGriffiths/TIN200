@@ -30,7 +30,7 @@ namespace TINWorkspaceTemp.Pages.Answers
             Input = new AnswerService.AnswerEditInput
             {
                 Id = answer.Id,
-                ClientSurveyId = answer.ClientSurveyId,
+                CompanySurveyId = answer.CompanySurveyId,
                 AnswerText = answer.AnswerText,
                 AnswerNumber = answer.AnswerNumber,
                 AnswerCurrency = answer.AnswerCurrency
@@ -53,7 +53,7 @@ namespace TINWorkspaceTemp.Pages.Answers
                 return NotFound();
             }
 
-            return RedirectToPage("./Index", new { companySurveyId = Input.ClientSurveyId });
+            return RedirectToPage("./Index", new { companySurveyId = Input.CompanySurveyId });
         }
     }
 }

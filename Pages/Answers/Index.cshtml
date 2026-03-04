@@ -9,7 +9,9 @@
         <div class="col-md-8">
             <h1>Answers by Company Survey</h1>
             <p class="text-muted mb-0">Select a Company Survey record to view and edit its answers.</p>
-            <p class="mb-0"><strong>Record count:</strong> @Model.Rows.Count</p>
+            <p class="mb-0"><strong>Questions total:</strong> @Model.QuestionCount</p>
+            <p class="mb-0"><strong>Rows shown:</strong> @Model.Rows.Count</p>
+            <p class="mb-0"><strong>Answered:</strong> @Model.AnsweredCount</p>
         </div>
     </div>
 
@@ -72,7 +74,14 @@
                         <td>@row.AnswerNumber</td>
                         <td>@(row.AnswerCurrency.HasValue ? row.AnswerCurrency.Value.ToString("C") : "")</td>
                         <td>
-                            <a asp-page="./Edit" asp-route-id="@row.Id" class="btn btn-sm btn-warning">Edit</a>
+                            @if (row.Id > 0)
+                            {
+                                <a asp-page="./Edit" asp-route-id="@row.Id" class="btn btn-sm btn-warning">Edit</a>
+                            }
+                            else
+                            {
+                                <span class="text-muted">No answer</span>
+                            }
                         </td>
                     </tr>
                 }

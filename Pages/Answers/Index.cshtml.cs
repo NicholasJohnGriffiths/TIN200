@@ -12,6 +12,8 @@ namespace TINWorkspaceTemp.Pages.Answers
         public List<AnswerService.CompanySurveyOption> CompanySurveyOptions { get; set; } = new();
         public int? SelectedFinancialYear { get; set; }
         public int? SelectedCompanySurveyId { get; set; }
+        public int QuestionCount { get; set; }
+        public int AnsweredCount { get; set; }
 
         public IndexModel(AnswerService answerService)
         {
@@ -20,6 +22,7 @@ namespace TINWorkspaceTemp.Pages.Answers
 
         public async Task OnGetAsync(int? financialYear, int? companySurveyId)
         {
+            QuestionCount = await _answerService.GetQuestionCountAsync();
             FinancialYears = await _answerService.GetAvailableFinancialYearsAsync();
             SelectedFinancialYear = financialYear ?? await _answerService.GetCurrentSurveyFinancialYearAsync();
 
@@ -43,10 +46,12 @@ namespace TINWorkspaceTemp.Pages.Answers
             if (!SelectedCompanySurveyId.HasValue)
             {
                 Rows = new List<AnswerService.AnswerListRow>();
+                AnsweredCount = 0;
                 return;
             }
 
             Rows = await _answerService.GetAnswerRowsAsync(SelectedCompanySurveyId.Value);
+            AnsweredCount = Rows.Count(x => x.Id > 0);
         }
     }
 }

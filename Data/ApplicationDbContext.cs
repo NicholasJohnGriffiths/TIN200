@@ -195,8 +195,8 @@ namespace TINWorkspaceTemp.Data
                     .HasColumnName("Id")
                     .ValueGeneratedOnAdd();
 
-                entity.Property(e => e.ClientSurveyId)
-                    .HasColumnName("ClientSurveyId")
+                entity.Property(e => e.CompanySurveyId)
+                    .HasColumnName("CompanySurveyId")
                     .HasColumnType("int")
                     .IsRequired();
 
@@ -219,7 +219,7 @@ namespace TINWorkspaceTemp.Data
 
                 entity.HasOne<CompanySurvey>()
                     .WithMany()
-                    .HasForeignKey(e => e.ClientSurveyId)
+                    .HasForeignKey(e => e.CompanySurveyId)
                     .OnDelete(DeleteBehavior.Restrict);
 
                 entity.HasOne<Question>()

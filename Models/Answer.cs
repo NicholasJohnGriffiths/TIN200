@@ -10,7 +10,7 @@ namespace TINWorkspaceTemp.Models
         public int Id { get; set; }
 
         [Required]
-        public int ClientSurveyId { get; set; }
+        public int CompanySurveyId { get; set; }
 
         [Required]
         public int QuestionId { get; set; }
