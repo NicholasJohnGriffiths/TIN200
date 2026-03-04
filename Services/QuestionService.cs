@@ -138,6 +138,43 @@ namespace TINWorkspaceTemp.Services
             await _context.SaveChangesAsync();
         }
 
+        public async Task MoveUpAsync(int id)
+        {
+            var question = await _context.Question.FindAsync(id);
+            if (question == null)
+            {
+                return;
+            }
+
+            var currentOrder = question.OrderNumber ?? 1;
+            if (currentOrder <= 1)
+            {
+                return;
+            }
+
+            question.OrderNumber = currentOrder - 1;
+            await UpdateAsync(question);
+        }
+
+        public async Task MoveDownAsync(int id)
+        {
+            var question = await _context.Question.FindAsync(id);
+            if (question == null)
+            {
+                return;
+            }
+
+            var maxOrder = await _context.Question.CountAsync();
+            var currentOrder = question.OrderNumber ?? maxOrder;
+            if (currentOrder >= maxOrder)
+            {
+                return;
+            }
+
+            question.OrderNumber = currentOrder + 1;
+            await UpdateAsync(question);
+        }
+
         public async Task<bool> ExistsAsync(int id)
         {
             return await _context.Question.AnyAsync(q => q.Id == id);

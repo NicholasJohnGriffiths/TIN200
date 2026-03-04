@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Mvc;
 using TINWorkspaceTemp.Models;
 using TINWorkspaceTemp.Services;
 
@@ -18,6 +19,18 @@ namespace TINWorkspaceTemp.Pages.Questions
         public async Task OnGetAsync()
         {
             Records = await _service.GetAllAsync();
+        }
+
+        public async Task<IActionResult> OnPostMoveUpAsync(int id)
+        {
+            await _service.MoveUpAsync(id);
+            return RedirectToPage();
+        }
+
+        public async Task<IActionResult> OnPostMoveDownAsync(int id)
+        {
+            await _service.MoveDownAsync(id);
+            return RedirectToPage();
         }
     }
 }
