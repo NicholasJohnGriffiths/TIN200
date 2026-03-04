@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Data.SqlClient;
 
-namespace TINWorkspaceTemp.Pages.Tin200
+namespace TINWorkspaceTemp.Pages.Company
 {
     [IgnoreAntiforgeryToken]
     public class ImportModel : PageModel
@@ -264,3 +264,4 @@ VALUES (@ceoFirst, @ceoLast, @email, @externalId, @companyName, @companyDesc, @f
         }
     }
 }
+

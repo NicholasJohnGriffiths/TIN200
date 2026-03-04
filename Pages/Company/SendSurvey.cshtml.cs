@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using TINWorkspaceTemp.Services;
 
-namespace TINWorkspaceTemp.Pages.Tin200
+namespace TINWorkspaceTemp.Pages.Company
 {
     public class SendSurveyModel : PageModel
     {
@@ -129,7 +129,7 @@ namespace TINWorkspaceTemp.Pages.Tin200
         private string BuildSurveyUrl(int id)
         {
             var token = _surveyLinkTokenService.GenerateToken(id);
-            return Url.Page("/Tin200/SurveyUpdate", pageHandler: null, values: new { id, token }, protocol: Request.Scheme) ?? string.Empty;
+            return Url.Page("/Company/SurveyUpdate", pageHandler: null, values: new { id, token }, protocol: Request.Scheme) ?? string.Empty;
         }
 
         private async Task LoadAvailableClientsAsync()
@@ -155,3 +155,4 @@ namespace TINWorkspaceTemp.Pages.Tin200
         }
     }
 }
+

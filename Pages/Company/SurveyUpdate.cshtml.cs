@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using TINWorkspaceTemp.Models;
 using TINWorkspaceTemp.Services;
 
-namespace TINWorkspaceTemp.Pages.Tin200
+namespace TINWorkspaceTemp.Pages.Company
 {
     public class SurveyUpdateModel : PageModel
     {
@@ -32,7 +32,7 @@ namespace TINWorkspaceTemp.Pages.Tin200
         {
             if (!_surveyLinkTokenService.IsTokenValid(id, token))
             {
-                return RedirectToPage("/Tin200/SurveyLinkInvalid");
+                return RedirectToPage("/Company/SurveyLinkInvalid");
             }
 
             var record = await _companyService.GetCompanyByIdAsync(id);
@@ -52,7 +52,7 @@ namespace TINWorkspaceTemp.Pages.Tin200
         {
             if (!_surveyLinkTokenService.IsTokenValid(id, Token))
             {
-                return RedirectToPage("/Tin200/SurveyLinkInvalid");
+                return RedirectToPage("/Company/SurveyLinkInvalid");
             }
 
             if (!ModelState.IsValid)
@@ -85,3 +85,4 @@ namespace TINWorkspaceTemp.Pages.Tin200
         }
     }
 }
+

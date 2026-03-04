@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
-namespace TINWorkspaceTemp.Pages.Tin200
+namespace TINWorkspaceTemp.Pages.Company
 {
     public class SurveyLinkInvalidModel : PageModel
     {
@@ -35,3 +35,4 @@ namespace TINWorkspaceTemp.Pages.Tin200
         }
     }
 }
+

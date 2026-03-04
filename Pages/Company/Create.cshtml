@@ -1,17 +1,15 @@
-@page "{id}"
-@model TINWorkspaceTemp.Pages.Tin200.EditModel
+@page
+@model TINWorkspaceTemp.Pages.Company.CreateModel
 @{
-    ViewData["Title"] = "Edit Company";
+    ViewData["Title"] = "Create New Company";
 }
 
 <div class="container mt-4">
     <div class="row">
         <div class="col-md-8">
-            <h1>Edit Company</h1>
+            <h1>Create New Company</h1>
             <hr />
             <form method="post">
-                <input type="hidden" asp-for="Record.Id" />
-
                 <div class="form-group mb-3">
                     <label asp-for="Record.CeoFirstName" class="form-label"></label>
                     <input asp-for="Record.CeoFirstName" class="form-control" />
@@ -72,10 +70,10 @@
                     <span asp-validation-for="Record.FinancialYear" class="text-danger"></span>
                 </div>
 
-                <!-- Company identity column removed from edit form -->
+                <!-- Company identity column removed from create form -->
 
                 <div class="form-group">
-                    <button type="submit" class="btn btn-success">Save Changes</button>
+                    <button type="submit" class="btn btn-success">Create</button>
                     <a asp-page="./Index" class="btn btn-secondary">Cancel</a>
                 </div>
             </form>
@@ -88,3 +86,4 @@
         await Html.RenderPartialAsync("_ValidationScriptsPartial");
     }
 }
+

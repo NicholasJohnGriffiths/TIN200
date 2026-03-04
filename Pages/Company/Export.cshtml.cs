@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using TINWorkspaceTemp.Services;
 
-namespace TINWorkspaceTemp.Pages.Tin200
+namespace TINWorkspaceTemp.Pages.Company
 {
     public class ExportModel : PageModel
     {
@@ -53,3 +53,4 @@ namespace TINWorkspaceTemp.Pages.Tin200
         }
     }
 }
+

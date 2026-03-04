@@ -3,40 +3,48 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using TINWorkspaceTemp.Models;
 using TINWorkspaceTemp.Services;
 
-namespace TINWorkspaceTemp.Pages.Tin200
+namespace TINWorkspaceTemp.Pages.Company
 {
-    public class DeleteModel : PageModel
+    public class EditModel : PageModel
     {
         private readonly CompanyService _service;
 
         [BindProperty]
-        public Models.Tin200? Record { get; set; }
+        public Models.Tin200 Record { get; set; } = new();
 
-        public DeleteModel(CompanyService service)
+        public EditModel(CompanyService service)
         {
             _service = service;
         }
 
         public async Task<IActionResult> OnGetAsync(int id)
         {
-            Record = await _service.GetCompanyByIdAsync(id);
-            if (Record == null)
+            var record = await _service.GetCompanyByIdAsync(id);
+            if (record == null)
             {
                 return NotFound();
             }
 
+            Record = record;
             return Page();
         }
 
         public async Task<IActionResult> OnPostAsync()
         {
-            if (Record?.Id == null)
+            if (!ModelState.IsValid)
+            {
+                return Page();
+            }
+
+            var exists = await _service.CompanyExistsAsync(Record.Id);
+            if (!exists)
             {
                 return NotFound();
             }
 
-            await _service.DeleteCompanyAsync(Record.Id);
+            await _service.UpdateCompanyAsync(Record);
             return RedirectToPage("./Index");
         }
     }
 }
+

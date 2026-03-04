@@ -11,17 +11,18 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizeFolder("/");
     options.Conventions.AllowAnonymousToPage("/Login");
     options.Conventions.AllowAnonymousToPage("/Error");
-    options.Conventions.AllowAnonymousToPage("/Tin200/SurveyUpdate");
-    options.Conventions.AllowAnonymousToPage("/Tin200/SurveyLinkInvalid");
-    options.Conventions.AddPageRoute("/Tin200/Index", "/Company");
-    options.Conventions.AddPageRoute("/Tin200/Create", "/Company/Create");
-    options.Conventions.AddPageRoute("/Tin200/Edit", "/Company/Edit/{id?}");
-    options.Conventions.AddPageRoute("/Tin200/Details", "/Company/Details/{id?}");
-    options.Conventions.AddPageRoute("/Tin200/Delete", "/Company/Delete/{id?}");
-    options.Conventions.AddPageRoute("/Tin200/Import", "/Company/Import");
-    options.Conventions.AddPageRoute("/Tin200/SendSurvey", "/Company/SendSurvey");
-    options.Conventions.AddPageRoute("/Tin200/SurveyUpdate", "/Company/SurveyUpdate/{id:int}");
-    options.Conventions.AddPageRoute("/Tin200/SurveyLinkInvalid", "/Company/SurveyLinkInvalid");
+    options.Conventions.AllowAnonymousToPage("/Company/SurveyUpdate");
+    options.Conventions.AllowAnonymousToPage("/Company/SurveyLinkInvalid");
+
+    options.Conventions.AddPageRoute("/Company/Index", "/Tin200");
+    options.Conventions.AddPageRoute("/Company/Create", "/Tin200/Create");
+    options.Conventions.AddPageRoute("/Company/Edit", "/Tin200/Edit/{id?}");
+    options.Conventions.AddPageRoute("/Company/Details", "/Tin200/Details/{id?}");
+    options.Conventions.AddPageRoute("/Company/Delete", "/Tin200/Delete/{id?}");
+    options.Conventions.AddPageRoute("/Company/Import", "/Tin200/Import");
+    options.Conventions.AddPageRoute("/Company/SendSurvey", "/Tin200/SendSurvey");
+    options.Conventions.AddPageRoute("/Company/SurveyUpdate", "/Tin200/SurveyUpdate/{id:int}");
+    options.Conventions.AddPageRoute("/Company/SurveyLinkInvalid", "/Tin200/SurveyLinkInvalid");
 });
 builder.Services.AddHealthChecks();
 
