@@ -12,6 +12,7 @@ namespace TINWorkspaceTemp.Data
 
         public DbSet<Tin200> Tin200 { get; set; } = null!;
         public DbSet<Survey> Survey { get; set; } = null!;
+        public DbSet<CompanySurvey> CompanySurvey { get; set; } = null!;
         public DbSet<CompanyFinancialAnalytics> CompanyFinancialAnalytics { get; set; } = null!;
         public DbSet<FinancialYearComparison> FinancialYearComparison { get; set; } = null!;
         public DbSet<RevenueSummaryBySize> RevenueSummaryBySize { get; set; } = null!;
@@ -90,6 +91,53 @@ namespace TINWorkspaceTemp.Data
                     .HasColumnName("FinancialYear")
                     .HasColumnType("int")
                     .IsRequired();
+            });
+
+            modelBuilder.Entity<CompanySurvey>(entity =>
+            {
+                entity.ToTable("CompanySurvey");
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("Id")
+                    .ValueGeneratedOnAdd();
+
+                entity.Property(e => e.CompanyId)
+                    .HasColumnName("CompanyId")
+                    .HasColumnType("int")
+                    .IsRequired();
+
+                entity.Property(e => e.SurveyId)
+                    .HasColumnName("SurveyId")
+                    .HasColumnType("int")
+                    .IsRequired();
+
+                entity.Property(e => e.Saved)
+                    .HasColumnName("Saved")
+                    .HasColumnType("bit")
+                    .IsRequired();
+
+                entity.Property(e => e.Submitted)
+                    .HasColumnName("Submitted")
+                    .HasColumnType("bit")
+                    .IsRequired();
+
+                entity.Property(e => e.Requested)
+                    .HasColumnName("Requested")
+                    .HasColumnType("bit")
+                    .IsRequired();
+
+                entity.HasOne<Tin200>()
+                    .WithMany()
+                    .HasForeignKey(e => e.CompanyId)
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .HasConstraintName("FK_CompanySurvey_TIN200");
+
+                entity.HasOne<Survey>()
+                    .WithMany()
+                    .HasForeignKey(e => e.SurveyId)
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .HasConstraintName("FK_CompanySurvey_Survey");
             });
 
             // Configure view models - no key required for views

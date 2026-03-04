@@ -1,17 +1,16 @@
 @page
-@model TINWorkspaceTemp.Pages.Survey.IndexModel
+@model TINWorkspaceTemp.Pages.CompanySurvey.IndexModel
 @{
-    ViewData["Title"] = "Survey Records";
+    ViewData["Title"] = "Company Survey Records";
 }
 
 <div class="container mt-4">
     <div class="row mb-3">
         <div class="col-md-8">
-            <h1>Survey Records</h1>
+            <h1>Company Survey Records</h1>
         </div>
         <div class="col-md-4 text-end">
-            <a asp-page="./Create" class="btn btn-primary">Add New Survey</a>
-            <a asp-page="/CompanySurvey/Index" class="btn btn-outline-secondary ms-2">Company Surveys</a>
+            <a asp-page="./Create" class="btn btn-primary">Add New Record</a>
         </div>
     </div>
 
@@ -21,7 +20,11 @@
             <thead class="table-dark">
                 <tr>
                     <th>ID</th>
-                    <th>Financial Year</th>
+                    <th>Company ID</th>
+                    <th>Survey ID</th>
+                    <th>Saved</th>
+                    <th>Submitted</th>
+                    <th>Requested</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -30,7 +33,11 @@
                 {
                     <tr>
                         <td>@record.Id</td>
-                        <td>@record.FinancialYear</td>
+                        <td>@record.CompanyId</td>
+                        <td>@record.SurveyId</td>
+                        <td>@record.Saved</td>
+                        <td>@record.Submitted</td>
+                        <td>@record.Requested</td>
                         <td>
                             <a asp-page="./Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
                             <a asp-page="./Edit" asp-route-id="@record.Id" class="btn btn-sm btn-warning">Edit</a>
@@ -43,6 +50,6 @@
     }
     else
     {
-        <div class="alert alert-info">No survey records found.</div>
+        <div class="alert alert-info">No company survey records found.</div>
     }
 </div>

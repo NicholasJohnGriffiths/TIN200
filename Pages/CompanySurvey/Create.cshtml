@@ -1,0 +1,48 @@
+@page
+@model TINWorkspaceTemp.Pages.CompanySurvey.CreateModel
+@{
+    ViewData["Title"] = "Create Company Survey";
+}
+
+<div class="container mt-4">
+    <h1>Create Company Survey</h1>
+    <hr />
+
+    <form method="post">
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+        <div class="form-group mb-3">
+            <label asp-for="Record.CompanyId" class="form-label"></label>
+            <input asp-for="Record.CompanyId" class="form-control" />
+            <span asp-validation-for="Record.CompanyId" class="text-danger"></span>
+        </div>
+
+        <div class="form-group mb-3">
+            <label asp-for="Record.SurveyId" class="form-label"></label>
+            <input asp-for="Record.SurveyId" class="form-control" />
+            <span asp-validation-for="Record.SurveyId" class="text-danger"></span>
+        </div>
+
+        <div class="form-check mb-2">
+            <input asp-for="Record.Saved" class="form-check-input" />
+            <label asp-for="Record.Saved" class="form-check-label"></label>
+        </div>
+
+        <div class="form-check mb-2">
+            <input asp-for="Record.Submitted" class="form-check-input" />
+            <label asp-for="Record.Submitted" class="form-check-label"></label>
+        </div>
+
+        <div class="form-check mb-3">
+            <input asp-for="Record.Requested" class="form-check-input" />
+            <label asp-for="Record.Requested" class="form-check-label"></label>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Create</button>
+        <a asp-page="./Index" class="btn btn-secondary">Back to List</a>
+    </form>
+</div>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+}
