@@ -7,7 +7,7 @@ namespace TINWorkspaceTemp.Pages.CompanySurvey
     {
         private readonly CompanySurveyService _service;
 
-        public List<Models.CompanySurvey> Records { get; set; } = new();
+        public List<CompanySurveyService.CompanySurveyListRow> Records { get; set; } = new();
 
         public IndexModel(CompanySurveyService service)
         {
@@ -16,7 +16,7 @@ namespace TINWorkspaceTemp.Pages.CompanySurvey
 
         public async Task OnGetAsync()
         {
-            Records = await _service.GetAllAsync();
+            Records = await _service.GetListRowsAsync();
         }
     }
 }

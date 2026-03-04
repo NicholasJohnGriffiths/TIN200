@@ -25,7 +25,32 @@ namespace TINWorkspaceTemp.Services
             .ToListAsync();
         }
 
-        public async Task<List<AnswerListRow>> GetAnswerRowsAsync(int? financialYear)
+        public async Task<List<CompanySurveyOption>> GetCompanySurveyOptionsAsync(int? financialYear)
+        {
+            var query =
+                from companySurvey in _context.CompanySurvey
+                join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
+                join company in _context.Tin200 on companySurvey.CompanyId equals company.Id
+                select new CompanySurveyOption
+                {
+                    CompanySurveyId = companySurvey.Id,
+                    CompanyId = company.Id,
+                    CompanyName = company.CompanyName,
+                    FinancialYear = survey.FinancialYear
+                };
+
+            if (financialYear.HasValue)
+            {
+                query = query.Where(x => x.FinancialYear == financialYear.Value);
+            }
+
+            return await query
+                .OrderBy(x => x.CompanyName)
+                .ThenByDescending(x => x.FinancialYear)
+                .ToListAsync();
+        }
+
+        public async Task<List<AnswerListRow>> GetAnswerRowsAsync(int companySurveyId)
         {
             var query =
                 from answer in _context.Answer
@@ -36,6 +61,7 @@ namespace TINWorkspaceTemp.Services
                 select new AnswerListRow
                 {
                     Id = answer.Id,
+                    ClientSurveyId = answer.ClientSurveyId,
                     CompanyId = company.Id,
                     CompanyName = company.CompanyName,
                     FinancialYear = survey.FinancialYear,
@@ -46,10 +72,7 @@ namespace TINWorkspaceTemp.Services
                     AnswerCurrency = answer.AnswerCurrency
                 };
 
-            if (financialYear.HasValue)
-            {
-                query = query.Where(x => x.FinancialYear == financialYear.Value);
-            }
+            query = query.Where(x => x.ClientSurveyId == companySurveyId);
 
             return await query
                 .OrderBy(x => x.CompanyName)
@@ -101,6 +124,7 @@ namespace TINWorkspaceTemp.Services
         public class AnswerListRow
         {
             public int Id { get; set; }
+            public int ClientSurveyId { get; set; }
             public int CompanyId { get; set; }
             public string? CompanyName { get; set; }
             public int FinancialYear { get; set; }
@@ -128,9 +152,18 @@ namespace TINWorkspaceTemp.Services
         public class AnswerEditInput
         {
             public int Id { get; set; }
+            public int ClientSurveyId { get; set; }
             public string? AnswerText { get; set; }
             public int? AnswerNumber { get; set; }
             public decimal? AnswerCurrency { get; set; }
+        }
+
+        public class CompanySurveyOption
+        {
+            public int CompanySurveyId { get; set; }
+            public int CompanyId { get; set; }
+            public string? CompanyName { get; set; }
+            public int FinancialYear { get; set; }
         }
     }
 }

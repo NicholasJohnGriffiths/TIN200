@@ -19,29 +19,23 @@
         <table class="table table-striped table-hover">
             <thead class="table-dark">
                 <tr>
-                    <th>ID</th>
-                    <th>Company ID</th>
-                    <th>Survey ID</th>
+                    <th>Company Name</th>
                     <th>Saved</th>
                     <th>Submitted</th>
-                    <th>Requested</th>
-                    <th>Actions</th>
+                    <th>Request</th>
+                    <th>Answers</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach (var record in Model.Records)
                 {
                     <tr>
-                        <td>@record.Id</td>
-                        <td>@record.CompanyId</td>
-                        <td>@record.SurveyId</td>
+                        <td>@record.CompanyName</td>
                         <td>@record.Saved</td>
                         <td>@record.Submitted</td>
                         <td>@record.Requested</td>
                         <td>
-                            <a asp-page="./Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
-                            <a asp-page="./Edit" asp-route-id="@record.Id" class="btn btn-sm btn-warning">Edit</a>
-                            <a asp-page="./Delete" asp-route-id="@record.Id" class="btn btn-sm btn-danger">Delete</a>
+                            <a asp-page="/Answers/Index" asp-route-companySurveyId="@record.Id" class="btn btn-sm btn-primary">Open Answers</a>
                         </td>
                     </tr>
                 }

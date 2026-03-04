@@ -20,6 +20,24 @@ namespace TINWorkspaceTemp.Services
                 .ToListAsync();
         }
 
+        public async Task<List<CompanySurveyListRow>> GetListRowsAsync()
+        {
+            return await (
+                from companySurvey in _context.CompanySurvey
+                join company in _context.Tin200 on companySurvey.CompanyId equals company.Id into companyJoin
+                from company in companyJoin.DefaultIfEmpty()
+                orderby company.CompanyName
+                select new CompanySurveyListRow
+                {
+                    Id = companySurvey.Id,
+                    CompanyName = company.CompanyName,
+                    Saved = companySurvey.Saved,
+                    Submitted = companySurvey.Submitted,
+                    Requested = companySurvey.Requested
+                }
+            ).ToListAsync();
+        }
+
         public async Task<CompanySurvey?> GetByIdAsync(int id)
         {
             return await _context.CompanySurvey.FindAsync(id);
@@ -52,6 +70,15 @@ namespace TINWorkspaceTemp.Services
         public async Task<bool> ExistsAsync(int id)
         {
             return await _context.CompanySurvey.AnyAsync(x => x.Id == id);
+        }
+
+        public class CompanySurveyListRow
+        {
+            public int Id { get; set; }
+            public string? CompanyName { get; set; }
+            public bool Saved { get; set; }
+            public bool Submitted { get; set; }
+            public bool Requested { get; set; }
         }
     }
 }

@@ -1,0 +1,58 @@
+@page "{id:int}"
+@model TINWorkspaceTemp.Pages.Questions.EditModel
+@{
+    ViewData["Title"] = "Edit Question";
+}
+
+<div class="container mt-4">
+    <h1>Edit Question</h1>
+    <hr />
+
+    <form method="post">
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+        <input type="hidden" asp-for="Record.Id" />
+
+        <div class="form-group mb-3">
+            <label asp-for="Record.OrderNumber" class="form-label"></label>
+            <input asp-for="Record.OrderNumber" class="form-control" />
+        </div>
+
+        <div class="form-group mb-3">
+            <label asp-for="Record.Title" class="form-label"></label>
+            <input asp-for="Record.Title" class="form-control" />
+        </div>
+
+        <div class="form-group mb-3">
+            <label asp-for="Record.Description" class="form-label"></label>
+            <textarea asp-for="Record.Description" class="form-control" rows="3"></textarea>
+        </div>
+
+        <div class="form-group mb-3">
+            <label asp-for="Record.QuestionText" class="form-label">Question</label>
+            <textarea asp-for="Record.QuestionText" class="form-control" rows="3"></textarea>
+        </div>
+
+        <div class="form-group mb-3">
+            <label asp-for="Record.AnswerType" class="form-label"></label>
+            <input asp-for="Record.AnswerType" class="form-control" />
+        </div>
+
+        <div class="row">
+            <div class="col-md-3 mb-3"><input asp-for="Record.Multi1" class="form-control" placeholder="Multi 1" /></div>
+            <div class="col-md-3 mb-3"><input asp-for="Record.Multi2" class="form-control" placeholder="Multi 2" /></div>
+            <div class="col-md-3 mb-3"><input asp-for="Record.Multi3" class="form-control" placeholder="Multi 3" /></div>
+            <div class="col-md-3 mb-3"><input asp-for="Record.Multi4" class="form-control" placeholder="Multi 4" /></div>
+            <div class="col-md-3 mb-3"><input asp-for="Record.Multi5" class="form-control" placeholder="Multi 5" /></div>
+            <div class="col-md-3 mb-3"><input asp-for="Record.Multi6" class="form-control" placeholder="Multi 6" /></div>
+            <div class="col-md-3 mb-3"><input asp-for="Record.Multi7" class="form-control" placeholder="Multi 7" /></div>
+            <div class="col-md-3 mb-3"><input asp-for="Record.Multi8" class="form-control" placeholder="Multi 8" /></div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a asp-page="./Index" class="btn btn-secondary">Back to List</a>
+    </form>
+</div>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+}

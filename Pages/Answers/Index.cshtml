@@ -7,29 +7,45 @@
 <div class="container-fluid px-0 mt-3">
     <div class="row mb-3">
         <div class="col-md-8">
-            <h1>Answers by Company</h1>
-            <p class="text-muted mb-0">Filtered by financial year from survey records.</p>
+            <h1>Answers by Company Survey</h1>
+            <p class="text-muted mb-0">Select a Company Survey record to view and edit its answers.</p>
         </div>
     </div>
 
     <div class="row mb-3">
         <div class="col-12">
-            <form method="get" class="d-flex">
-                <label class="me-2 align-self-center">Financial Year:</label>
-                <select name="financialYear" class="form-select me-2" aria-label="Financial Year" style="max-width: 180px;">
+            <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
+                <label class="me-1">Financial Year:</label>
+                <select name="financialYear" class="form-select" aria-label="Financial Year" style="max-width: 180px;">
                     <option value="">All</option>
                     @foreach (var year in Model.FinancialYears)
                     {
                         <option value="@year" selected="@(Model.SelectedFinancialYear == year ? "selected" : null)">@year</option>
                     }
                 </select>
+
+                <label class="ms-2 me-1">Company Survey:</label>
+                <select name="companySurveyId" class="form-select" aria-label="Company Survey" style="max-width: 360px;">
+                    <option value="">Select Company Survey</option>
+                    @foreach (var option in Model.CompanySurveyOptions)
+                    {
+                        <option value="@option.CompanySurveyId" selected="@(Model.SelectedCompanySurveyId == option.CompanySurveyId ? "selected" : null)">
+                            #@option.CompanySurveyId - @option.CompanyName (FY @option.FinancialYear)
+                        </option>
+                    }
+                </select>
+
                 <button class="btn btn-outline-primary" type="submit">Apply</button>
                 <a class="btn btn-link ms-2" asp-page="./Index">Clear</a>
             </form>
         </div>
     </div>
 
-    @if (Model.Rows.Any())
+    @if (!Model.SelectedCompanySurveyId.HasValue)
+    {
+        <div class="alert alert-info">Select a Company Survey record to view answers.</div>
+    }
+    else if (Model.Rows.Any())
     {
         <div class="table-responsive">
             <table class="table table-striped table-hover">
@@ -65,6 +81,6 @@
     }
     else
     {
-        <div class="alert alert-info">No answers found for the selected filter.</div>
+        <div class="alert alert-info">No answers found for the selected Company Survey.</div>
     }
 </div>
