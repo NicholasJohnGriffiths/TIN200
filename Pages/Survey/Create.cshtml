@@ -1,0 +1,27 @@
+@page
+@model TINWorkspaceTemp.Pages.Survey.CreateModel
+@{
+    ViewData["Title"] = "Create Survey";
+}
+
+<div class="container mt-4">
+    <h1>Create Survey</h1>
+    <hr />
+
+    <form method="post">
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+        <div class="form-group mb-3">
+            <label asp-for="Record.FinancialYear" class="form-label"></label>
+            <input asp-for="Record.FinancialYear" class="form-control" />
+            <span asp-validation-for="Record.FinancialYear" class="text-danger"></span>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Create</button>
+        <a asp-page="./Index" class="btn btn-secondary">Back to List</a>
+    </form>
+</div>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+}

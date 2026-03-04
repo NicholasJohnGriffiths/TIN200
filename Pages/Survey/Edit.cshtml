@@ -1,0 +1,28 @@
+@page "{id:int}"
+@model TINWorkspaceTemp.Pages.Survey.EditModel
+@{
+    ViewData["Title"] = "Edit Survey";
+}
+
+<div class="container mt-4">
+    <h1>Edit Survey</h1>
+    <hr />
+
+    <form method="post">
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+        <input type="hidden" asp-for="Record.Id" />
+
+        <div class="form-group mb-3">
+            <label asp-for="Record.FinancialYear" class="form-label"></label>
+            <input asp-for="Record.FinancialYear" class="form-control" />
+            <span asp-validation-for="Record.FinancialYear" class="text-danger"></span>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a asp-page="./Index" class="btn btn-secondary">Back to List</a>
+    </form>
+</div>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+}

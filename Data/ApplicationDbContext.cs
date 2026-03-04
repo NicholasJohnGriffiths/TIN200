@@ -11,6 +11,7 @@ namespace TINWorkspaceTemp.Data
         }
 
         public DbSet<Tin200> Tin200 { get; set; } = null!;
+        public DbSet<Survey> Survey { get; set; } = null!;
         public DbSet<CompanyFinancialAnalytics> CompanyFinancialAnalytics { get; set; } = null!;
         public DbSet<FinancialYearComparison> FinancialYearComparison { get; set; } = null!;
         public DbSet<RevenueSummaryBySize> RevenueSummaryBySize { get; set; } = null!;
@@ -75,6 +76,20 @@ namespace TINWorkspaceTemp.Data
                     .HasColumnType("int");
 
                 // TIN200 column exists in the database but is intentionally not mapped to the model
+            });
+
+            modelBuilder.Entity<Survey>(entity =>
+            {
+                entity.ToTable("Survey");
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Id)
+                    .HasColumnName("Id")
+                    .ValueGeneratedOnAdd();
+
+                entity.Property(e => e.FinancialYear)
+                    .HasColumnName("FinancialYear")
+                    .HasColumnType("int")
+                    .IsRequired();
             });
 
             // Configure view models - no key required for views

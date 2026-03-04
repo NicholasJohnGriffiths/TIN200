@@ -1,0 +1,21 @@
+@page "{id:int}"
+@model TINWorkspaceTemp.Pages.Survey.DetailsModel
+@{
+    ViewData["Title"] = "Survey Details";
+}
+
+<div class="container mt-4">
+    <h1>Survey Details</h1>
+    <hr />
+
+    <dl class="row">
+        <dt class="col-sm-3">ID</dt>
+        <dd class="col-sm-9">@Model.Record.Id</dd>
+
+        <dt class="col-sm-3">Financial Year</dt>
+        <dd class="col-sm-9">@Model.Record.FinancialYear</dd>
+    </dl>
+
+    <a asp-page="./Edit" asp-route-id="@Model.Record.Id" class="btn btn-warning">Edit</a>
+    <a asp-page="./Index" class="btn btn-secondary">Back to List</a>
+</div>
