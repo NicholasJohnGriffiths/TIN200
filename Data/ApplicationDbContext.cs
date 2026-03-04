@@ -93,6 +93,11 @@ namespace TINWorkspaceTemp.Data
                     .HasColumnName("FinancialYear")
                     .HasColumnType("int")
                     .IsRequired();
+
+                entity.Property(e => e.CurrentSurvey)
+                    .HasColumnName("CurrentSurvey")
+                    .HasColumnType("bit")
+                    .IsRequired();
             });
 
             modelBuilder.Entity<CompanySurvey>(entity =>

@@ -14,6 +14,21 @@
         </div>
     </div>
 
+    <div class="row mb-3">
+        <div class="col-12">
+            <form method="get" class="d-flex">
+                <label class="me-2 align-self-center">Survey Financial Year:</label>
+                <select name="financialYear" class="form-select me-2" aria-label="Survey Financial Year" style="max-width: 180px;">
+                    @foreach (var year in Model.FinancialYears)
+                    {
+                        <option value="@year" selected="@(Model.SelectedFinancialYear == year ? "selected" : null)">@year</option>
+                    }
+                </select>
+                <button class="btn btn-outline-primary" type="submit">Apply</button>
+            </form>
+        </div>
+    </div>
+
     @if (Model.Records.Any())
     {
         <table class="table table-striped table-hover">
@@ -35,7 +50,7 @@
                         <td>@record.Submitted</td>
                         <td>@record.Requested</td>
                         <td>
-                            <a asp-page="/Answers/Index" asp-route-companySurveyId="@record.Id" class="btn btn-sm btn-primary">Open Answers</a>
+                            <a asp-page="/Answers/Index" asp-route-companySurveyId="@record.Id" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-sm btn-primary">Open Answers</a>
                         </td>
                     </tr>
                 }

@@ -12,5 +12,9 @@ namespace TINWorkspaceTemp.Models
         [Display(Name = "Financial Year")]
         [Required]
         public int FinancialYear { get; set; }
+
+        [Display(Name = "Current Survey")]
+        [Required]
+        public bool CurrentSurvey { get; set; }
     }
 }

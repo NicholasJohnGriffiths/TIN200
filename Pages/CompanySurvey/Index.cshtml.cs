@@ -8,15 +8,21 @@ namespace TINWorkspaceTemp.Pages.CompanySurvey
         private readonly CompanySurveyService _service;
 
         public List<CompanySurveyService.CompanySurveyListRow> Records { get; set; } = new();
+        public List<int> FinancialYears { get; set; } = new();
+        public int? SelectedFinancialYear { get; set; }
 
         public IndexModel(CompanySurveyService service)
         {
             _service = service;
         }
 
-        public async Task OnGetAsync()
+        public async Task OnGetAsync(int? financialYear)
         {
-            Records = await _service.GetListRowsAsync();
+            FinancialYears = await _service.GetAvailableFinancialYearsAsync();
+
+            SelectedFinancialYear = financialYear ?? await _service.GetCurrentSurveyFinancialYearAsync();
+
+            Records = await _service.GetListRowsAsync(SelectedFinancialYear);
         }
     }
 }

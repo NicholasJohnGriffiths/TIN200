@@ -22,20 +22,53 @@ namespace TINWorkspaceTemp.Services
 
         public async Task<List<CompanySurveyListRow>> GetListRowsAsync()
         {
-            return await (
+            return await GetListRowsAsync(null);
+        }
+
+        public async Task<List<CompanySurveyListRow>> GetListRowsAsync(int? financialYear)
+        {
+            var query =
                 from companySurvey in _context.CompanySurvey
+                join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
                 join company in _context.Tin200 on companySurvey.CompanyId equals company.Id into companyJoin
                 from company in companyJoin.DefaultIfEmpty()
-                orderby company.CompanyName
                 select new CompanySurveyListRow
                 {
                     Id = companySurvey.Id,
                     CompanyName = company.CompanyName,
+                    FinancialYear = survey.FinancialYear,
                     Saved = companySurvey.Saved,
                     Submitted = companySurvey.Submitted,
                     Requested = companySurvey.Requested
-                }
-            ).ToListAsync();
+                };
+
+            if (financialYear.HasValue)
+            {
+                query = query.Where(x => x.FinancialYear == financialYear.Value);
+            }
+
+            return await query
+                .OrderBy(x => x.CompanyName)
+                .ThenBy(x => x.Id)
+                .ToListAsync();
+        }
+
+        public async Task<List<int>> GetAvailableFinancialYearsAsync()
+        {
+            return await _context.Survey
+                .Select(s => s.FinancialYear)
+                .Distinct()
+                .OrderByDescending(y => y)
+                .ToListAsync();
+        }
+
+        public async Task<int?> GetCurrentSurveyFinancialYearAsync()
+        {
+            return await _context.Survey
+                .Where(s => s.CurrentSurvey)
+                .Select(s => (int?)s.FinancialYear)
+                .OrderByDescending(y => y)
+                .FirstOrDefaultAsync();
         }
 
         public async Task<CompanySurvey?> GetByIdAsync(int id)
@@ -76,6 +109,7 @@ namespace TINWorkspaceTemp.Services
         {
             public int Id { get; set; }
             public string? CompanyName { get; set; }
+            public int FinancialYear { get; set; }
             public bool Saved { get; set; }
             public bool Submitted { get; set; }
             public bool Requested { get; set; }
