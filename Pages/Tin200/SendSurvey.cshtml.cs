@@ -6,16 +6,16 @@ namespace TINWorkspaceTemp.Pages.Tin200
 {
     public class SendSurveyModel : PageModel
     {
-        private readonly Tin200Service _tin200Service;
+        private readonly CompanyService _companyService;
         private readonly ISurveyEmailService _surveyEmailService;
         private readonly ISurveyLinkTokenService _surveyLinkTokenService;
 
         public SendSurveyModel(
-            Tin200Service tin200Service,
+            CompanyService companyService,
             ISurveyEmailService surveyEmailService,
             ISurveyLinkTokenService surveyLinkTokenService)
         {
-            _tin200Service = tin200Service;
+            _companyService = companyService;
             _surveyEmailService = surveyEmailService;
             _surveyLinkTokenService = surveyLinkTokenService;
         }
@@ -134,7 +134,7 @@ namespace TINWorkspaceTemp.Pages.Tin200
 
         private async Task LoadAvailableClientsAsync()
         {
-            var clients = await _tin200Service.GetAllTin200Async();
+            var clients = await _companyService.GetAllCompaniesAsync();
             AvailableClients = clients
                 .OrderBy(c => c.CompanyName)
                 .ThenBy(c => c.Id)

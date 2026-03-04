@@ -7,12 +7,12 @@ namespace TINWorkspaceTemp.Pages.Tin200
 {
     public class SurveyUpdateModel : PageModel
     {
-        private readonly Tin200Service _tin200Service;
+        private readonly CompanyService _companyService;
         private readonly ISurveyLinkTokenService _surveyLinkTokenService;
 
-        public SurveyUpdateModel(Tin200Service tin200Service, ISurveyLinkTokenService surveyLinkTokenService)
+        public SurveyUpdateModel(CompanyService companyService, ISurveyLinkTokenService surveyLinkTokenService)
         {
-            _tin200Service = tin200Service;
+            _companyService = companyService;
             _surveyLinkTokenService = surveyLinkTokenService;
         }
 
@@ -35,7 +35,7 @@ namespace TINWorkspaceTemp.Pages.Tin200
                 return RedirectToPage("/Tin200/SurveyLinkInvalid");
             }
 
-            var record = await _tin200Service.GetTin200ByIdAsync(id);
+            var record = await _companyService.GetCompanyByIdAsync(id);
             if (record == null)
             {
                 return NotFound();
@@ -60,7 +60,7 @@ namespace TINWorkspaceTemp.Pages.Tin200
                 return Page();
             }
 
-            var existing = await _tin200Service.GetTin200ByIdAsync(id);
+            var existing = await _companyService.GetCompanyByIdAsync(id);
             if (existing == null)
             {
                 return NotFound();
@@ -74,7 +74,7 @@ namespace TINWorkspaceTemp.Pages.Tin200
             existing.Fye2024 = Record.Fye2024;
             existing.Fye2023 = Record.Fye2023;
 
-            await _tin200Service.UpdateTin200Async(existing);
+            await _companyService.UpdateCompanyAsync(existing);
 
             if (string.Equals(FormAction, "save", StringComparison.OrdinalIgnoreCase))
             {

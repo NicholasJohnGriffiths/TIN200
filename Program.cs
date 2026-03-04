@@ -13,6 +13,15 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AllowAnonymousToPage("/Error");
     options.Conventions.AllowAnonymousToPage("/Tin200/SurveyUpdate");
     options.Conventions.AllowAnonymousToPage("/Tin200/SurveyLinkInvalid");
+    options.Conventions.AddPageRoute("/Tin200/Index", "/Company");
+    options.Conventions.AddPageRoute("/Tin200/Create", "/Company/Create");
+    options.Conventions.AddPageRoute("/Tin200/Edit", "/Company/Edit/{id?}");
+    options.Conventions.AddPageRoute("/Tin200/Details", "/Company/Details/{id?}");
+    options.Conventions.AddPageRoute("/Tin200/Delete", "/Company/Delete/{id?}");
+    options.Conventions.AddPageRoute("/Tin200/Import", "/Company/Import");
+    options.Conventions.AddPageRoute("/Tin200/SendSurvey", "/Company/SendSurvey");
+    options.Conventions.AddPageRoute("/Tin200/SurveyUpdate", "/Company/SurveyUpdate/{id:int}");
+    options.Conventions.AddPageRoute("/Tin200/SurveyLinkInvalid", "/Company/SurveyLinkInvalid");
 });
 builder.Services.AddHealthChecks();
 
@@ -31,7 +40,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Add custom services
-builder.Services.AddScoped<Tin200Service>();
+builder.Services.AddScoped<CompanyService>();
 builder.Services.AddScoped<SurveyService>();
 builder.Services.AddScoped<CompanySurveyService>();
 builder.Services.AddScoped<AnswerService>();

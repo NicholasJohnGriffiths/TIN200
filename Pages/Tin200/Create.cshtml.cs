@@ -7,12 +7,12 @@ namespace TINWorkspaceTemp.Pages.Tin200
 {
     public class CreateModel : PageModel
     {
-        private readonly Tin200Service _service;
+        private readonly CompanyService _service;
 
         [BindProperty]
         public Models.Tin200 Record { get; set; } = new();
 
-        public CreateModel(Tin200Service service)
+        public CreateModel(CompanyService service)
         {
             _service = service;
         }
@@ -28,7 +28,7 @@ namespace TINWorkspaceTemp.Pages.Tin200
                 return Page();
             }
 
-            await _service.CreateTin200Async(Record);
+            await _service.CreateCompanyAsync(Record);
             return RedirectToPage("./Index");
         }
     }

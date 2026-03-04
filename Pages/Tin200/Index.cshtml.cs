@@ -6,13 +6,13 @@ namespace TINWorkspaceTemp.Pages.Tin200
 {
     public class IndexModel : PageModel
     {
-        private readonly Tin200Service _service;
+        private readonly CompanyService _service;
 
         public List<Models.Tin200> Records { get; set; } = new();
         public List<int> Years { get; set; } = new();
         public int? SelectedYear { get; set; }
 
-        public IndexModel(Tin200Service service)
+        public IndexModel(CompanyService service)
         {
             _service = service;
         }
@@ -30,7 +30,7 @@ namespace TINWorkspaceTemp.Pages.Tin200
                 SelectedYear = null;
             }
 
-            Records = await _service.GetAllTin200Async(SelectedYear);
+            Records = await _service.GetAllCompaniesAsync(SelectedYear);
         }
     }
 }

@@ -7,9 +7,9 @@ namespace TINWorkspaceTemp.Pages.Tin200
 {
     public class ExportModel : PageModel
     {
-        private readonly Tin200Service _service;
+        private readonly CompanyService _service;
 
-        public ExportModel(Tin200Service service)
+        public ExportModel(CompanyService service)
         {
             _service = service;
         }
@@ -23,7 +23,7 @@ namespace TINWorkspaceTemp.Pages.Tin200
                 year = years.FirstOrDefault();
             }
 
-            var records = await _service.GetAllTin200Async(year);
+            var records = await _service.GetAllCompaniesAsync(year);
 
             var sb = new StringBuilder();
             // header

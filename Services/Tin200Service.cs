@@ -5,18 +5,18 @@ using System.Data;
 
 namespace TINWorkspaceTemp.Services
 {
-    public class Tin200Service
+    public class CompanyService
     {
         private readonly ApplicationDbContext _context;
-        private readonly ILogger<Tin200Service> _logger;
+        private readonly ILogger<CompanyService> _logger;
 
-        public Tin200Service(ApplicationDbContext context, ILogger<Tin200Service> logger)
+        public CompanyService(ApplicationDbContext context, ILogger<CompanyService> logger)
         {
             _context = context;
             _logger = logger;
         }
 
-        public async Task<List<Tin200>> GetAllTin200Async(int? financialYear = null)
+        public async Task<List<Tin200>> GetAllCompaniesAsync(int? financialYear = null)
         {
             try
             {
@@ -39,7 +39,7 @@ namespace TINWorkspaceTemp.Services
                 _logger.LogError(ex, "Primary TIN200 query failed.");
                 try
                 {
-                    return await GetAllTin200FallbackAsync(financialYear);
+                    return await GetAllCompaniesFallbackAsync(financialYear);
                 }
                 catch (Exception fallbackEx)
                 {
@@ -76,7 +76,7 @@ namespace TINWorkspaceTemp.Services
                 _logger.LogError(ex, "Failed to read available financial years from TIN200.");
                 try
                 {
-                    var rows = await GetAllTin200FallbackAsync();
+                    var rows = await GetAllCompaniesFallbackAsync();
                     var years = new List<int>();
                     if (rows.Any(r => r.Fye2025 != null)) years.Add(2025);
                     if (rows.Any(r => r.Fye2024 != null)) years.Add(2024);
@@ -91,7 +91,7 @@ namespace TINWorkspaceTemp.Services
             }
         }
 
-        public async Task<Tin200?> GetTin200ByIdAsync(int id)
+        public async Task<Tin200?> GetCompanyByIdAsync(int id)
         {
             try
             {
@@ -102,7 +102,7 @@ namespace TINWorkspaceTemp.Services
                 _logger.LogError(ex, "Failed to load TIN200 record by id {Id}.", id);
                 try
                 {
-                    var all = await GetAllTin200FallbackAsync();
+                    var all = await GetAllCompaniesFallbackAsync();
                     return all.FirstOrDefault(x => x.Id == id);
                 }
                 catch (Exception fallbackEx)
@@ -113,38 +113,38 @@ namespace TINWorkspaceTemp.Services
             }
         }
 
-        public async Task<Tin200> CreateTin200Async(Tin200 tin200)
+        public async Task<Tin200> CreateCompanyAsync(Tin200 company)
         {
-            _context.Tin200.Add(tin200);
+            _context.Tin200.Add(company);
             await _context.SaveChangesAsync();
-            return tin200;
+            return company;
         }
 
-        public async Task<Tin200> UpdateTin200Async(Tin200 tin200)
+        public async Task<Tin200> UpdateCompanyAsync(Tin200 company)
         {
-            _context.Tin200.Update(tin200);
+            _context.Tin200.Update(company);
             await _context.SaveChangesAsync();
-            return tin200;
+            return company;
         }
 
-        public async Task DeleteTin200Async(int id)
+        public async Task DeleteCompanyAsync(int id)
         {
-            var tin200 = await GetTin200ByIdAsync(id);
-            if (tin200 != null)
+            var company = await GetCompanyByIdAsync(id);
+            if (company != null)
             {
-                _context.Tin200.Remove(tin200);
+                _context.Tin200.Remove(company);
                 await _context.SaveChangesAsync();
             }
         }
 
-        public async Task<bool> Tin200ExistsAsync(int id)
+        public async Task<bool> CompanyExistsAsync(int id)
         {
             return await _context.Tin200.AnyAsync(t => t.Id == id);
         }
 
-        private async Task<List<Tin200>> GetAllTin200FallbackAsync(int? financialYear = null)
+        private async Task<List<Tin200>> GetAllCompaniesFallbackAsync(int? financialYear = null)
         {
-            var map = await GetTin200ColumnMapAsync();
+            var map = await GetCompanyColumnMapAsync();
             var rows = new List<Tin200>();
 
             var db = _context.Database.GetDbConnection();
@@ -220,7 +220,7 @@ FROM [TIN200]";
             }
         }
 
-        private async Task<Dictionary<string, string>> GetTin200ColumnMapAsync()
+        private async Task<Dictionary<string, string>> GetCompanyColumnMapAsync()
         {
             var db = _context.Database.GetDbConnection();
             var shouldClose = db.State != ConnectionState.Open;
@@ -301,5 +301,20 @@ WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'TIN200'";
 
             return Convert.ToDecimal(record.GetValue(ordinal));
         }
+    }
+
+    public class Tin200Service : CompanyService
+    {
+        public Tin200Service(ApplicationDbContext context, ILogger<CompanyService> logger)
+            : base(context, logger)
+        {
+        }
+
+        public Task<List<Tin200>> GetAllTin200Async(int? financialYear = null) => GetAllCompaniesAsync(financialYear);
+        public Task<Tin200?> GetTin200ByIdAsync(int id) => GetCompanyByIdAsync(id);
+        public Task<Tin200> CreateTin200Async(Tin200 tin200) => CreateCompanyAsync(tin200);
+        public Task<Tin200> UpdateTin200Async(Tin200 tin200) => UpdateCompanyAsync(tin200);
+        public Task DeleteTin200Async(int id) => DeleteCompanyAsync(id);
+        public Task<bool> Tin200ExistsAsync(int id) => CompanyExistsAsync(id);
     }
 }

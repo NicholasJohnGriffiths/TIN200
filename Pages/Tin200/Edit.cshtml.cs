@@ -7,19 +7,19 @@ namespace TINWorkspaceTemp.Pages.Tin200
 {
     public class EditModel : PageModel
     {
-        private readonly Tin200Service _service;
+        private readonly CompanyService _service;
 
         [BindProperty]
         public Models.Tin200 Record { get; set; } = new();
 
-        public EditModel(Tin200Service service)
+        public EditModel(CompanyService service)
         {
             _service = service;
         }
 
         public async Task<IActionResult> OnGetAsync(int id)
         {
-            var record = await _service.GetTin200ByIdAsync(id);
+            var record = await _service.GetCompanyByIdAsync(id);
             if (record == null)
             {
                 return NotFound();
@@ -36,13 +36,13 @@ namespace TINWorkspaceTemp.Pages.Tin200
                 return Page();
             }
 
-            var exists = await _service.Tin200ExistsAsync(Record.Id);
+            var exists = await _service.CompanyExistsAsync(Record.Id);
             if (!exists)
             {
                 return NotFound();
             }
 
-            await _service.UpdateTin200Async(Record);
+            await _service.UpdateCompanyAsync(Record);
             return RedirectToPage("./Index");
         }
     }
