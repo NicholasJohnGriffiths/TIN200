@@ -1,0 +1,70 @@
+@page
+@model TINWorkspaceTemp.Pages.Answers.IndexModel
+@{
+    ViewData["Title"] = "Answers by Company";
+}
+
+<div class="container-fluid px-0 mt-3">
+    <div class="row mb-3">
+        <div class="col-md-8">
+            <h1>Answers by Company</h1>
+            <p class="text-muted mb-0">Filtered by financial year from survey records.</p>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-12">
+            <form method="get" class="d-flex">
+                <label class="me-2 align-self-center">Financial Year:</label>
+                <select name="financialYear" class="form-select me-2" aria-label="Financial Year" style="max-width: 180px;">
+                    <option value="">All</option>
+                    @foreach (var year in Model.FinancialYears)
+                    {
+                        <option value="@year" selected="@(Model.SelectedFinancialYear == year ? "selected" : null)">@year</option>
+                    }
+                </select>
+                <button class="btn btn-outline-primary" type="submit">Apply</button>
+                <a class="btn btn-link ms-2" asp-page="./Index">Clear</a>
+            </form>
+        </div>
+    </div>
+
+    @if (Model.Rows.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Company</th>
+                        <th>Year</th>
+                        <th>Question</th>
+                        <th>Answer Text</th>
+                        <th>Answer Number</th>
+                        <th>Answer Currency</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var row in Model.Rows)
+                {
+                    <tr>
+                        <td>@row.CompanyName</td>
+                        <td>@row.FinancialYear</td>
+                        <td>@row.QuestionText</td>
+                        <td>@row.AnswerText</td>
+                        <td>@row.AnswerNumber</td>
+                        <td>@(row.AnswerCurrency.HasValue ? row.AnswerCurrency.Value.ToString("C") : "")</td>
+                        <td>
+                            <a asp-page="./Edit" asp-route-id="@row.Id" class="btn btn-sm btn-warning">Edit</a>
+                        </td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">No answers found for the selected filter.</div>
+    }
+</div>

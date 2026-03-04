@@ -1,0 +1,49 @@
+@page "{id:int}"
+@model TINWorkspaceTemp.Pages.Answers.EditModel
+@{
+    ViewData["Title"] = "Edit Answer";
+}
+
+<div class="container mt-4">
+    <h1>Edit Answer</h1>
+    <hr />
+
+    @if (Model.Details != null)
+    {
+        <div class="mb-3">
+            <div><strong>Company:</strong> @Model.Details.CompanyName</div>
+            <div><strong>Financial Year:</strong> @Model.Details.FinancialYear</div>
+            <div><strong>Question:</strong> @Model.Details.QuestionText</div>
+        </div>
+    }
+
+    <form method="post">
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+        <input type="hidden" asp-for="Input.Id" />
+
+        <div class="form-group mb-3">
+            <label asp-for="Input.AnswerText" class="form-label">Answer Text</label>
+            <textarea asp-for="Input.AnswerText" class="form-control" rows="4"></textarea>
+            <span asp-validation-for="Input.AnswerText" class="text-danger"></span>
+        </div>
+
+        <div class="form-group mb-3">
+            <label asp-for="Input.AnswerNumber" class="form-label">Answer Number</label>
+            <input asp-for="Input.AnswerNumber" class="form-control" />
+            <span asp-validation-for="Input.AnswerNumber" class="text-danger"></span>
+        </div>
+
+        <div class="form-group mb-3">
+            <label asp-for="Input.AnswerCurrency" class="form-label">Answer Currency</label>
+            <input asp-for="Input.AnswerCurrency" class="form-control" />
+            <span asp-validation-for="Input.AnswerCurrency" class="text-danger"></span>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a asp-page="./Index" class="btn btn-secondary">Back to List</a>
+    </form>
+</div>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+}

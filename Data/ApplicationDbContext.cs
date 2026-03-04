@@ -13,6 +13,8 @@ namespace TINWorkspaceTemp.Data
         public DbSet<Tin200> Tin200 { get; set; } = null!;
         public DbSet<Survey> Survey { get; set; } = null!;
         public DbSet<CompanySurvey> CompanySurvey { get; set; } = null!;
+        public DbSet<Question> Question { get; set; } = null!;
+        public DbSet<Answer> Answer { get; set; } = null!;
         public DbSet<CompanyFinancialAnalytics> CompanyFinancialAnalytics { get; set; } = null!;
         public DbSet<FinancialYearComparison> FinancialYearComparison { get; set; } = null!;
         public DbSet<RevenueSummaryBySize> RevenueSummaryBySize { get; set; } = null!;
@@ -138,6 +140,87 @@ namespace TINWorkspaceTemp.Data
                     .HasForeignKey(e => e.SurveyId)
                     .OnDelete(DeleteBehavior.Restrict)
                     .HasConstraintName("FK_CompanySurvey_Survey");
+            });
+
+            modelBuilder.Entity<Question>(entity =>
+            {
+                entity.ToTable("Question");
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("Id")
+                    .ValueGeneratedOnAdd();
+
+                entity.Property(e => e.Title)
+                    .HasColumnName("Title")
+                    .HasColumnType("varchar(255)");
+
+                entity.Property(e => e.Description)
+                    .HasColumnName("Description")
+                    .HasColumnType("varchar(max)");
+
+                entity.Property(e => e.QuestionText)
+                    .HasColumnName("Question")
+                    .HasColumnType("varchar(max)");
+
+                entity.Property(e => e.OrderNumber)
+                    .HasColumnName("OrderNumber")
+                    .HasColumnType("int");
+
+                entity.Property(e => e.Multi1).HasColumnName("Multi_1").HasColumnType("varchar(50)");
+                entity.Property(e => e.Multi2).HasColumnName("Multi_2").HasColumnType("varchar(50)");
+                entity.Property(e => e.Multi3).HasColumnName("Multi_3").HasColumnType("varchar(50)");
+                entity.Property(e => e.Multi4).HasColumnName("Multi_4").HasColumnType("varchar(50)");
+                entity.Property(e => e.Multi5).HasColumnName("Multi_5").HasColumnType("varchar(50)");
+                entity.Property(e => e.Multi6).HasColumnName("Multi_6").HasColumnType("varchar(50)");
+                entity.Property(e => e.Multi7).HasColumnName("Multi_7").HasColumnType("varchar(50)");
+                entity.Property(e => e.Multi8).HasColumnName("Multi_8").HasColumnType("varchar(50)");
+
+                entity.Property(e => e.AnswerType)
+                    .HasColumnName("AnswerType")
+                    .HasColumnType("nvarchar(50)");
+            });
+
+            modelBuilder.Entity<Answer>(entity =>
+            {
+                entity.ToTable("Answer");
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("Id")
+                    .ValueGeneratedOnAdd();
+
+                entity.Property(e => e.ClientSurveyId)
+                    .HasColumnName("ClientSurveyId")
+                    .HasColumnType("int")
+                    .IsRequired();
+
+                entity.Property(e => e.QuestionId)
+                    .HasColumnName("QuestionId")
+                    .HasColumnType("int")
+                    .IsRequired();
+
+                entity.Property(e => e.AnswerText)
+                    .HasColumnName("AnswerText")
+                    .HasColumnType("varchar(max)");
+
+                entity.Property(e => e.AnswerCurrency)
+                    .HasColumnName("AnswerCurrency")
+                    .HasColumnType("money");
+
+                entity.Property(e => e.AnswerNumber)
+                    .HasColumnName("AnswerNumber")
+                    .HasColumnType("int");
+
+                entity.HasOne<CompanySurvey>()
+                    .WithMany()
+                    .HasForeignKey(e => e.ClientSurveyId)
+                    .OnDelete(DeleteBehavior.Restrict);
+
+                entity.HasOne<Question>()
+                    .WithMany()
+                    .HasForeignKey(e => e.QuestionId)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             // Configure view models - no key required for views
