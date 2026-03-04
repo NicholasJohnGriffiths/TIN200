@@ -12,6 +12,8 @@ namespace TINWorkspaceTemp.Pages.Questions
         [BindProperty]
         public Question Record { get; set; } = new();
 
+        public List<string> AnswerTypeOptions { get; } = Enum.GetNames<QuestionAnswerType>().ToList();
+
         public EditModel(QuestionService service)
         {
             _service = service;
@@ -31,6 +33,11 @@ namespace TINWorkspaceTemp.Pages.Questions
 
         public async Task<IActionResult> OnPostAsync()
         {
+            if (!Enum.TryParse<QuestionAnswerType>(Record.AnswerType, out _))
+            {
+                ModelState.AddModelError("Record.AnswerType", "Answer Type must be one of: Text, Currency, Number, Multichoice.");
+            }
+
             if (!ModelState.IsValid)
             {
                 return Page();
