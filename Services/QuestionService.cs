@@ -175,6 +175,21 @@ namespace TINWorkspaceTemp.Services
             await UpdateAsync(question);
         }
 
+        public async Task NormalizeOrderNumbersAsync()
+        {
+            var orderedQuestions = await _context.Question
+                .OrderBy(q => q.OrderNumber ?? int.MaxValue)
+                .ThenBy(q => q.Id)
+                .ToListAsync();
+
+            for (var index = 0; index < orderedQuestions.Count; index++)
+            {
+                orderedQuestions[index].OrderNumber = index + 1;
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
         public async Task<bool> ExistsAsync(int id)
         {
             return await _context.Question.AnyAsync(q => q.Id == id);

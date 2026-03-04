@@ -32,5 +32,11 @@ namespace TINWorkspaceTemp.Pages.Questions
             await _service.MoveDownAsync(id);
             return RedirectToPage();
         }
+
+        public async Task<IActionResult> OnPostReorderAsync()
+        {
+            await _service.NormalizeOrderNumbersAsync();
+            return RedirectToPage();
+        }
     }
 }

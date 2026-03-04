@@ -11,7 +11,12 @@
             <p class="mb-0"><strong>Row count:</strong> @Model.Records.Count</p>
         </div>
         <div class="col-md-4 text-end">
-            <a asp-page="./Create" class="btn btn-primary">Add New Question</a>
+            <div class="d-inline-flex gap-2">
+                <form method="post" asp-page-handler="Reorder" class="d-inline">
+                    <button type="submit" class="btn btn-outline-secondary">Reorder</button>
+                </form>
+                <a asp-page="./Create" class="btn btn-primary">Add New Question</a>
+            </div>
         </div>
     </div>
 
@@ -21,7 +26,6 @@
             <table class="table table-striped table-hover">
                 <thead class="table-dark">
                     <tr>
-                        <th>ID</th>
                         <th>Order</th>
                         <th>Title</th>
                         <th>Question</th>
@@ -34,7 +38,6 @@
                 {
                     var record = Model.Records[i];
                     <tr>
-                        <td>@record.Id</td>
                         <td>@record.OrderNumber</td>
                         <td>@record.Title</td>
                         <td>@record.QuestionText</td>
