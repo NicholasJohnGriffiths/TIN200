@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using TINWorkspaceTemp.Models;
-using TINWorkspaceTemp.Services;
+using TINWeb.Models;
+using TINWeb.Services;
 
-namespace TINWorkspaceTemp.Pages.Questions
+namespace TINWeb.Pages.Questions
 {
     public class EditModel : PageModel
     {

@@ -3,7 +3,7 @@ using Azure.Communication.Email;
 using Microsoft.Extensions.Options;
 using System.Net;
 
-namespace TINWorkspaceTemp.Services
+namespace TINWeb.Services
 {
     public class SurveyEmailService : ISurveyEmailService
     {

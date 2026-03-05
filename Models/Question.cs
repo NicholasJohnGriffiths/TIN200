@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace TINWorkspaceTemp.Models
+namespace TINWeb.Models
 {
     [Table("Question")]
     public class Question

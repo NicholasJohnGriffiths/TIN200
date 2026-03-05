@@ -1,7 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
-namespace TINWorkspaceTemp.Pages;
+namespace TINWeb.Pages;
 
 public class PrivacyModel : PageModel
 {

@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using TINWorkspaceTemp.Services;
+using TINWeb.Services;
 
-namespace TINWorkspaceTemp.Pages.Company
+namespace TINWeb.Pages.Company
 {
     public class SendSurveyModel : PageModel
     {

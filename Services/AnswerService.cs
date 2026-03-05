@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using TINWorkspaceTemp.Data;
+using TINWeb.Data;
 
-namespace TINWorkspaceTemp.Services
+namespace TINWeb.Services
 {
     public class AnswerService
     {

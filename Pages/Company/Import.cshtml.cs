@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Data.SqlClient;
 
-namespace TINWorkspaceTemp.Pages.Company
+namespace TINWeb.Pages.Company
 {
     [IgnoreAntiforgeryToken]
     public class ImportModel : PageModel

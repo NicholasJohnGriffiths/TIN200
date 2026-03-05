@@ -111,7 +111,7 @@ az webapp config connection-string set `
     --settings DefaultConnection="$connectionString" | Out-Null
 
 Write-Host "Publishing application..."
-dotnet publish (Join-Path $projectRoot "TINWorkspaceTemp.csproj") -c Release -o $publishDir
+dotnet publish (Join-Path $projectRoot "TINWeb.csproj") -c Release -o $publishDir
 
 if (Test-Path $publishZip) {
     Remove-Item $publishZip -Force

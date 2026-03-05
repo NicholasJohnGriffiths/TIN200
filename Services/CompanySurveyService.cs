@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using TINWorkspaceTemp.Data;
-using TINWorkspaceTemp.Models;
+using TINWeb.Data;
+using TINWeb.Models;
 
-namespace TINWorkspaceTemp.Services
+namespace TINWeb.Services
 {
     public class CompanySurveyService
     {

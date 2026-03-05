@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Options;
 
-namespace TINWorkspaceTemp.Services
+namespace TINWeb.Services
 {
     public class SurveyLinkTokenService : ISurveyLinkTokenService
     {

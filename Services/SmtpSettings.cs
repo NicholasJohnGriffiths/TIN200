@@ -1,4 +1,4 @@
-namespace TINWorkspaceTemp.Services
+namespace TINWeb.Services
 {
     public class SmtpSettings
     {

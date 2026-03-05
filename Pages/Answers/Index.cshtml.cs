@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using TINWorkspaceTemp.Services;
+using TINWeb.Services;
 
-namespace TINWorkspaceTemp.Pages.Answers
+namespace TINWeb.Pages.Answers
 {
     public class IndexModel : PageModel
     {

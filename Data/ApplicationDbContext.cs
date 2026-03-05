@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using TINWorkspaceTemp.Models;
+using TINWeb.Models;
 
-namespace TINWorkspaceTemp.Data
+namespace TINWeb.Data
 {
     public class ApplicationDbContext : DbContext
     {

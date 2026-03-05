@@ -1,4 +1,4 @@
-namespace TINWorkspaceTemp.Models
+namespace TINWeb.Models
 {
     public enum QuestionAnswerType
     {

@@ -1,7 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using TINWorkspaceTemp.Data;
-using TINWorkspaceTemp.Services;
+using TINWeb.Data;
+using TINWeb.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -32,7 +32,7 @@ builder.Services
     {
         options.LoginPath = "/Login";
         options.AccessDeniedPath = "/Login";
-        options.Cookie.Name = "TINWorkspaceTemp.Auth";
+        options.Cookie.Name = "TINWeb.Auth";
         options.SlidingExpiration = true;
     });
 
