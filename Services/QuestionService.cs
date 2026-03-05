@@ -105,6 +105,8 @@ namespace TINWeb.Services
             existingRecord.Multi6 = record.Multi6;
             existingRecord.Multi7 = record.Multi7;
             existingRecord.Multi8 = record.Multi8;
+            existingRecord.Multi9 = record.Multi9;
+            existingRecord.Multi10 = record.Multi10;
 
             await _context.SaveChangesAsync();
             return existingRecord;

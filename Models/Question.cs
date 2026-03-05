@@ -44,6 +44,12 @@ namespace TINWeb.Models
         [StringLength(255)]
         public string? Multi8 { get; set; }
 
+        [StringLength(255)]
+        public string? Multi9 { get; set; }
+
+        [StringLength(255)]
+        public string? Multi10 { get; set; }
+
         [StringLength(50)]
         public string? AnswerType { get; set; }
     }

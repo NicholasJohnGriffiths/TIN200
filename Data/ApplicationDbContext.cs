@@ -184,6 +184,8 @@ namespace TINWeb.Data
                 entity.Property(e => e.Multi6).HasColumnName("Multi_6").HasColumnType("varchar(255)");
                 entity.Property(e => e.Multi7).HasColumnName("Multi_7").HasColumnType("varchar(255)");
                 entity.Property(e => e.Multi8).HasColumnName("Multi_8").HasColumnType("varchar(255)");
+                entity.Property(e => e.Multi9).HasColumnName("Multi_9").HasColumnType("varchar(255)");
+                entity.Property(e => e.Multi10).HasColumnName("Multi_10").HasColumnType("varchar(255)");
 
                 entity.Property(e => e.AnswerType)
                     .HasColumnName("AnswerType")

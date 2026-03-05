@@ -16,8 +16,8 @@
         <dt class="col-sm-3">Group Title</dt><dd class="col-sm-9">@Model.Record.GroupTitle</dd>
         <dt class="col-sm-3">Question</dt><dd class="col-sm-9">@Model.Record.QuestionText</dd>
         <dt class="col-sm-3">Answer Type</dt><dd class="col-sm-9">@Model.Record.AnswerType</dd>
-        <dt class="col-sm-3">Multi 1-8</dt>
-        <dd class="col-sm-9">@string.Join(", ", new[] { Model.Record.Multi1, Model.Record.Multi2, Model.Record.Multi3, Model.Record.Multi4, Model.Record.Multi5, Model.Record.Multi6, Model.Record.Multi7, Model.Record.Multi8 }.Where(x => !string.IsNullOrWhiteSpace(x)))</dd>
+        <dt class="col-sm-3">Multi 1-10</dt>
+        <dd class="col-sm-9">@string.Join(", ", new[] { Model.Record.Multi1, Model.Record.Multi2, Model.Record.Multi3, Model.Record.Multi4, Model.Record.Multi5, Model.Record.Multi6, Model.Record.Multi7, Model.Record.Multi8, Model.Record.Multi9, Model.Record.Multi10 }.Where(x => !string.IsNullOrWhiteSpace(x)))</dd>
     </dl>
 
     <a asp-page="./Edit" asp-route-id="@Model.Record.Id" class="btn btn-warning">Edit</a>
