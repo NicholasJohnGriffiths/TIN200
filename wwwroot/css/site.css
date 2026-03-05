@@ -30,7 +30,7 @@ body {
   text-align: start;
 }
 
-/* Wider centered container for TIN200 pages */
+/* Wider centered container for company pages */
 .wider-container {
   max-width: 1800px;
   width: 100%;
@@ -44,13 +44,26 @@ body {
   .wider-container { max-width: 1100px; }
 }
 
-/* TIN200 table: smaller action buttons and tighter spacing */
-.tin200-table td .btn-sm {
+/* Company table: smaller action buttons and tighter spacing */
+.company-table {
+  font-size: 0.8rem;
+}
+.company-table th,
+.company-table td {
+  padding: 0.35rem 0.45rem;
+}
+.company-table td .btn-sm {
   padding: 0.15rem 0.35rem;
   font-size: 0.72rem;
   line-height: 1;
 }
-.tin200-table td .btn-sm + .btn-sm {
+.company-table td .btn-sm + .btn-sm {
   margin-left: 0.25rem;
 }
-.tin200-table td { white-space: nowrap; }
+.company-table td { white-space: nowrap; }
+
+@media (max-width: 768px) {
+  .company-table {
+    font-size: 0.72rem;
+  }
+}

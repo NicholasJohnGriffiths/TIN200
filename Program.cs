@@ -53,6 +53,11 @@ builder.Services.AddScoped<ISurveyEmailService, SurveyEmailService>();
 builder.Services.AddScoped<ISurveyLinkTokenService, SurveyLinkTokenService>();
 
 var app = builder.Build();
+var urls = builder.Configuration["ASPNETCORE_URLS"];
+var httpsPort = builder.Configuration["ASPNETCORE_HTTPS_PORT"] ?? builder.Configuration["HTTPS_PORT"];
+var shouldUseHttpsRedirection = !app.Environment.IsDevelopment()
+    || !string.IsNullOrWhiteSpace(httpsPort)
+    || (!string.IsNullOrWhiteSpace(urls) && urls.Contains("https://", StringComparison.OrdinalIgnoreCase));
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
@@ -62,7 +67,10 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+if (shouldUseHttpsRedirection)
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseStaticFiles();
 

@@ -102,7 +102,7 @@ Write-Host "Configuring app settings and SQL connection string..."
 az webapp config appsettings set `
     --resource-group $ResourceGroup `
     --name $WebAppName `
-    --settings ASPNETCORE_ENVIRONMENT=Production | Out-Null
+    --settings ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_HTTPS_PORT=443 | Out-Null
 
 az webapp config connection-string set `
     --resource-group $ResourceGroup `

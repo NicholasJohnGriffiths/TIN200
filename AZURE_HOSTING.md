@@ -39,8 +39,11 @@ What the script does:
 - Creates Azure SQL logical server + database
 - Configures SQL firewall rules
 - Sets `ASPNETCORE_ENVIRONMENT=Production`
+- Sets `ASPNETCORE_HTTPS_PORT=443`
 - Sets `DefaultConnection` connection string in App Service
 - Publishes and deploys the app
+
+Note: Azure App Service terminates TLS at the front end. Setting `ASPNETCORE_HTTPS_PORT=443` ensures ASP.NET Core generates HTTPS redirects and URLs with the expected public port.
 
 ## 3) Create/import database schema and data
 
