@@ -26,7 +26,7 @@ namespace TINWorkspaceTemp.Data
 
             modelBuilder.Entity<Tin200>(entity =>
             {
-                entity.ToTable("TIN200");
+                entity.ToTable("Company");
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Id)
                     .HasColumnName("Id")
@@ -78,7 +78,7 @@ namespace TINWorkspaceTemp.Data
                     .HasColumnName("FinancialYear")
                     .HasColumnType("int");
 
-                // TIN200 column exists in the database but is intentionally not mapped to the model
+                // Company column exists in the database but is intentionally not mapped to the model
             });
 
             modelBuilder.Entity<Survey>(entity =>

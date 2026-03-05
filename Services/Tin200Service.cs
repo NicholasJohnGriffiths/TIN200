@@ -170,7 +170,7 @@ SELECT
     [{map["Fye2025"]}] AS Fye2025,
     [{map["Fye2024"]}] AS Fye2024,
     [{map["Fye2023"]}] AS Fye2023
-FROM [TIN200]";
+FROM [Company]";
 
                 if (financialYear.HasValue)
                 {
@@ -235,7 +235,7 @@ FROM [TIN200]";
                 cmd.CommandText = @"
 SELECT COLUMN_NAME
 FROM INFORMATION_SCHEMA.COLUMNS
-WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'TIN200'";
+WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'Company'";
 
                 var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 using var reader = await cmd.ExecuteReaderAsync();
