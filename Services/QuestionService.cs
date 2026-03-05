@@ -94,6 +94,7 @@ namespace TINWeb.Services
             existingRecord.OrderNumber = targetOrder;
             existingRecord.Title = record.Title;
             existingRecord.Description = record.Description;
+            existingRecord.GroupTitle = record.GroupTitle;
             existingRecord.QuestionText = record.QuestionText;
             existingRecord.AnswerType = record.AnswerType;
             existingRecord.Multi1 = record.Multi1;

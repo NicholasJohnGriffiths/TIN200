@@ -164,6 +164,10 @@ namespace TINWeb.Data
                     .HasColumnName("Description")
                     .HasColumnType("varchar(max)");
 
+                entity.Property(e => e.GroupTitle)
+                    .HasColumnName("GroupTitle")
+                    .HasColumnType("varchar(max)");
+
                 entity.Property(e => e.QuestionText)
                     .HasColumnName("Question")
                     .HasColumnType("varchar(max)");

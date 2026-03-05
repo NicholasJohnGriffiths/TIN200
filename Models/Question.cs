@@ -14,6 +14,8 @@ namespace TINWeb.Models
 
         public string? Description { get; set; }
 
+        public string? GroupTitle { get; set; }
+
         public string? QuestionText { get; set; }
 
         public int? OrderNumber { get; set; }
