@@ -49,7 +49,7 @@ namespace TINWeb.Pages.Questions
             }
 
             await _service.UpdateAsync(Record);
-            return RedirectToPage("./Index");
+            return RedirectToPage("./Index", new { focusId = Record.Id });
         }
     }
 }

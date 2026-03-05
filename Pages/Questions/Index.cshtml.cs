@@ -11,6 +11,9 @@ namespace TINWeb.Pages.Questions
 
         public List<Question> Records { get; set; } = new();
 
+        [BindProperty(SupportsGet = true)]
+        public int? FocusId { get; set; }
+
         public IndexModel(QuestionService service)
         {
             _service = service;

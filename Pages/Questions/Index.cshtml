@@ -37,7 +37,8 @@
                 @for (var i = 0; i < Model.Records.Count; i++)
                 {
                     var record = Model.Records[i];
-                    <tr>
+                    var isFocused = Model.FocusId.HasValue && Model.FocusId.Value == record.Id;
+                    <tr id="question-@record.Id" class="@(isFocused ? "focused-question-row" : string.Empty)">
                         <td>@record.OrderNumber</td>
                         <td>@record.Title</td>
                         <td>@record.QuestionText</td>
@@ -74,4 +75,23 @@
         white-space: nowrap;
         min-width: 200px;
     }
+
+    .focused-question-row {
+        outline: 2px solid rgba(13, 110, 253, 0.35);
+        outline-offset: -2px;
+    }
 </style>
+
+@if (Model.FocusId.HasValue)
+{
+    <script>
+        (function () {
+            const row = document.getElementById('question-@Model.FocusId.Value');
+            if (!row) {
+                return;
+            }
+
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        })();
+    </script>
+}
