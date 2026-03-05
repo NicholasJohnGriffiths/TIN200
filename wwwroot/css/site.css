@@ -79,6 +79,32 @@ body {
   overflow-wrap: normal;
 }
 
+.questions-table th:nth-child(2),
+.questions-table td:nth-child(2) {
+  min-width: 12rem;
+}
+
+.questions-table th:nth-child(4),
+.questions-table td:nth-child(4) {
+  min-width: 9rem;
+}
+
+.answers-table th:nth-child(1),
+.answers-table td:nth-child(1) {
+  min-width: 15rem;
+}
+
+.answers-table th:nth-child(2),
+.answers-table td:nth-child(2) {
+  min-width: 6rem;
+}
+
+.answers-table th:nth-child(7),
+.answers-table td:nth-child(7) {
+  min-width: 7.5rem;
+  white-space: nowrap;
+}
+
 @media (max-width: 768px) {
   .company-table {
     font-size: 0.72rem;
