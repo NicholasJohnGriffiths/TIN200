@@ -65,11 +65,18 @@ body {
   overflow-wrap: anywhere;
 }
 
-.answers-table td .btn-sm,
-.questions-table td .btn-sm {
+.answers-table td .btn-sm {
   padding: 0.25rem 0.5rem;
   font-size: 0.875rem;
   line-height: 1.5;
+}
+
+.questions-table td .btn-sm {
+  padding: 0.2rem 0.45rem;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow-wrap: normal;
 }
 
 @media (max-width: 768px) {
