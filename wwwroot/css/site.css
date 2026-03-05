@@ -65,6 +65,13 @@ body {
   overflow-wrap: anywhere;
 }
 
+.answers-table td .btn-sm,
+.questions-table td .btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
 @media (max-width: 768px) {
   .company-table {
     font-size: 0.72rem;
