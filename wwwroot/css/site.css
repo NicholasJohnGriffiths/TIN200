@@ -60,7 +60,10 @@ body {
 .company-table td .btn-sm + .btn-sm {
   margin-left: 0.25rem;
 }
-.company-table td { white-space: nowrap; }
+.company-table td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 
 @media (max-width: 768px) {
   .company-table {
