@@ -20,28 +20,28 @@ namespace TINWeb.Models
 
         public int? OrderNumber { get; set; }
 
-        [StringLength(50)]
+        [StringLength(255)]
         public string? Multi1 { get; set; }
 
-        [StringLength(50)]
+        [StringLength(255)]
         public string? Multi2 { get; set; }
 
-        [StringLength(50)]
+        [StringLength(255)]
         public string? Multi3 { get; set; }
 
-        [StringLength(50)]
+        [StringLength(255)]
         public string? Multi4 { get; set; }
 
-        [StringLength(50)]
+        [StringLength(255)]
         public string? Multi5 { get; set; }
 
-        [StringLength(50)]
+        [StringLength(255)]
         public string? Multi6 { get; set; }
 
-        [StringLength(50)]
+        [StringLength(255)]
         public string? Multi7 { get; set; }
 
-        [StringLength(50)]
+        [StringLength(255)]
         public string? Multi8 { get; set; }
 
         [StringLength(50)]

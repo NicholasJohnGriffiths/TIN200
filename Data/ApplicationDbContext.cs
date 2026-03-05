@@ -176,14 +176,14 @@ namespace TINWeb.Data
                     .HasColumnName("OrderNumber")
                     .HasColumnType("int");
 
-                entity.Property(e => e.Multi1).HasColumnName("Multi_1").HasColumnType("varchar(50)");
-                entity.Property(e => e.Multi2).HasColumnName("Multi_2").HasColumnType("varchar(50)");
-                entity.Property(e => e.Multi3).HasColumnName("Multi_3").HasColumnType("varchar(50)");
-                entity.Property(e => e.Multi4).HasColumnName("Multi_4").HasColumnType("varchar(50)");
-                entity.Property(e => e.Multi5).HasColumnName("Multi_5").HasColumnType("varchar(50)");
-                entity.Property(e => e.Multi6).HasColumnName("Multi_6").HasColumnType("varchar(50)");
-                entity.Property(e => e.Multi7).HasColumnName("Multi_7").HasColumnType("varchar(50)");
-                entity.Property(e => e.Multi8).HasColumnName("Multi_8").HasColumnType("varchar(50)");
+                entity.Property(e => e.Multi1).HasColumnName("Multi_1").HasColumnType("varchar(255)");
+                entity.Property(e => e.Multi2).HasColumnName("Multi_2").HasColumnType("varchar(255)");
+                entity.Property(e => e.Multi3).HasColumnName("Multi_3").HasColumnType("varchar(255)");
+                entity.Property(e => e.Multi4).HasColumnName("Multi_4").HasColumnType("varchar(255)");
+                entity.Property(e => e.Multi5).HasColumnName("Multi_5").HasColumnType("varchar(255)");
+                entity.Property(e => e.Multi6).HasColumnName("Multi_6").HasColumnType("varchar(255)");
+                entity.Property(e => e.Multi7).HasColumnName("Multi_7").HasColumnType("varchar(255)");
+                entity.Property(e => e.Multi8).HasColumnName("Multi_8").HasColumnType("varchar(255)");
 
                 entity.Property(e => e.AnswerType)
                     .HasColumnName("AnswerType")
