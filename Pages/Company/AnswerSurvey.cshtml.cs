@@ -37,6 +37,7 @@ namespace TINWeb.Pages.Company
 
         public async Task<IActionResult> OnGetAsync(int id, string token, bool saved = false, bool submitted = false)
         {
+            token = GetEffectiveToken(token);
             var hasSurveyAccessCookie = Request.Cookies.TryGetValue($"{AccessCookiePrefix}{id}", out var accessCookieValue)
                 && string.Equals(accessCookieValue, "1", StringComparison.Ordinal);
             var hasValidToken = !string.IsNullOrWhiteSpace(token) && _surveyLinkTokenService.IsTokenValid(id, token);
@@ -85,7 +86,7 @@ namespace TINWeb.Pages.Company
 
         public async Task<IActionResult> OnPostAsync(int id, string? token)
         {
-            var effectiveToken = string.IsNullOrWhiteSpace(Token) ? token : Token;
+            var effectiveToken = GetEffectiveToken(string.IsNullOrWhiteSpace(Token) ? token : Token);
             var hasSurveyAccessCookie = Request.Cookies.TryGetValue($"{AccessCookiePrefix}{id}", out var accessCookieValue)
                 && string.Equals(accessCookieValue, "1", StringComparison.Ordinal);
             var hasValidToken = !string.IsNullOrWhiteSpace(effectiveToken) && _surveyLinkTokenService.IsTokenValid(id, effectiveToken);
@@ -375,6 +376,28 @@ namespace TINWeb.Pages.Company
                 .Where(value => !string.IsNullOrWhiteSpace(value))
                 .Distinct(StringComparer.Ordinal)
                 .ToList();
+        }
+
+        private string GetEffectiveToken(string? candidate)
+        {
+            var token = candidate;
+
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                token = Request.Query["token"].FirstOrDefault();
+            }
+
+            if (string.IsNullOrWhiteSpace(token) && RouteData.Values.TryGetValue("token", out var routeToken))
+            {
+                token = routeToken?.ToString();
+            }
+
+            token ??= string.Empty;
+            token = Uri.UnescapeDataString(token.Trim());
+            token = token.Trim('"', '\'', '<', '>', '(', ')', '[', ']', '{', '}');
+            token = token.TrimEnd('.', ',', ';', ':');
+
+            return token;
         }
 
         public class AnswerEditRow
