@@ -1,12 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using TINWeb.Services;
+using System.Collections.Concurrent;
 
 namespace TINWeb.Pages.Answers
 {
     public class IndexModel : PageModel
     {
         private readonly AnswerService _answerService;
+        private static readonly ConcurrentDictionary<string, PendingAnswerImport> PendingImports = new();
 
         public List<AnswerService.AnswerListRow> Rows { get; set; } = new();
         public List<int> FinancialYears { get; set; } = new();
@@ -15,6 +17,8 @@ namespace TINWeb.Pages.Answers
         public int? SelectedCompanySurveyId { get; set; }
         public int QuestionCount { get; set; }
         public int AnsweredCount { get; set; }
+        public AnswerService.AnswerImportPreviewResult? ImportPreview { get; set; }
+        public string? PendingImportToken { get; set; }
 
         [TempData]
         public string? StatusMessage { get; set; }
@@ -28,6 +32,11 @@ namespace TINWeb.Pages.Answers
         }
 
         public async Task OnGetAsync(int? financialYear, int? companySurveyId)
+        {
+            await LoadPageDataAsync(financialYear, companySurveyId);
+        }
+
+        private async Task LoadPageDataAsync(int? financialYear, int? companySurveyId)
         {
             QuestionCount = await _answerService.GetQuestionCountAsync();
             FinancialYears = await _answerService.GetAvailableFinancialYearsAsync();
@@ -80,6 +89,119 @@ namespace TINWeb.Pages.Answers
             }
 
             return RedirectToPage();
+        }
+
+        public async Task<IActionResult> OnPostPreviewImportAsync(IFormFile? importFile, int? financialYear)
+        {
+            if (importFile == null || importFile.Length == 0)
+            {
+                ErrorMessage = "Import failed: please select an Excel file.";
+                return RedirectToPage(new { financialYear });
+            }
+
+            var fileName = importFile.FileName ?? string.Empty;
+            if (!fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                ErrorMessage = "Import failed: only .xlsx Excel files are supported.";
+                return RedirectToPage(new { financialYear });
+            }
+
+            var effectiveYear = financialYear ?? await _answerService.GetCurrentSurveyFinancialYearAsync();
+            if (!effectiveYear.HasValue)
+            {
+                ErrorMessage = "Import failed: no financial year is selected and no current survey year is configured.";
+                return RedirectToPage();
+            }
+
+            CleanupExpiredPendingImports();
+
+            var token = Guid.NewGuid().ToString("N");
+            var tempDir = Path.Combine(Path.GetTempPath(), "tinweb-answer-import");
+            Directory.CreateDirectory(tempDir);
+            var tempFilePath = Path.Combine(tempDir, $"{token}.xlsx");
+
+            await using (var tempFileStream = System.IO.File.Create(tempFilePath))
+            {
+                await importFile.CopyToAsync(tempFileStream);
+            }
+
+            AnswerService.AnswerImportPreviewResult preview;
+            await using (var readStream = System.IO.File.OpenRead(tempFilePath))
+            {
+                preview = await _answerService.PreviewAnswersImportFromExcelAsync(readStream, effectiveYear.Value);
+            }
+
+            PendingImports[token] = new PendingAnswerImport
+            {
+                Token = token,
+                FinancialYear = effectiveYear.Value,
+                TempFilePath = tempFilePath,
+                CreatedUtc = DateTime.UtcNow
+            };
+
+            await LoadPageDataAsync(effectiveYear.Value, null);
+            ImportPreview = preview;
+            PendingImportToken = token;
+            return Page();
+        }
+
+        public async Task<IActionResult> OnPostApplyImportAsync(string? previewToken)
+        {
+            CleanupExpiredPendingImports();
+
+            if (string.IsNullOrWhiteSpace(previewToken) || !PendingImports.TryGetValue(previewToken, out var pendingImport))
+            {
+                ErrorMessage = "Apply import failed: preview session not found or expired. Please preview the file again.";
+                return RedirectToPage();
+            }
+
+            try
+            {
+                await using var stream = System.IO.File.OpenRead(pendingImport.TempFilePath);
+                var result = await _answerService.ImportAnswersFromExcelAsync(stream, pendingImport.FinancialYear);
+                if (result.Errors.Any())
+                {
+                    StatusMessage = $"Import completed with warnings. Inserted: {result.InsertedCount}, Updated: {result.UpdatedCount}. Warnings: {string.Join(" ", result.Errors.Take(5))}";
+                }
+                else
+                {
+                    StatusMessage = $"Import completed. Inserted: {result.InsertedCount}, Updated: {result.UpdatedCount}.";
+                }
+            }
+            finally
+            {
+                PendingImports.TryRemove(previewToken, out _);
+                if (System.IO.File.Exists(pendingImport.TempFilePath))
+                {
+                    System.IO.File.Delete(pendingImport.TempFilePath);
+                }
+            }
+
+            return RedirectToPage(new { financialYear = pendingImport.FinancialYear });
+        }
+
+        private static void CleanupExpiredPendingImports()
+        {
+            var cutoff = DateTime.UtcNow.AddMinutes(-30);
+            foreach (var key in PendingImports.Keys)
+            {
+                if (PendingImports.TryGetValue(key, out var pending) && pending.CreatedUtc < cutoff)
+                {
+                    PendingImports.TryRemove(key, out _);
+                    if (System.IO.File.Exists(pending.TempFilePath))
+                    {
+                        System.IO.File.Delete(pending.TempFilePath);
+                    }
+                }
+            }
+        }
+
+        private sealed class PendingAnswerImport
+        {
+            public string Token { get; set; } = string.Empty;
+            public int FinancialYear { get; set; }
+            public string TempFilePath { get; set; } = string.Empty;
+            public DateTime CreatedUtc { get; set; }
         }
     }
 }

@@ -20,6 +20,6 @@ namespace TINWeb.Models
         [Column(TypeName = "money")]
         public decimal? AnswerCurrency { get; set; }
 
-        public int? AnswerNumber { get; set; }
+        public double? AnswerNumber { get; set; }
     }
 }

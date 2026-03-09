@@ -225,7 +225,7 @@ namespace TINWeb.Data
 
                 entity.Property(e => e.AnswerNumber)
                     .HasColumnName("AnswerNumber")
-                    .HasColumnType("int");
+                    .HasColumnType("float");
 
                 entity.HasOne<CompanySurvey>()
                     .WithMany()

@@ -34,6 +34,16 @@
                 </div>
             }
 
+            <div id="bulkSendProgressContainer" class="mb-3" style="display:none;">
+                <div class="d-flex justify-content-between small mb-1">
+                    <span id="bulkSendProgressLabel">Sending survey emails...</span>
+                    <span id="bulkSendProgressPercent">0%</span>
+                </div>
+                <div class="progress" role="progressbar" aria-label="Bulk send progress" aria-valuemin="0" aria-valuemax="100">
+                    <div id="bulkSendProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
+                </div>
+            </div>
+
             <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
             <div class="card mb-3">
@@ -163,6 +173,10 @@
             const warningModalElement = document.getElementById('bulkSendWarningModal');
             const warningTarget = document.getElementById('bulkSendWarningTarget');
             const confirmBulkSendBtn = document.getElementById('confirmBulkSendBtn');
+            const bulkSendProgressContainer = document.getElementById('bulkSendProgressContainer');
+            const bulkSendProgressBar = document.getElementById('bulkSendProgressBar');
+            const bulkSendProgressPercent = document.getElementById('bulkSendProgressPercent');
+            const bulkSendProgressLabel = document.getElementById('bulkSendProgressLabel');
             const warningModal = warningModalElement && window.bootstrap && window.bootstrap.Modal
                 ? new window.bootstrap.Modal(warningModalElement)
                 : null;
@@ -176,6 +190,7 @@
             let activeFilter = 'all';
             let sortKey = 'company';
             let sortDir = 'asc';
+            let bulkProgressTimerId = null;
 
             if (!selectAllBtn || !clearAllBtn) {
                 return;
@@ -303,6 +318,34 @@
                         btn.textContent = baseLabel;
                     }
                 });
+            };
+
+            const startBulkSendProgress = () => {
+                if (!bulkSendProgressContainer || !bulkSendProgressBar || !bulkSendProgressPercent || !bulkSendProgressLabel) {
+                    return;
+                }
+
+                if (bulkProgressTimerId) {
+                    window.clearInterval(bulkProgressTimerId);
+                }
+
+                let value = 10;
+                bulkSendProgressLabel.textContent = 'Sending survey emails...';
+                bulkSendProgressContainer.style.display = '';
+
+                const render = () => {
+                    bulkSendProgressBar.style.width = `${value}%`;
+                    bulkSendProgressPercent.textContent = `${value}%`;
+                };
+
+                render();
+
+                bulkProgressTimerId = window.setInterval(() => {
+                    if (value < 92) {
+                        value += 4;
+                        render();
+                    }
+                }, 300);
             };
 
             const applySort = () => {
@@ -463,6 +506,7 @@
             if (bulkSendForm) {
                 bulkSendForm.addEventListener('submit', function (event) {
                     if (bulkSendConfirmed) {
+                        startBulkSendProgress();
                         return;
                     }
 
@@ -495,6 +539,7 @@
                     }
 
                     bulkSendConfirmed = true;
+                    startBulkSendProgress();
                     bulkSendForm.submit();
                 });
             }
@@ -502,6 +547,7 @@
             if (confirmBulkSendBtn && bulkSendForm) {
                 confirmBulkSendBtn.addEventListener('click', function () {
                     bulkSendConfirmed = true;
+                    startBulkSendProgress();
                     if (warningModal) {
                         warningModal.hide();
                     }
