@@ -24,6 +24,9 @@ namespace TINWeb.Pages.Company
         public int FinancialYear { get; set; }
 
         [BindProperty]
+        public int CompanyId { get; set; }
+
+        [BindProperty]
         public string Token { get; set; } = string.Empty;
 
         [BindProperty]
@@ -54,6 +57,7 @@ namespace TINWeb.Pages.Company
             }
 
             Company = company;
+            CompanyId = company.Id;
             Token = hasValidToken ? token : string.Empty;
             Saved = saved;
             Submitted = submitted;
@@ -112,6 +116,7 @@ namespace TINWeb.Pages.Company
             }
 
             Company = company;
+            CompanyId = company.Id;
 
             var survey = await GetCurrentSurveyAsync();
             if (survey == null)
@@ -409,6 +414,11 @@ namespace TINWeb.Pages.Company
             if (routeId > 0)
             {
                 return routeId;
+            }
+
+            if (CompanyId > 0)
+            {
+                return CompanyId;
             }
 
             var tokenId = TryGetClientIdFromToken(token);

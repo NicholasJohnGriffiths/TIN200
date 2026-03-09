@@ -29,6 +29,7 @@
 
             <form method="post" asp-route-id="@Model.Company.Id" asp-route-token="@Model.Token">
                 <input type="hidden" asp-for="Token" />
+                <input type="hidden" asp-for="CompanyId" />
 
                 <div class="row mb-3">
                     <div class="col-md-6">
