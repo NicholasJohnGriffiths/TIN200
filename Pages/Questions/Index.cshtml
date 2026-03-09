@@ -5,6 +5,13 @@
 }
 
 <div class="container-fluid px-0 mt-3">
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <div class="alert alert-success" role="alert">
+            @Model.StatusMessage
+        </div>
+    }
+
     <div class="row mb-3">
         <div class="col-md-8">
             <h1>Questions</h1>
@@ -12,7 +19,12 @@
         </div>
         <div class="col-md-4 text-end">
             <div class="d-inline-flex gap-2">
+                <a asp-page-handler="Export" class="btn btn-outline-success">Export</a>
                 <form method="post" asp-page-handler="Reorder" class="d-inline">
+                    @if (Model.FocusId.HasValue)
+                    {
+                        <input type="hidden" name="focusId" value="@Model.FocusId.Value" />
+                    }
                     <button type="submit" class="btn btn-outline-secondary">Reorder</button>
                 </form>
                 <a asp-page="./Create" class="btn btn-primary">Add New Question</a>
@@ -27,8 +39,8 @@
                 <thead class="table-dark">
                     <tr>
                         <th>Order</th>
-                        <th>Title</th>
-                        <th>Question</th>
+                        <th class="title-col">Title</th>
+                        <th class="question-col">Question</th>
                         <th>Answer Type</th>
                         <th>Actions</th>
                     </tr>
@@ -40,8 +52,8 @@
                     var isFocused = Model.FocusId.HasValue && Model.FocusId.Value == record.Id;
                     <tr id="question-@record.Id" class="@(isFocused ? "focused-question-row" : string.Empty)">
                         <td>@record.OrderNumber</td>
-                        <td>@record.Title</td>
-                        <td>@record.QuestionText</td>
+                        <td class="title-col">@record.Title</td>
+                        <td class="question-col">@record.QuestionText</td>
                         <td>@record.AnswerType</td>
                         <td class="actions-col">
                             <div class="d-inline-flex gap-1 flex-nowrap">
@@ -71,6 +83,14 @@
 </div>
 
 <style>
+    .title-col {
+        width: 20%;
+    }
+
+    .question-col {
+        width: 50%;
+    }
+
     .actions-col {
         white-space: nowrap;
         min-width: 200px;
@@ -92,6 +112,8 @@
             }
 
             row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            row.setAttribute('tabindex', '-1');
+            row.focus({ preventScroll: true });
         })();
     </script>
 }

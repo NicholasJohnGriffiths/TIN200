@@ -5,6 +5,20 @@
 }
 
 <div class="container-fluid px-0 mt-3">
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <div class="alert alert-success" role="alert">
+            @Model.StatusMessage
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            @Model.ErrorMessage
+        </div>
+    }
+
     <div class="row mb-3">
         <div class="col-md-8">
             <h1>Answers by Company Survey</h1>
@@ -12,6 +26,12 @@
             <p class="mb-0"><strong>Questions total:</strong> @Model.QuestionCount</p>
             <p class="mb-0"><strong>Rows shown:</strong> @Model.Rows.Count</p>
             <p class="mb-0"><strong>Answered:</strong> @Model.AnsweredCount</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <form method="post" asp-page-handler="DeleteAllAnswers" id="deleteAllAnswersForm" class="d-inline">
+                <input type="hidden" name="deleteConfirmation" id="deleteConfirmationInput" />
+                <button type="button" class="btn btn-danger" id="deleteAllAnswersButton">Delete All Answers</button>
+            </form>
         </div>
     </div>
 
@@ -94,4 +114,31 @@
         <div class="alert alert-info">No answers found for the selected Company Survey.</div>
     }
 </div>
+
+<script>
+    (function () {
+        const button = document.getElementById('deleteAllAnswersButton');
+        const form = document.getElementById('deleteAllAnswersForm');
+        const confirmationInput = document.getElementById('deleteConfirmationInput');
+
+        if (!button || !form || !confirmationInput) {
+            return;
+        }
+
+        button.addEventListener('click', function () {
+            const acknowledged = window.confirm('WARNING: This will permanently delete all data in the Answer table and recreate the table, constraints, and indexes. This cannot be undone. Click OK to continue.');
+            if (!acknowledged) {
+                return;
+            }
+
+            const typed = window.prompt('Type delete to confirm this action.');
+            if (typed === null) {
+                return;
+            }
+
+            confirmationInput.value = typed;
+            form.submit();
+        });
+    })();
+</script>
 

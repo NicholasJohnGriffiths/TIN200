@@ -30,7 +30,7 @@ namespace TINWeb.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Id)
                     .HasColumnName("Id")
-                    .ValueGeneratedOnAdd();
+                    .ValueGeneratedNever();
                 
                 entity.Property(e => e.CeoFirstName)
                     .HasColumnName("CEOFirstName")
@@ -171,6 +171,10 @@ namespace TINWeb.Data
                 entity.Property(e => e.QuestionText)
                     .HasColumnName("Question")
                     .HasColumnType("varchar(max)");
+
+                entity.Property(e => e.ImportColumnName)
+                    .HasColumnName("ImportColumnName")
+                    .HasColumnType("varchar(255)");
 
                 entity.Property(e => e.OrderNumber)
                     .HasColumnName("OrderNumber")

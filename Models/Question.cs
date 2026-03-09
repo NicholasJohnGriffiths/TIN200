@@ -18,6 +18,9 @@ namespace TINWeb.Models
 
         public string? QuestionText { get; set; }
 
+        [StringLength(255)]
+        public string? ImportColumnName { get; set; }
+
         public int? OrderNumber { get; set; }
 
         [StringLength(255)]

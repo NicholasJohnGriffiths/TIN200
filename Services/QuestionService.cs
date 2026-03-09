@@ -13,6 +13,32 @@ namespace TINWeb.Services
             _context = context;
         }
 
+        private async Task<List<Question>> GetNormalizedOrderedQuestionsAsync()
+        {
+            var orderedQuestions = await _context.Question
+                .OrderBy(q => q.OrderNumber ?? int.MaxValue)
+                .ThenBy(q => q.Id)
+                .ToListAsync();
+
+            var hasChanges = false;
+            for (var index = 0; index < orderedQuestions.Count; index++)
+            {
+                var normalizedOrder = index + 1;
+                if (orderedQuestions[index].OrderNumber != normalizedOrder)
+                {
+                    orderedQuestions[index].OrderNumber = normalizedOrder;
+                    hasChanges = true;
+                }
+            }
+
+            if (hasChanges)
+            {
+                await _context.SaveChangesAsync();
+            }
+
+            return orderedQuestions;
+        }
+
         public async Task<List<Question>> GetAllAsync()
         {
             return await _context.Question
@@ -28,15 +54,7 @@ namespace TINWeb.Services
 
         public async Task<Question> CreateAsync(Question record)
         {
-            var orderedQuestions = await _context.Question
-                .OrderBy(q => q.OrderNumber ?? int.MaxValue)
-                .ThenBy(q => q.Id)
-                .ToListAsync();
-
-            for (var index = 0; index < orderedQuestions.Count; index++)
-            {
-                orderedQuestions[index].OrderNumber = index + 1;
-            }
+            var orderedQuestions = await GetNormalizedOrderedQuestionsAsync();
 
             var maxInsertOrder = orderedQuestions.Count + 1;
             var requestedOrder = record.OrderNumber ?? maxInsertOrder;
@@ -55,15 +73,7 @@ namespace TINWeb.Services
 
         public async Task<Question> UpdateAsync(Question record)
         {
-            var orderedQuestions = await _context.Question
-                .OrderBy(q => q.OrderNumber ?? int.MaxValue)
-                .ThenBy(q => q.Id)
-                .ToListAsync();
-
-            for (var index = 0; index < orderedQuestions.Count; index++)
-            {
-                orderedQuestions[index].OrderNumber = index + 1;
-            }
+            var orderedQuestions = await GetNormalizedOrderedQuestionsAsync();
 
             var existingRecord = orderedQuestions.FirstOrDefault(q => q.Id == record.Id);
             if (existingRecord == null)
@@ -96,6 +106,7 @@ namespace TINWeb.Services
             existingRecord.Description = record.Description;
             existingRecord.GroupTitle = record.GroupTitle;
             existingRecord.QuestionText = record.QuestionText;
+            existingRecord.ImportColumnName = record.ImportColumnName;
             existingRecord.AnswerType = record.AnswerType;
             existingRecord.Multi1 = record.Multi1;
             existingRecord.Multi2 = record.Multi2;
@@ -114,15 +125,7 @@ namespace TINWeb.Services
 
         public async Task DeleteAsync(int id)
         {
-            var orderedQuestions = await _context.Question
-                .OrderBy(q => q.OrderNumber ?? int.MaxValue)
-                .ThenBy(q => q.Id)
-                .ToListAsync();
-
-            for (var index = 0; index < orderedQuestions.Count; index++)
-            {
-                orderedQuestions[index].OrderNumber = index + 1;
-            }
+            var orderedQuestions = await GetNormalizedOrderedQuestionsAsync();
 
             var record = orderedQuestions.FirstOrDefault(q => q.Id == id);
             if (record == null)
@@ -143,54 +146,47 @@ namespace TINWeb.Services
 
         public async Task MoveUpAsync(int id)
         {
-            var question = await _context.Question.FindAsync(id);
-            if (question == null)
+            var orderedQuestions = await GetNormalizedOrderedQuestionsAsync();
+
+            var currentIndex = orderedQuestions.FindIndex(q => q.Id == id);
+            if (currentIndex <= 0)
             {
                 return;
             }
 
-            var currentOrder = question.OrderNumber ?? 1;
-            if (currentOrder <= 1)
-            {
-                return;
-            }
+            var currentQuestion = orderedQuestions[currentIndex];
+            var previousQuestion = orderedQuestions[currentIndex - 1];
 
-            question.OrderNumber = currentOrder - 1;
-            await UpdateAsync(question);
+            var previousOrder = previousQuestion.OrderNumber ?? currentIndex;
+            previousQuestion.OrderNumber = currentQuestion.OrderNumber;
+            currentQuestion.OrderNumber = previousOrder;
+
+            await _context.SaveChangesAsync();
         }
 
         public async Task MoveDownAsync(int id)
         {
-            var question = await _context.Question.FindAsync(id);
-            if (question == null)
+            var orderedQuestions = await GetNormalizedOrderedQuestionsAsync();
+
+            var currentIndex = orderedQuestions.FindIndex(q => q.Id == id);
+            if (currentIndex < 0 || currentIndex >= orderedQuestions.Count - 1)
             {
                 return;
             }
 
-            var maxOrder = await _context.Question.CountAsync();
-            var currentOrder = question.OrderNumber ?? maxOrder;
-            if (currentOrder >= maxOrder)
-            {
-                return;
-            }
+            var currentQuestion = orderedQuestions[currentIndex];
+            var nextQuestion = orderedQuestions[currentIndex + 1];
 
-            question.OrderNumber = currentOrder + 1;
-            await UpdateAsync(question);
+            var nextOrder = nextQuestion.OrderNumber ?? (currentIndex + 2);
+            nextQuestion.OrderNumber = currentQuestion.OrderNumber;
+            currentQuestion.OrderNumber = nextOrder;
+
+            await _context.SaveChangesAsync();
         }
 
         public async Task NormalizeOrderNumbersAsync()
         {
-            var orderedQuestions = await _context.Question
-                .OrderBy(q => q.OrderNumber ?? int.MaxValue)
-                .ThenBy(q => q.Id)
-                .ToListAsync();
-
-            for (var index = 0; index < orderedQuestions.Count; index++)
-            {
-                orderedQuestions[index].OrderNumber = index + 1;
-            }
-
-            await _context.SaveChangesAsync();
+            await GetNormalizedOrderedQuestionsAsync();
         }
 
         public async Task<bool> ExistsAsync(int id)

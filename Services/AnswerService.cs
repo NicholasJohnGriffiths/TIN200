@@ -153,6 +153,48 @@ namespace TINWeb.Services
             return true;
         }
 
+        public async Task RecreateAnswerTableAsync()
+        {
+            const string sql = @"
+IF OBJECT_ID(N'[dbo].[Answer]', N'U') IS NOT NULL
+BEGIN
+    DROP TABLE [dbo].[Answer];
+END;
+
+CREATE TABLE [dbo].[Answer](
+    [Id] [int] IDENTITY(1,1) NOT NULL,
+    [CompanySurveyId] [int] NOT NULL,
+    [QuestionId] [int] NOT NULL,
+    [AnswerText] [varchar](max) NULL,
+    [AnswerCurrency] [money] NULL,
+    [AnswerNumber] [int] NULL,
+ CONSTRAINT [PK_Answer] PRIMARY KEY CLUSTERED 
+(
+    [Id] ASC
+) WITH (
+    PAD_INDEX = OFF,
+    STATISTICS_NORECOMPUTE = OFF,
+    IGNORE_DUP_KEY = OFF,
+    ALLOW_ROW_LOCKS = ON,
+    ALLOW_PAGE_LOCKS = ON,
+    OPTIMIZE_FOR_SEQUENTIAL_KEY = OFF
+) ON [PRIMARY]
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY];
+
+ALTER TABLE [dbo].[Answer] WITH CHECK ADD CONSTRAINT [FK_Answer_CompanySurvey]
+FOREIGN KEY([CompanySurveyId]) REFERENCES [dbo].[CompanySurvey] ([Id]);
+
+ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_CompanySurvey];
+
+ALTER TABLE [dbo].[Answer] WITH CHECK ADD CONSTRAINT [FK_Answer_Question]
+FOREIGN KEY([QuestionId]) REFERENCES [dbo].[Question] ([Id]);
+
+ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
+";
+
+            await _context.Database.ExecuteSqlRawAsync(sql);
+        }
+
         public class AnswerListRow
         {
             public int Id { get; set; }

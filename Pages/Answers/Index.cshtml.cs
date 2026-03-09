@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using TINWeb.Services;
 
@@ -14,6 +15,12 @@ namespace TINWeb.Pages.Answers
         public int? SelectedCompanySurveyId { get; set; }
         public int QuestionCount { get; set; }
         public int AnsweredCount { get; set; }
+
+        [TempData]
+        public string? StatusMessage { get; set; }
+
+        [TempData]
+        public string? ErrorMessage { get; set; }
 
         public IndexModel(AnswerService answerService)
         {
@@ -52,6 +59,27 @@ namespace TINWeb.Pages.Answers
 
             Rows = await _answerService.GetAnswerRowsAsync(SelectedCompanySurveyId.Value);
             AnsweredCount = Rows.Count(x => x.Id > 0);
+        }
+
+        public async Task<IActionResult> OnPostDeleteAllAnswersAsync(string? deleteConfirmation)
+        {
+            if (!string.Equals(deleteConfirmation?.Trim(), "delete", StringComparison.Ordinal))
+            {
+                ErrorMessage = "Delete cancelled. You must type 'delete' exactly to confirm.";
+                return RedirectToPage();
+            }
+
+            try
+            {
+                await _answerService.RecreateAnswerTableAsync();
+                StatusMessage = "All answers were deleted and the Answer table was recreated.";
+            }
+            catch (Exception ex)
+            {
+                ErrorMessage = $"Delete all answers failed: {ex.Message}";
+            }
+
+            return RedirectToPage();
         }
     }
 }
