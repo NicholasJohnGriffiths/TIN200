@@ -101,6 +101,8 @@ namespace TINWeb.Pages.Company
                 return RedirectToPage("/Company/SurveyLinkInvalid", new { reason = "post-auth-failed" });
             }
 
+            id = ResolveCompanyId(id, effectiveToken);
+
             Token = hasValidToken ? effectiveToken! : string.Empty;
 
             var company = await _context.Tin200.FirstOrDefaultAsync(c => c.Id == id);
@@ -400,6 +402,77 @@ namespace TINWeb.Pages.Company
             token = token.TrimEnd('.', ',', ';', ':');
 
             return token;
+        }
+
+        private int ResolveCompanyId(int routeId, string? token)
+        {
+            if (routeId > 0)
+            {
+                return routeId;
+            }
+
+            var tokenId = TryGetClientIdFromToken(token);
+            if (tokenId.HasValue && tokenId.Value > 0)
+            {
+                return tokenId.Value;
+            }
+
+            var referer = Request.Headers.Referer.ToString();
+            if (!string.IsNullOrWhiteSpace(referer) && Uri.TryCreate(referer, UriKind.Absolute, out var refererUri))
+            {
+                var segments = refererUri.AbsolutePath.Trim('/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+                for (var i = 0; i < segments.Length - 1; i++)
+                {
+                    if (segments[i].Equals("AnswerSurvey", StringComparison.OrdinalIgnoreCase)
+                        && int.TryParse(segments[i + 1], out var parsedId)
+                        && parsedId > 0)
+                    {
+                        return parsedId;
+                    }
+                }
+            }
+
+            return routeId;
+        }
+
+        private static int? TryGetClientIdFromToken(string? token)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return null;
+            }
+
+            try
+            {
+                var base64 = token.Replace('-', '+').Replace('_', '/');
+                switch (base64.Length % 4)
+                {
+                    case 2:
+                        base64 += "==";
+                        break;
+                    case 3:
+                        base64 += "=";
+                        break;
+                }
+
+                var decoded = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(base64));
+                var parts = decoded.Split(':');
+                if (parts.Length < 3)
+                {
+                    return null;
+                }
+
+                if (int.TryParse(parts[0], out var clientId) && clientId > 0)
+                {
+                    return clientId;
+                }
+            }
+            catch
+            {
+                return null;
+            }
+
+            return null;
         }
 
         public class AnswerEditRow
