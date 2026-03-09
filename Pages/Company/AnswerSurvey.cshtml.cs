@@ -90,9 +90,11 @@ namespace TINWeb.Pages.Company
             var hasSurveyAccessCookie = Request.Cookies.TryGetValue($"{AccessCookiePrefix}{id}", out var accessCookieValue)
                 && string.Equals(accessCookieValue, "1", StringComparison.Ordinal);
             var hasValidToken = !string.IsNullOrWhiteSpace(effectiveToken) && _surveyLinkTokenService.IsTokenValid(id, effectiveToken);
+            var baseSurveyPath = $"{Request.Scheme}://{Request.Host}/Company/AnswerSurvey/{id}";
             var hasSameOriginPost = string.Equals(Request.Headers.Origin.ToString(), $"{Request.Scheme}://{Request.Host}", StringComparison.OrdinalIgnoreCase)
-                || string.Equals(Request.Headers.Referer.ToString(), $"{Request.Scheme}://{Request.Host}/Company/AnswerSurvey/{id}", StringComparison.OrdinalIgnoreCase)
-                || Request.Headers.Referer.ToString().StartsWith($"{Request.Scheme}://{Request.Host}/Company/AnswerSurvey/{id}?", StringComparison.OrdinalIgnoreCase);
+                || string.Equals(Request.Headers.Referer.ToString(), baseSurveyPath, StringComparison.OrdinalIgnoreCase)
+                || Request.Headers.Referer.ToString().StartsWith(baseSurveyPath + "?", StringComparison.OrdinalIgnoreCase)
+                || Request.Headers.Referer.ToString().StartsWith(baseSurveyPath + "/", StringComparison.OrdinalIgnoreCase);
 
             if (!hasValidToken && !hasSurveyAccessCookie && !hasSameOriginPost)
             {
