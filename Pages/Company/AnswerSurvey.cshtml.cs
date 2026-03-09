@@ -8,6 +8,7 @@ using TINWeb.Services;
 namespace TINWeb.Pages.Company
 {
     [IgnoreAntiforgeryToken]
+    [RequestFormLimits(ValueCountLimit = 20000)]
     public class AnswerSurveyModel : PageModel
     {
         private const string AccessCookiePrefix = "survey_access_";
