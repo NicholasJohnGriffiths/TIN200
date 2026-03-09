@@ -49,7 +49,7 @@ namespace TINWeb.Pages.Company
             var company = await _context.Tin200.FirstOrDefaultAsync(c => c.Id == id);
             if (company == null)
             {
-                return NotFound();
+                return RedirectToPage("/Company/SurveyLinkInvalid");
             }
 
             Company = company;
@@ -103,7 +103,7 @@ namespace TINWeb.Pages.Company
             var company = await _context.Tin200.FirstOrDefaultAsync(c => c.Id == id);
             if (company == null)
             {
-                return NotFound();
+                return RedirectToPage("/Company/SurveyLinkInvalid");
             }
 
             Company = company;
