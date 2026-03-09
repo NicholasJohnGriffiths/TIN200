@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Mvc;
 
 namespace TINWeb.Pages.Company
 {
@@ -12,11 +13,14 @@ namespace TINWeb.Pages.Company
         }
 
         public string RequestNewLinkUrl { get; private set; } = string.Empty;
+        public string? Reason { get; private set; }
 
         public bool HasSupportEmail => !string.IsNullOrWhiteSpace(RequestNewLinkUrl);
 
-        public void OnGet()
+        public void OnGet(string? reason)
         {
+            Reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+
             var supportEmail = _configuration["SurveyLinkSettings:SupportEmail"];
             if (string.IsNullOrWhiteSpace(supportEmail))
             {
