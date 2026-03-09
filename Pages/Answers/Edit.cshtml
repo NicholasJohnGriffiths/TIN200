@@ -21,24 +21,95 @@
         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
         <input type="hidden" asp-for="Input.Id" />
         <input type="hidden" asp-for="Input.CompanySurveyId" />
+        <input type="hidden" asp-for="Input.AnswerType" />
 
-        <div class="form-group mb-3">
-            <label asp-for="Input.AnswerText" class="form-label">Answer Text</label>
-            <textarea asp-for="Input.AnswerText" class="form-control" rows="4"></textarea>
-            <span asp-validation-for="Input.AnswerText" class="text-danger"></span>
-        </div>
+        @{
+            var answerType = (Model.Input.AnswerType ?? string.Empty).Trim();
+        }
 
-        <div class="form-group mb-3">
-            <label asp-for="Input.AnswerNumber" class="form-label">Answer Number</label>
-            <input asp-for="Input.AnswerNumber" class="form-control" />
-            <span asp-validation-for="Input.AnswerNumber" class="text-danger"></span>
-        </div>
+        @if (answerType.Equals("Number", StringComparison.OrdinalIgnoreCase))
+        {
+            <div class="form-group mb-3">
+                <label asp-for="Input.AnswerNumber" class="form-label">Answer Number</label>
+                <input asp-for="Input.AnswerNumber" class="form-control" />
+                <span asp-validation-for="Input.AnswerNumber" class="text-danger"></span>
+            </div>
 
-        <div class="form-group mb-3">
-            <label asp-for="Input.AnswerCurrency" class="form-label">Answer Currency</label>
-            <input asp-for="Input.AnswerCurrency" class="form-control" />
-            <span asp-validation-for="Input.AnswerCurrency" class="text-danger"></span>
-        </div>
+            <input type="hidden" asp-for="Input.AnswerText" />
+            <input type="hidden" asp-for="Input.AnswerCurrency" />
+        }
+        else if (answerType.Equals("Currency", StringComparison.OrdinalIgnoreCase))
+        {
+            <div class="form-group mb-3">
+                <label asp-for="Input.AnswerCurrency" class="form-label">Answer Currency</label>
+                <input asp-for="Input.AnswerCurrency" class="form-control" />
+                <span asp-validation-for="Input.AnswerCurrency" class="text-danger"></span>
+            </div>
+
+            <input type="hidden" asp-for="Input.AnswerText" />
+            <input type="hidden" asp-for="Input.AnswerNumber" />
+        }
+        else if (answerType.Equals("SingleChoice", StringComparison.OrdinalIgnoreCase))
+        {
+            <div class="form-group mb-3">
+                <label asp-for="Input.AnswerText" class="form-label">Answer</label>
+                <select asp-for="Input.AnswerText" class="form-select">
+                    <option value="">Select an option</option>
+                    @foreach (var option in Model.Input.ChoiceOptions)
+                    {
+                        <option value="@option">@option</option>
+                    }
+                </select>
+                <span asp-validation-for="Input.AnswerText" class="text-danger"></span>
+            </div>
+
+            <input type="hidden" asp-for="Input.AnswerNumber" />
+            <input type="hidden" asp-for="Input.AnswerCurrency" />
+        }
+        else if (answerType.Equals("Multichoice", StringComparison.OrdinalIgnoreCase) || answerType.Equals("MultiChoice", StringComparison.OrdinalIgnoreCase))
+        {
+            <div class="form-group mb-3">
+                <label class="form-label">Answer</label>
+                @if (Model.Input.ChoiceOptions.Count == 0)
+                {
+                    <div class="text-muted">No options available for this question.</div>
+                }
+                else
+                {
+                    for (var optionIndex = 0; optionIndex < Model.Input.ChoiceOptions.Count; optionIndex++)
+                    {
+                        var option = Model.Input.ChoiceOptions[optionIndex];
+                        var optionId = $"opt_{optionIndex}";
+                        var isChecked = Model.Input.SelectedChoices.Contains(option, StringComparer.Ordinal);
+                        <div class="form-check">
+                            <input
+                                class="form-check-input"
+                                type="checkbox"
+                                name="Input.SelectedChoices"
+                                value="@option"
+                                id="@optionId"
+                                @(isChecked ? "checked" : null) />
+                            <label class="form-check-label" for="@optionId">@option</label>
+                        </div>
+                    }
+                }
+            </div>
+
+            <input type="hidden" asp-for="Input.AnswerText" />
+            <input type="hidden" asp-for="Input.AnswerNumber" />
+            <input type="hidden" asp-for="Input.AnswerCurrency" />
+        }
+        else
+        {
+            <div class="form-group mb-3">
+                <label asp-for="Input.AnswerText" class="form-label">Answer Text</label>
+                <textarea asp-for="Input.AnswerText" class="form-control" rows="4"></textarea>
+                <span asp-validation-for="Input.AnswerText" class="text-danger"></span>
+            </div>
+
+            <input type="hidden" asp-for="Input.AnswerNumber" />
+            <input type="hidden" asp-for="Input.AnswerCurrency" />
+        }
 
         <button type="submit" class="btn btn-primary">Save</button>
         <a asp-page="./Index" asp-route-companySurveyId="@Model.Input.CompanySurveyId" class="btn btn-secondary">Back to List</a>
@@ -47,4 +118,23 @@
 
 @section Scripts {
     @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+    <script>
+        (function () {
+            var form = document.querySelector('form');
+            if (!form) {
+                return;
+            }
+
+            var focusTarget = form.querySelector(
+                'input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])'
+            );
+
+            if (focusTarget) {
+                focusTarget.focus();
+                if (focusTarget.select && (focusTarget.tagName === 'INPUT' || focusTarget.tagName === 'TEXTAREA')) {
+                    focusTarget.select();
+                }
+            }
+        })();
+    </script>
 }

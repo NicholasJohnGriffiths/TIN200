@@ -35,6 +35,11 @@
                     <button type="submit" class="btn btn-outline-primary btn-sm">Preview Import</button>
                 </form>
 
+                <form method="post" asp-page-handler="CreateMissingAnswers" id="createMissingAnswersForm" class="d-inline">
+                    <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
+                    <button type="submit" class="btn btn-outline-secondary btn-sm">Create Missing Answers</button>
+                </form>
+
                 <form method="post" asp-page-handler="DeleteAllAnswers" id="deleteAllAnswersForm" class="d-inline">
                     <input type="hidden" name="deleteConfirmation" id="deleteConfirmationInput" />
                     <button type="button" class="btn btn-danger btn-sm" id="deleteAllAnswersButton">Delete All Answers</button>
@@ -185,6 +190,7 @@
         const progressLabel = document.getElementById('importProgressLabel');
         const previewImportForm = document.querySelector('form[asp-page-handler="PreviewImport"]') || document.querySelector('form[action*="handler=PreviewImport"]');
         const applyImportForm = document.querySelector('form[action*="handler=ApplyImport"]');
+        const createMissingAnswersForm = document.getElementById('createMissingAnswersForm');
 
         let timerId = null;
 
@@ -228,6 +234,7 @@
 
         wire(previewImportForm, 'Previewing import file...');
         wire(applyImportForm, 'Applying import...');
+        wire(createMissingAnswersForm, 'Creating missing answers...');
     })();
 
     (function () {

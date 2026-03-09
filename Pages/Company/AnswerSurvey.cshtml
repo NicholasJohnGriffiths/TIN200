@@ -1,0 +1,240 @@
+@page "{id:int}"
+@model TINWeb.Pages.Company.AnswerSurveyModel
+@{
+    ViewData["Title"] = "Survey Answers";
+    Layout = "_SurveyLayout";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <h1>Survey Answers</h1>
+            <p class="text-muted">Please complete the survey answers for the current survey year.</p>
+            <hr />
+
+            @if (Model.Submitted)
+            {
+                <div class="alert alert-success" role="alert">
+                    Thank you. Your survey has been submitted successfully.
+                </div>
+            }
+            else if (Model.Saved)
+            {
+                <div class="alert alert-info" role="alert">
+                    Your answers have been saved.
+                </div>
+            }
+
+            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+            <form method="post" asp-route-id="@Model.Company.Id" asp-route-token="@Model.Token">
+                <input type="hidden" asp-for="Token" />
+
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Company Name</label>
+                        <input class="form-control bg-light" value="@Model.Company.CompanyName" readonly />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Financial Year</label>
+                        <input class="form-control bg-light" value="@Model.FinancialYear" readonly />
+                    </div>
+                </div>
+
+                @{
+                    string? currentGroupTitle = null;
+                }
+
+                @for (var i = 0; i < Model.Rows.Count; i++)
+                {
+                    var answerType = (Model.Rows[i].AnswerType ?? string.Empty).Trim();
+                    var groupTitle = Model.Rows[i].GroupTitle?.Trim();
+                    var hasPreviousYearValue = !string.IsNullOrWhiteSpace(Model.Rows[i].PreviousYearValue);
+                    var previousYearText = Model.Rows[i].PreviousYearAnswerText ?? string.Empty;
+                    var previousYearNumber = Model.Rows[i].PreviousYearAnswerNumber?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+                    var previousYearCurrency = Model.Rows[i].PreviousYearAnswerCurrency?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+
+                    if (!string.IsNullOrWhiteSpace(groupTitle) && !string.Equals(currentGroupTitle, groupTitle, StringComparison.Ordinal))
+                    {
+                        currentGroupTitle = groupTitle;
+                        <div class="card mb-2">
+                            <div class="card-header small fw-semibold text-body-secondary py-2">@groupTitle</div>
+                        </div>
+                    }
+
+                    <div class="mb-3 pb-3 border-bottom">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <div class="small text-muted">Question @(Model.Rows[i].OrderNumber?.ToString() ?? "-")</div>
+                                <label class="form-label fw-semibold mb-0">@Model.Rows[i].QuestionText</label>
+                            </div>
+                            <span class="badge text-bg-secondary">@Model.Rows[i].AnswerType</span>
+                        </div>
+
+                        <input type="hidden" asp-for="Rows[i].QuestionId" />
+                        <input type="hidden" asp-for="Rows[i].OrderNumber" />
+                        <input type="hidden" asp-for="Rows[i].GroupTitle" />
+                        <input type="hidden" asp-for="Rows[i].QuestionText" />
+                        <input type="hidden" asp-for="Rows[i].AnswerType" />
+
+                        <div class="row g-3 align-items-start survey-answer-row" data-row-index="@i">
+                            <div class="col-md-8">
+                                @if (answerType.Equals("Number", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <input asp-for="Rows[i].AnswerNumber" class="form-control" placeholder="Enter number" />
+                                    <input type="hidden" asp-for="Rows[i].AnswerText" />
+                                    <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
+                                }
+                                else if (answerType.Equals("Currency", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <input asp-for="Rows[i].AnswerCurrency" class="form-control" placeholder="Enter currency" />
+                                    <input type="hidden" asp-for="Rows[i].AnswerText" />
+                                    <input type="hidden" asp-for="Rows[i].AnswerNumber" />
+                                }
+                                else if (answerType.Equals("SingleChoice", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    <select asp-for="Rows[i].AnswerText" class="form-select">
+                                        <option value="">Select an option</option>
+                                        @foreach (var option in Model.Rows[i].ChoiceOptions)
+                                        {
+                                            <option value="@option">@option</option>
+                                        }
+                                    </select>
+                                    <input type="hidden" asp-for="Rows[i].AnswerNumber" />
+                                    <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
+                                }
+                                else if (answerType.Equals("Multichoice", StringComparison.OrdinalIgnoreCase) || answerType.Equals("MultiChoice", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    if (Model.Rows[i].ChoiceOptions.Count == 0)
+                                    {
+                                        <div class="text-muted small">No options available for this question.</div>
+                                    }
+                                    else
+                                    {
+                                        for (var optionIndex = 0; optionIndex < Model.Rows[i].ChoiceOptions.Count; optionIndex++)
+                                        {
+                                            var option = Model.Rows[i].ChoiceOptions[optionIndex];
+                                            var optionId = $"row_{i}_opt_{optionIndex}";
+                                            var isChecked = Model.Rows[i].SelectedChoices.Contains(option, StringComparer.Ordinal);
+
+                                            <div class="form-check">
+                                                <input
+                                                    class="form-check-input"
+                                                    type="checkbox"
+                                                    name="Rows[@i].SelectedChoices"
+                                                    value="@option"
+                                                    id="@optionId"
+                                                    @(isChecked ? "checked" : null) />
+                                                <label class="form-check-label" for="@optionId">@option</label>
+                                            </div>
+                                        }
+                                    }
+
+                                    <input type="hidden" asp-for="Rows[i].AnswerText" />
+                                    <input type="hidden" asp-for="Rows[i].AnswerNumber" />
+                                    <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
+                                }
+                                else
+                                {
+                                    <input asp-for="Rows[i].AnswerText" class="form-control" placeholder="Enter answer" />
+                                    <input type="hidden" asp-for="Rows[i].AnswerNumber" />
+                                    <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
+                                }
+                            </div>
+                            <div class="col-md-4 text-md-end">
+                                <div class="small text-body-secondary">prev year: @(Model.Rows[i].PreviousYearValue ?? "—")</div>
+                                @if (hasPreviousYearValue)
+                                {
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-secondary mt-1 copy-prev-year-btn"
+                                        data-row-index="@i"
+                                        data-answer-type="@answerType"
+                                        data-prev-text="@previousYearText"
+                                        data-prev-number="@previousYearNumber"
+                                        data-prev-currency="@previousYearCurrency">
+                                        Copy prev year
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+
+                <div class="d-flex gap-2">
+                    <button type="submit" name="FormAction" value="save" class="btn btn-secondary">Save for Later</button>
+                    <button type="submit" name="FormAction" value="submit" class="btn btn-primary">Submit Final</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+    <script>
+        (function () {
+            function normalizeType(value) {
+                return (value || '').trim().toLowerCase();
+            }
+
+            function splitChoices(text) {
+                if (!text) {
+                    return [];
+                }
+
+                return text
+                    .split(/[;,|\n\r]+/)
+                    .map(function (x) { return x.trim(); })
+                    .filter(function (x) { return x.length > 0; });
+            }
+
+            document.querySelectorAll('.copy-prev-year-btn').forEach(function (button) {
+                button.addEventListener('click', function () {
+                    var rowIndex = button.getAttribute('data-row-index');
+                    var answerType = normalizeType(button.getAttribute('data-answer-type'));
+                    var prevText = button.getAttribute('data-prev-text') || '';
+                    var prevNumber = button.getAttribute('data-prev-number') || '';
+                    var prevCurrency = button.getAttribute('data-prev-currency') || '';
+
+                    if (answerType === 'number') {
+                        var numberInput = document.getElementById('Rows_' + rowIndex + '__AnswerNumber');
+                        if (numberInput) {
+                            numberInput.value = prevNumber;
+                            numberInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            numberInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                        return;
+                    }
+
+                    if (answerType === 'currency') {
+                        var currencyInput = document.getElementById('Rows_' + rowIndex + '__AnswerCurrency');
+                        if (currencyInput) {
+                            currencyInput.value = prevCurrency;
+                            currencyInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            currencyInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                        return;
+                    }
+
+                    if (answerType === 'multichoice') {
+                        var selectedSet = new Set(splitChoices(prevText));
+                        var selector = "input[type='checkbox'][name='Rows[" + rowIndex + "].SelectedChoices']";
+                        document.querySelectorAll(selector).forEach(function (checkbox) {
+                            checkbox.checked = selectedSet.has((checkbox.value || '').trim());
+                            checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                        });
+                        return;
+                    }
+
+                    var textInput = document.getElementById('Rows_' + rowIndex + '__AnswerText');
+                    if (textInput) {
+                        textInput.value = prevText;
+                        textInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        textInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                });
+            });
+        })();
+    </script>
+}

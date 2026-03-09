@@ -31,6 +31,9 @@ namespace TINWeb.Pages.Answers
             {
                 Id = answer.Id,
                 CompanySurveyId = answer.CompanySurveyId,
+                AnswerType = answer.AnswerType,
+                ChoiceOptions = answer.ChoiceOptions,
+                SelectedChoices = ParseMultiChoiceAnswer(answer.AnswerText),
                 AnswerText = answer.AnswerText,
                 AnswerNumber = answer.AnswerNumber,
                 AnswerCurrency = answer.AnswerCurrency
@@ -44,7 +47,22 @@ namespace TINWeb.Pages.Answers
             if (!ModelState.IsValid)
             {
                 Details = await _answerService.GetAnswerForEditAsync(Input.Id);
+
+                if (Details != null)
+                {
+                    Input.AnswerType = Details.AnswerType;
+                    Input.ChoiceOptions = Details.ChoiceOptions;
+                    Input.SelectedChoices = ParseMultiChoiceAnswer(Input.AnswerText);
+                }
+
                 return Page();
+            }
+
+            Details = await _answerService.GetAnswerForEditAsync(Input.Id);
+            if (Details != null)
+            {
+                Input.AnswerType = Details.AnswerType;
+                Input.ChoiceOptions = Details.ChoiceOptions;
             }
 
             var updated = await _answerService.UpdateAnswerAsync(Input);
@@ -54,6 +72,21 @@ namespace TINWeb.Pages.Answers
             }
 
             return RedirectToPage("./Index", new { companySurveyId = Input.CompanySurveyId });
+        }
+
+        private static List<string> ParseMultiChoiceAnswer(string? answerText)
+        {
+            if (string.IsNullOrWhiteSpace(answerText))
+            {
+                return new List<string>();
+            }
+
+            return answerText
+                .Split(new[] { ';', ',', '|', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(value => value.Trim())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct()
+                .ToList();
         }
     }
 }

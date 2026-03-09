@@ -2,6 +2,7 @@
 @model TINWeb.Pages.Company.SurveyLinkInvalidModel
 @{
     ViewData["Title"] = "Survey Link Invalid";
+    Layout = "_SurveyLayout";
 }
 
 <div class="container mt-5">
@@ -16,9 +17,8 @@
             </p>
             @if (Model.HasSupportEmail)
             {
-                <a href="@Model.RequestNewLinkUrl" class="btn btn-outline-primary mt-2 me-2">Request New Link</a>
+                <a href="@Model.RequestNewLinkUrl" class="btn btn-outline-primary mt-2 me-2">Request Survey</a>
             }
-            <a asp-page="/Index" class="btn btn-primary mt-2">Back to Home</a>
         </div>
     </div>
 </div>

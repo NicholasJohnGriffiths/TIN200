@@ -12,6 +12,7 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AllowAnonymousToPage("/Login");
     options.Conventions.AllowAnonymousToPage("/Error");
     options.Conventions.AllowAnonymousToPage("/Company/SurveyUpdate");
+    options.Conventions.AllowAnonymousToPage("/Company/AnswerSurvey");
     options.Conventions.AllowAnonymousToPage("/Company/SurveyLinkInvalid");
 
     options.Conventions.AddPageRoute("/Company/Index", "/Tin200");

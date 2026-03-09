@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Options;
 using TINWeb.Services;
 
 namespace TINWeb.Pages.Company
@@ -9,15 +10,18 @@ namespace TINWeb.Pages.Company
         private readonly CompanyService _companyService;
         private readonly ISurveyEmailService _surveyEmailService;
         private readonly ISurveyLinkTokenService _surveyLinkTokenService;
+        private readonly SurveyLinkSettings _surveyLinkSettings;
 
         public SendSurveyModel(
             CompanyService companyService,
             ISurveyEmailService surveyEmailService,
-            ISurveyLinkTokenService surveyLinkTokenService)
+            ISurveyLinkTokenService surveyLinkTokenService,
+            IOptions<SurveyLinkSettings> surveyLinkSettings)
         {
             _companyService = companyService;
             _surveyEmailService = surveyEmailService;
             _surveyLinkTokenService = surveyLinkTokenService;
+            _surveyLinkSettings = surveyLinkSettings.Value;
         }
 
         [BindProperty]
@@ -129,7 +133,15 @@ namespace TINWeb.Pages.Company
         private string BuildSurveyUrl(int id)
         {
             var token = _surveyLinkTokenService.GenerateToken(id);
-            return Url.Page("/Company/SurveyUpdate", pageHandler: null, values: new { id, token }, protocol: Request.Scheme) ?? string.Empty;
+            var relativePath = Url.Page("/Company/AnswerSurvey", pageHandler: null, values: new { id, token }, protocol: null) ?? string.Empty;
+            var configuredBaseUrl = (_surveyLinkSettings.BaseUrl ?? string.Empty).Trim().TrimEnd('/');
+
+            if (!string.IsNullOrWhiteSpace(configuredBaseUrl) && Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out _))
+            {
+                return $"{configuredBaseUrl}{relativePath}";
+            }
+
+            return Url.Page("/Company/AnswerSurvey", pageHandler: null, values: new { id, token }, protocol: Request.Scheme) ?? string.Empty;
         }
 
         private async Task LoadAvailableClientsAsync()

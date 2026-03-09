@@ -22,6 +22,7 @@
                 <tr>
                     <th>ID</th>
                     <th>Financial Year</th>
+                    <th>Current Survey</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -31,6 +32,7 @@
                     <tr>
                         <td>@record.Id</td>
                         <td>@record.FinancialYear</td>
+                        <td>@(record.CurrentSurvey ? "Yes" : "No")</td>
                         <td>
                             <a asp-page="./Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
                             <a asp-page="./Edit" asp-route-id="@record.Id" class="btn btn-sm btn-warning">Edit</a>

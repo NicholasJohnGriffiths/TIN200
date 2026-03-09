@@ -23,6 +23,15 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$SqlAdminPassword,
 
+    [Parameter(Mandatory = $false)]
+    [string]$SurveyLinkSecretKey = "",
+
+    [Parameter(Mandatory = $false)]
+    [int]$SurveyLinkExpiryHours = 72,
+
+    [Parameter(Mandatory = $false)]
+    [string]$SurveySupportEmail = "",
+
     [switch]$AllowMyIp
 )
 
@@ -99,10 +108,29 @@ az webapp create `
 $connectionString = "Server=tcp:$SqlServerName.database.windows.net,1433;Initial Catalog=$SqlDatabaseName;Persist Security Info=False;User ID=$SqlAdminUser;Password=$SqlAdminPassword;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
 
 Write-Host "Configuring app settings and SQL connection string..."
+$surveyBaseUrl = "https://$WebAppName.azurewebsites.net"
+
+$appSettings = @(
+    "ASPNETCORE_ENVIRONMENT=Production",
+    "ASPNETCORE_HTTPS_PORT=443",
+    "SurveyLinkSettings__BaseUrl=$surveyBaseUrl",
+    "SurveyLinkSettings__ExpiryHours=$SurveyLinkExpiryHours"
+)
+
+if (-not [string]::IsNullOrWhiteSpace($SurveySupportEmail)) {
+    $appSettings += "SurveyLinkSettings__SupportEmail=$SurveySupportEmail"
+}
+
+if (-not [string]::IsNullOrWhiteSpace($SurveyLinkSecretKey)) {
+    $appSettings += "SurveyLinkSettings__SecretKey=$SurveyLinkSecretKey"
+} else {
+    Write-Warning "SurveyLinkSecretKey was not provided. Existing Azure setting will be retained."
+}
+
 az webapp config appsettings set `
     --resource-group $ResourceGroup `
     --name $WebAppName `
-    --settings ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_HTTPS_PORT=443 | Out-Null
+    --settings $appSettings | Out-Null
 
 az webapp config connection-string set `
     --resource-group $ResourceGroup `

@@ -31,6 +31,9 @@ Set-Location .\deploy
   -SqlDatabaseName "tin200db" `
   -SqlAdminUser "tinadmin" `
   -SqlAdminPassword "<STRONG_PASSWORD>" `
+  -SurveyLinkSecretKey "<STABLE_STRONG_SECRET>" `
+  -SurveyLinkExpiryHours 72 `
+  -SurveySupportEmail "support@yourcompany.com" `
   -AllowMyIp
 ```
 
@@ -40,8 +43,15 @@ What the script does:
 - Configures SQL firewall rules
 - Sets `ASPNETCORE_ENVIRONMENT=Production`
 - Sets `ASPNETCORE_HTTPS_PORT=443`
+- Sets `SurveyLinkSettings__BaseUrl=https://<webapp-name>.azurewebsites.net`
+- Sets `SurveyLinkSettings__ExpiryHours` and optional `SurveyLinkSettings__SupportEmail`
+- Sets `SurveyLinkSettings__SecretKey` when provided (recommended)
 - Sets `DefaultConnection` connection string in App Service
 - Publishes and deploys the app
+
+Important for survey links:
+- `SurveyLinkSettings__SecretKey` must be stable and non-empty in Azure.
+- If it changes, previously sent links become invalid.
 
 Note: Azure App Service terminates TLS at the front end. Setting `ASPNETCORE_HTTPS_PORT=443` ensures ASP.NET Core generates HTTPS redirects and URLs with the expected public port.
 

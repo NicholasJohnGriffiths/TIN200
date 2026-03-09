@@ -33,24 +33,61 @@ namespace TINWeb.Pages.Answers
 
         public async Task OnGetAsync(int? financialYear, int? companySurveyId)
         {
-            await LoadPageDataAsync(financialYear, companySurveyId);
+            var hasExplicitFilters = Request.Query.ContainsKey("financialYear") || Request.Query.ContainsKey("companySurveyId");
+            await LoadPageDataAsync(financialYear, companySurveyId, hasExplicitFilters);
         }
 
-        private async Task LoadPageDataAsync(int? financialYear, int? companySurveyId)
+        private async Task LoadPageDataAsync(int? financialYear, int? companySurveyId, bool preserveExplicitFilters = false)
         {
             QuestionCount = await _answerService.GetQuestionCountAsync();
             FinancialYears = await _answerService.GetAvailableFinancialYearsAsync();
-            SelectedFinancialYear = financialYear ?? await _answerService.GetCurrentSurveyFinancialYearAsync();
 
-            if (!SelectedFinancialYear.HasValue && FinancialYears.Any())
+            if (!financialYear.HasValue && companySurveyId.HasValue)
             {
-                SelectedFinancialYear = FinancialYears.First();
+                var selectedCompanySurvey = (await _answerService.GetCompanySurveyOptionsAsync(null))
+                    .FirstOrDefault(x => x.CompanySurveyId == companySurveyId.Value);
+                financialYear = selectedCompanySurvey?.FinancialYear;
+            }
+
+            if (preserveExplicitFilters)
+            {
+                SelectedFinancialYear = financialYear;
+            }
+            else
+            {
+                SelectedFinancialYear = financialYear ?? await _answerService.GetCurrentSurveyFinancialYearAsync();
+
+                if (!SelectedFinancialYear.HasValue && FinancialYears.Any())
+                {
+                    SelectedFinancialYear = FinancialYears.First();
+                }
             }
 
             CompanySurveyOptions = await _answerService.GetCompanySurveyOptionsAsync(SelectedFinancialYear);
             SelectedCompanySurveyId = companySurveyId;
 
-            if (!SelectedCompanySurveyId.HasValue)
+            if (SelectedCompanySurveyId.HasValue && !CompanySurveyOptions.Any(x => x.CompanySurveyId == SelectedCompanySurveyId.Value))
+            {
+                var allOptions = await _answerService.GetCompanySurveyOptionsAsync(null);
+                var previouslySelected = allOptions.FirstOrDefault(x => x.CompanySurveyId == SelectedCompanySurveyId.Value);
+
+                if (previouslySelected != null)
+                {
+                    var sameCompanyInSelectedYear = CompanySurveyOptions
+                        .Where(x => x.CompanyId == previouslySelected.CompanyId)
+                        .OrderByDescending(x => x.AnswerCount)
+                        .ThenByDescending(x => x.CompanySurveyId)
+                        .FirstOrDefault();
+
+                    SelectedCompanySurveyId = sameCompanyInSelectedYear?.CompanySurveyId;
+                }
+                else
+                {
+                    SelectedCompanySurveyId = null;
+                }
+            }
+
+            if (!SelectedCompanySurveyId.HasValue && !preserveExplicitFilters)
             {
                 SelectedCompanySurveyId = CompanySurveyOptions
                     .OrderByDescending(x => x.AnswerCount)
@@ -89,6 +126,20 @@ namespace TINWeb.Pages.Answers
             }
 
             return RedirectToPage();
+        }
+
+        public async Task<IActionResult> OnPostCreateMissingAnswersAsync(int? financialYear)
+        {
+            var effectiveYear = financialYear ?? await _answerService.GetCurrentSurveyFinancialYearAsync();
+            if (!effectiveYear.HasValue)
+            {
+                ErrorMessage = "Create missing answers failed: no financial year is selected and no current survey year is configured.";
+                return RedirectToPage();
+            }
+
+            var createdCount = await _answerService.CreateMissingAnswersForYearAsync(effectiveYear.Value);
+            StatusMessage = $"Create Missing Answers complete for FY {effectiveYear.Value}. New answer rows created: {createdCount}.";
+            return RedirectToPage(new { financialYear = effectiveYear.Value });
         }
 
         public async Task<IActionResult> OnPostPreviewImportAsync(IFormFile? importFile, int? financialYear)

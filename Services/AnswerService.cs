@@ -118,7 +118,7 @@ namespace TINWeb.Services
 
         public async Task<AnswerEditRow?> GetAnswerForEditAsync(int answerId)
         {
-            return await (
+            var row = await (
                 from answer in _context.Answer
                 join companySurvey in _context.CompanySurvey on answer.CompanySurveyId equals companySurvey.Id
                 join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
@@ -134,11 +134,43 @@ namespace TINWeb.Services
                     CompanyName = company.CompanyName,
                     FinancialYear = survey.FinancialYear,
                     QuestionText = question.QuestionText,
+                    AnswerType = question.AnswerType,
+                    Multi1 = question.Multi1,
+                    Multi2 = question.Multi2,
+                    Multi3 = question.Multi3,
+                    Multi4 = question.Multi4,
+                    Multi5 = question.Multi5,
+                    Multi6 = question.Multi6,
+                    Multi7 = question.Multi7,
+                    Multi8 = question.Multi8,
                     AnswerText = answer.AnswerText,
                     AnswerNumber = answer.AnswerNumber,
                     AnswerCurrency = answer.AnswerCurrency
                 }
             ).FirstOrDefaultAsync();
+
+            if (row == null)
+            {
+                return null;
+            }
+
+            row.ChoiceOptions = new[]
+            {
+                row.Multi1,
+                row.Multi2,
+                row.Multi3,
+                row.Multi4,
+                row.Multi5,
+                row.Multi6,
+                row.Multi7,
+                row.Multi8
+            }
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+            return row;
         }
 
         public async Task<bool> UpdateAnswerAsync(AnswerEditInput input)
@@ -149,12 +181,172 @@ namespace TINWeb.Services
                 return false;
             }
 
-            answer.AnswerText = input.AnswerText;
-            answer.AnswerNumber = input.AnswerNumber;
-            answer.AnswerCurrency = input.AnswerCurrency;
+            var question = await _context.Question.FirstOrDefaultAsync(q => q.Id == answer.QuestionId);
+            var answerType = question?.AnswerType?.Trim() ?? string.Empty;
+
+            var choiceOptions = question == null
+                ? new List<string>()
+                : new[]
+                {
+                    question.Multi1,
+                    question.Multi2,
+                    question.Multi3,
+                    question.Multi4,
+                    question.Multi5,
+                    question.Multi6,
+                    question.Multi7,
+                    question.Multi8
+                }
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value!.Trim())
+                .Distinct()
+                .ToList();
+
+            if (answerType.Equals("Number", StringComparison.OrdinalIgnoreCase))
+            {
+                answer.AnswerText = null;
+                answer.AnswerCurrency = null;
+                answer.AnswerNumber = input.AnswerNumber;
+            }
+            else if (answerType.Equals("Currency", StringComparison.OrdinalIgnoreCase))
+            {
+                answer.AnswerText = null;
+                answer.AnswerNumber = null;
+                answer.AnswerCurrency = input.AnswerCurrency;
+            }
+            else if (answerType.Equals("SingleChoice", StringComparison.OrdinalIgnoreCase))
+            {
+                answer.AnswerText = choiceOptions.Contains(input.AnswerText ?? string.Empty)
+                    ? input.AnswerText
+                    : null;
+                answer.AnswerNumber = null;
+                answer.AnswerCurrency = null;
+            }
+            else if (answerType.Equals("Multichoice", StringComparison.OrdinalIgnoreCase) || answerType.Equals("MultiChoice", StringComparison.OrdinalIgnoreCase))
+            {
+                var selected = (input.SelectedChoices ?? new List<string>())
+                    .Select(value => (value ?? string.Empty).Trim())
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Where(value => choiceOptions.Contains(value))
+                    .Distinct()
+                    .ToList();
+
+                answer.AnswerText = selected.Count == 0 ? null : string.Join("; ", selected);
+                answer.AnswerNumber = null;
+                answer.AnswerCurrency = null;
+            }
+            else
+            {
+                answer.AnswerText = input.AnswerText;
+                answer.AnswerNumber = null;
+                answer.AnswerCurrency = null;
+            }
 
             await _context.SaveChangesAsync();
             return true;
+        }
+
+        public async Task<int> CreateMissingAnswersForYearAsync(int financialYear)
+        {
+            var surveyId = await _context.Survey
+                .Where(s => s.FinancialYear == financialYear)
+                .OrderByDescending(s => s.CurrentSurvey)
+                .ThenByDescending(s => s.Id)
+                .Select(s => (int?)s.Id)
+                .FirstOrDefaultAsync();
+
+            if (!surveyId.HasValue)
+            {
+                return 0;
+            }
+
+            var companyIds = await _context.Tin200
+                .Select(c => c.Id)
+                .ToListAsync();
+
+            var existingCompanySurveyCompanyIds = await _context.CompanySurvey
+                .Where(cs => cs.SurveyId == surveyId.Value)
+                .Select(cs => cs.CompanyId)
+                .Distinct()
+                .ToListAsync();
+
+            var missingCompanySurveyCompanyIds = companyIds
+                .Except(existingCompanySurveyCompanyIds)
+                .ToList();
+
+            foreach (var companyId in missingCompanySurveyCompanyIds)
+            {
+                _context.CompanySurvey.Add(new CompanySurvey
+                {
+                    CompanyId = companyId,
+                    SurveyId = surveyId.Value,
+                    Saved = false,
+                    Submitted = false,
+                    Requested = false
+                });
+            }
+
+            if (missingCompanySurveyCompanyIds.Any())
+            {
+                await _context.SaveChangesAsync();
+            }
+
+            var companySurveyIds = await _context.CompanySurvey
+                .Where(cs => cs.SurveyId == surveyId.Value)
+                .Select(cs => cs.Id)
+                .Distinct()
+                .ToListAsync();
+
+            if (!companySurveyIds.Any())
+            {
+                return 0;
+            }
+
+            var questionIds = await _context.Question
+                .Select(q => q.Id)
+                .ToListAsync();
+
+            if (!questionIds.Any())
+            {
+                return 0;
+            }
+
+            var existingPairs = await _context.Answer
+                .Where(a => companySurveyIds.Contains(a.CompanySurveyId))
+                .Select(a => new { a.CompanySurveyId, a.QuestionId })
+                .Distinct()
+                .ToListAsync();
+
+            var existingSet = new HashSet<(int CompanySurveyId, int QuestionId)>(
+                existingPairs.Select(x => (x.CompanySurveyId, x.QuestionId)));
+
+            var rowsToInsert = new List<Answer>();
+
+            foreach (var companySurveyId in companySurveyIds)
+            {
+                foreach (var questionId in questionIds)
+                {
+                    if (existingSet.Contains((companySurveyId, questionId)))
+                    {
+                        continue;
+                    }
+
+                    rowsToInsert.Add(new Answer
+                    {
+                        CompanySurveyId = companySurveyId,
+                        QuestionId = questionId
+                    });
+                }
+            }
+
+            if (!rowsToInsert.Any())
+            {
+                return 0;
+            }
+
+            _context.Answer.AddRange(rowsToInsert);
+            await _context.SaveChangesAsync();
+            return rowsToInsert.Count;
         }
 
         public async Task RecreateAnswerTableAsync()
@@ -689,6 +881,16 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             public string? CompanyName { get; set; }
             public int FinancialYear { get; set; }
             public string? QuestionText { get; set; }
+            public string? AnswerType { get; set; }
+            public string? Multi1 { get; set; }
+            public string? Multi2 { get; set; }
+            public string? Multi3 { get; set; }
+            public string? Multi4 { get; set; }
+            public string? Multi5 { get; set; }
+            public string? Multi6 { get; set; }
+            public string? Multi7 { get; set; }
+            public string? Multi8 { get; set; }
+            public List<string> ChoiceOptions { get; set; } = new();
             public string? AnswerText { get; set; }
             public double? AnswerNumber { get; set; }
             public decimal? AnswerCurrency { get; set; }
@@ -698,6 +900,9 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
         {
             public int Id { get; set; }
             public int CompanySurveyId { get; set; }
+            public string? AnswerType { get; set; }
+            public List<string> ChoiceOptions { get; set; } = new();
+            public List<string> SelectedChoices { get; set; } = new();
             public string? AnswerText { get; set; }
             public double? AnswerNumber { get; set; }
             public decimal? AnswerCurrency { get; set; }

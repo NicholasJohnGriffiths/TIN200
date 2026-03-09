@@ -15,6 +15,9 @@
 
         <dt class="col-sm-3">Financial Year</dt>
         <dd class="col-sm-9">@Model.Record.FinancialYear</dd>
+
+        <dt class="col-sm-3">Current Survey</dt>
+        <dd class="col-sm-9">@(Model.Record.CurrentSurvey ? "Yes" : "No")</dd>
     </dl>
 
     <form method="post">
