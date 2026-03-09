@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Http.Features;
 using TINWeb.Data;
 using TINWeb.Services;
 
@@ -52,6 +53,10 @@ builder.Services.Configure<AzureCommunicationEmailSettings>(builder.Configuratio
 builder.Services.Configure<SurveyLinkSettings>(builder.Configuration.GetSection("SurveyLinkSettings"));
 builder.Services.AddScoped<ISurveyEmailService, SurveyEmailService>();
 builder.Services.AddScoped<ISurveyLinkTokenService, SurveyLinkTokenService>();
+builder.Services.Configure<FormOptions>(options =>
+{
+    options.ValueCountLimit = 20000;
+});
 
 var app = builder.Build();
 var urls = builder.Configuration["ASPNETCORE_URLS"];
