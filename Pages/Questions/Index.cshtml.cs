@@ -32,10 +32,33 @@ namespace TINWeb.Pages.Questions
         {
             var records = await _service.GetAllAsync();
 
+            var orderedRecords = records
+                .OrderBy(r => r.OrderNumber ?? int.MaxValue)
+                .ThenBy(r => r.Id)
+                .ToList();
+
+            var groupOrderByTitle = new Dictionary<string, int>(StringComparer.Ordinal);
+            var nextGroupOrder = 0;
+
+            foreach (var record in orderedRecords)
+            {
+                var groupKey = (record.GroupTitle ?? string.Empty).Trim();
+                if (!groupOrderByTitle.ContainsKey(groupKey))
+                {
+                    groupOrderByTitle[groupKey] = nextGroupOrder++;
+                }
+            }
+
+            var exportRecords = orderedRecords
+                .OrderBy(r => groupOrderByTitle[(r.GroupTitle ?? string.Empty).Trim()])
+                .ThenBy(r => r.OrderNumber ?? int.MaxValue)
+                .ThenBy(r => r.Id)
+                .ToList();
+
             var csv = new StringBuilder();
             csv.AppendLine("OrderNumber,Title,GroupTitle,Question,Description,AnswerType,Choices,ImportColumnName");
 
-            foreach (var record in records)
+            foreach (var record in exportRecords)
             {
                 var choices = string.Join("|", new[]
                 {
