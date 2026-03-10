@@ -14,7 +14,8 @@ public class LoginModel : PageModel
     private static readonly Dictionary<string, string> AllowedUsers = new(StringComparer.OrdinalIgnoreCase)
     {
         ["nick@griffinsolutions.co.nz"] = "Lesley01*",
-        ["lisa.klyn@tinetwork.com"] = "02032026"
+        ["lisa.klyn@tinetwork.com"] = "02032026",
+        ["narjis.adnan@tinetwork.com"] = "10032026"
     };
 
     [BindProperty]
