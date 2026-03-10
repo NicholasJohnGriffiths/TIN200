@@ -44,7 +44,7 @@ namespace TINWeb.Pages.Answers
             var rows = await _answerService.GetAnswerExportRowsAsync(effectiveYear);
 
             var csv = new StringBuilder();
-            csv.AppendLine("CompanyExternalId,CompanyId,CompanyName,CompanyEmail,AnswerId,CompanySurveyId,QuestionId,AnswerText,AnswerCurrency,AnswerNumber");
+            csv.AppendLine("Company.ExternalID,Company.Id,CompanyName,Email,Answer.Id,CompanySurveyId,QuestionId,AnswerText,AnswerCurrency,AnswerNumber");
 
             foreach (var row in rows)
             {
