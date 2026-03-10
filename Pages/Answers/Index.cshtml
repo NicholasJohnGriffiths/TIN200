@@ -122,9 +122,9 @@
                     <option value="">Select Company Survey</option>
                     @foreach (var option in Model.CompanySurveyOptions)
                     {
-                        var savedDate = option.SavedDate?.ToString("yyyy-MM-dd") ?? string.Empty;
-                        var submittedDate = option.SubmittedDate?.ToString("yyyy-MM-dd") ?? string.Empty;
-                        var requestedDate = option.RequestedDate?.ToString("yyyy-MM-dd") ?? string.Empty;
+                        var savedDate = option.SavedDate?.ToString("dd/MM/yyyy") ?? string.Empty;
+                        var submittedDate = option.SubmittedDate?.ToString("dd/MM/yyyy") ?? string.Empty;
+                        var requestedDate = option.RequestedDate?.ToString("dd/MM/yyyy") ?? string.Empty;
                         <option value="@option.CompanySurveyId" selected="@(Model.SelectedCompanySurveyId == option.CompanySurveyId ? "selected" : null)">
                             CompanySurvey: #@option.CompanySurveyId | @option.CompanyName | FY: @option.FinancialYear | Answers: @option.AnswerCount | Saved: @option.Saved | Submitted: @option.Submitted | Requested: @option.Requested | SavedDate: @savedDate | SubmittedDate: @submittedDate | RequestedDate: @requestedDate
                         </option>
