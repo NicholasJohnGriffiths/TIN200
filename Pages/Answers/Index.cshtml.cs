@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using TINWeb.Services;
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Text;
 
 namespace TINWeb.Pages.Answers
@@ -43,29 +44,32 @@ namespace TINWeb.Pages.Answers
             var effectiveYear = financialYear ?? await _answerService.GetCurrentSurveyFinancialYearAsync();
             var rows = await _answerService.GetAnswerExportRowsAsync(effectiveYear);
 
-            var questionIds = rows
-                .Select(r => r.QuestionId)
-                .Distinct()
-                .OrderBy(x => x)
+            var questionColumns = rows
+                .GroupBy(r => r.QuestionId)
+                .OrderBy(g => g.Key)
+                .Select(g =>
+                {
+                    var title = g
+                        .Select(x => x.QuestionTitle)
+                        .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x));
+
+                    return new
+                    {
+                        QuestionId = g.Key,
+                        Header = string.IsNullOrWhiteSpace(title) ? $"Question {g.Key}" : title!.Trim()
+                    };
+                })
                 .ToList();
 
             var csv = new StringBuilder();
             var headerColumns = new List<string>
             {
-                "company.externalid",
-                "company.name",
-                "company.email"
+                "ExternalId",
+                "CompanyName",
+                "Email"
             };
 
-            foreach (var questionId in questionIds)
-            {
-                headerColumns.Add($"answer.id.q{questionId}");
-                headerColumns.Add($"answer.companysurveyid.q{questionId}");
-                headerColumns.Add($"answer.questionid.q{questionId}");
-                headerColumns.Add($"answer.answertext.q{questionId}");
-                headerColumns.Add($"answer.answercurrency.q{questionId}");
-                headerColumns.Add($"answer.answernumber.q{questionId}");
-            }
+            headerColumns.AddRange(questionColumns.Select(x => x.Header));
 
             csv.AppendLine(string.Join(',', headerColumns.Select(EscapeCsv)));
 
@@ -87,24 +91,14 @@ namespace TINWeb.Pages.Answers
                     .GroupBy(x => x.QuestionId)
                     .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.AnswerId).First());
 
-                foreach (var questionId in questionIds)
+                foreach (var question in questionColumns)
                 {
-                    if (latestByQuestion.TryGetValue(questionId, out var answer))
+                    if (latestByQuestion.TryGetValue(question.QuestionId, out var answer))
                     {
-                        values.Add(EscapeCsv(answer.AnswerId.ToString()));
-                        values.Add(EscapeCsv(answer.CompanySurveyId.ToString()));
-                        values.Add(EscapeCsv(answer.QuestionId.ToString()));
-                        values.Add(EscapeCsv(answer.AnswerText));
-                        values.Add(EscapeCsv(answer.AnswerCurrency?.ToString() ?? string.Empty));
-                        values.Add(EscapeCsv(answer.AnswerNumber?.ToString() ?? string.Empty));
+                        values.Add(EscapeCsv(GetAnswerValue(answer)));
                     }
                     else
                     {
-                        values.Add(string.Empty);
-                        values.Add(string.Empty);
-                        values.Add(string.Empty);
-                        values.Add(string.Empty);
-                        values.Add(string.Empty);
                         values.Add(string.Empty);
                     }
                 }
@@ -116,6 +110,26 @@ namespace TINWeb.Pages.Answers
             var fileName = $"answers-export-fy-{yearLabel}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.csv";
             var bytes = Encoding.UTF8.GetBytes(csv.ToString());
             return File(bytes, "text/csv", fileName);
+        }
+
+        private static string GetAnswerValue(AnswerService.AnswerExportRow answer)
+        {
+            if (!string.IsNullOrWhiteSpace(answer.AnswerText))
+            {
+                return answer.AnswerText;
+            }
+
+            if (answer.AnswerCurrency.HasValue)
+            {
+                return answer.AnswerCurrency.Value.ToString(CultureInfo.InvariantCulture);
+            }
+
+            if (answer.AnswerNumber.HasValue)
+            {
+                return answer.AnswerNumber.Value.ToString(CultureInfo.InvariantCulture);
+            }
+
+            return string.Empty;
         }
 
         private async Task LoadPageDataAsync(int? financialYear, int? companySurveyId, bool preserveExplicitFilters = false)

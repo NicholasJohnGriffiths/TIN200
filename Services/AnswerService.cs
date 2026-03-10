@@ -123,6 +123,7 @@ namespace TINWeb.Services
                 join companySurvey in _context.CompanySurvey on answer.CompanySurveyId equals companySurvey.Id
                 join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
                 join company in _context.Tin200 on companySurvey.CompanyId equals company.Id
+                join question in _context.Question on answer.QuestionId equals question.Id
                 select new AnswerExportRow
                 {
                     CompanyExternalId = company.ExternalId,
@@ -132,6 +133,7 @@ namespace TINWeb.Services
                     AnswerId = answer.Id,
                     CompanySurveyId = answer.CompanySurveyId,
                     QuestionId = answer.QuestionId,
+                    QuestionTitle = question.Title,
                     AnswerText = answer.AnswerText,
                     AnswerCurrency = answer.AnswerCurrency,
                     AnswerNumber = answer.AnswerNumber,
@@ -950,6 +952,7 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             public int AnswerId { get; set; }
             public int CompanySurveyId { get; set; }
             public int QuestionId { get; set; }
+            public string? QuestionTitle { get; set; }
             public string? AnswerText { get; set; }
             public decimal? AnswerCurrency { get; set; }
             public double? AnswerNumber { get; set; }
