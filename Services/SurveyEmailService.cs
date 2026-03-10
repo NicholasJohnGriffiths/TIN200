@@ -36,6 +36,9 @@ You have been invited to review and update your company details for TIN200.
 Open your secure survey link:
 {surveyUrl}
 
+Should you want to request a new link to update your survey please click this link:
+{surveyUrl}
+
 If you did not expect this email, you can safely ignore it.{(string.IsNullOrWhiteSpace(supportEmail) ? string.Empty : $"\n\nNeed help? Contact {supportEmail}.")}
 
 Regards,
@@ -44,6 +47,8 @@ TIN200 Team";
             var htmlBody = $@"<p>Hello {WebUtility.HtmlEncode(recipientName)},</p>
 <p>You have been invited to review and update your company details for <strong>TIN200</strong>.</p>
 <p><a href=""{WebUtility.HtmlEncode(surveyUrl)}"">Open your secure survey link</a></p>
+<p>Should you want to request a new link to update your survey please click this link:</p>
+<p><a href=""{WebUtility.HtmlEncode(surveyUrl)}"">Request a new link to update your survey</a></p>
 <p>If you did not expect this email, you can safely ignore it.</p>
 {(string.IsNullOrWhiteSpace(supportEmail) ? string.Empty : $"<p>Need help? Contact <a href=\"mailto:{WebUtility.HtmlEncode(supportEmail)}\">{WebUtility.HtmlEncode(supportEmail)}</a>.</p>")}
 <p>Regards,<br/>TIN200 Team</p>";
