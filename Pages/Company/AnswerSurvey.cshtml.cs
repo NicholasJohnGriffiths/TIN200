@@ -48,13 +48,13 @@ namespace TINWeb.Pages.Company
 
             if (!hasValidToken && !hasSurveyAccessCookie)
             {
-                return RedirectToPage("/Company/SurveyLinkInvalid", new { reason = "invalid-token" });
+                return RedirectToPage("/Company/SurveyLinkInvalid", new { id, reason = "invalid-token" });
             }
 
             var company = await _context.Tin200.FirstOrDefaultAsync(c => c.Id == id);
             if (company == null)
             {
-                return RedirectToPage("/Company/SurveyLinkInvalid", new { reason = "company-not-found" });
+                return RedirectToPage("/Company/SurveyLinkInvalid", new { id, reason = "company-not-found" });
             }
 
             Company = company;
@@ -103,7 +103,7 @@ namespace TINWeb.Pages.Company
 
             if (!hasValidToken && !hasSurveyAccessCookie && !hasSameOriginPost)
             {
-                return RedirectToPage("/Company/SurveyLinkInvalid", new { reason = "post-auth-failed" });
+                return RedirectToPage("/Company/SurveyLinkInvalid", new { id, reason = "post-auth-failed" });
             }
 
             id = ResolveCompanyId(id, effectiveToken);
@@ -113,7 +113,7 @@ namespace TINWeb.Pages.Company
             var company = await _context.Tin200.FirstOrDefaultAsync(c => c.Id == id);
             if (company == null)
             {
-                return RedirectToPage("/Company/SurveyLinkInvalid", new { reason = "company-not-found" });
+                return RedirectToPage("/Company/SurveyLinkInvalid", new { id, reason = "company-not-found" });
             }
 
             Company = company;

@@ -32,7 +32,7 @@ namespace TINWeb.Pages.Company
         {
             if (!_surveyLinkTokenService.IsTokenValid(id, token))
             {
-                return RedirectToPage("/Company/SurveyLinkInvalid");
+                return RedirectToPage("/Company/SurveyLinkInvalid", new { id, reason = "invalid-token" });
             }
 
             var record = await _companyService.GetCompanyByIdAsync(id);
@@ -52,7 +52,7 @@ namespace TINWeb.Pages.Company
         {
             if (!_surveyLinkTokenService.IsTokenValid(id, Token))
             {
-                return RedirectToPage("/Company/SurveyLinkInvalid");
+                return RedirectToPage("/Company/SurveyLinkInvalid", new { id, reason = "invalid-token" });
             }
 
             if (!ModelState.IsValid)

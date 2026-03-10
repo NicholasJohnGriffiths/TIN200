@@ -40,7 +40,10 @@
                     <button type="submit" class="btn btn-outline-secondary btn-sm">Create Missing Answers</button>
                 </form>
 
-                <a asp-page="./Index" asp-page-handler="Export" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-outline-success btn-sm">Export</a>
+                <form method="get" asp-page="./Index" asp-page-handler="Export" id="answersExportForm" class="d-inline">
+                    <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
+                    <button type="submit" class="btn btn-outline-success btn-sm">Export</button>
+                </form>
 
                 <form method="post" asp-page-handler="DeleteAllAnswers" id="deleteAllAnswersForm" class="d-inline">
                     <input type="hidden" name="deleteConfirmation" id="deleteConfirmationInput" />
@@ -115,12 +118,15 @@
                 </select>
 
                 <label class="ms-2 me-1">Company Survey:</label>
-                <select name="companySurveyId" class="form-select" aria-label="Company Survey" style="max-width: 360px;">
+                <select name="companySurveyId" class="form-select" aria-label="Company Survey" style="max-width: 980px; min-width: 760px;">
                     <option value="">Select Company Survey</option>
                     @foreach (var option in Model.CompanySurveyOptions)
                     {
+                        var savedDate = option.SavedDate?.ToString("yyyy-MM-dd") ?? string.Empty;
+                        var submittedDate = option.SubmittedDate?.ToString("yyyy-MM-dd") ?? string.Empty;
+                        var requestedDate = option.RequestedDate?.ToString("yyyy-MM-dd") ?? string.Empty;
                         <option value="@option.CompanySurveyId" selected="@(Model.SelectedCompanySurveyId == option.CompanySurveyId ? "selected" : null)">
-                            #@option.CompanySurveyId - @option.CompanyName (FY @option.FinancialYear, Answers: @option.AnswerCount)
+                            CompanySurvey: #@option.CompanySurveyId | @option.CompanyName | FY: @option.FinancialYear | Answers: @option.AnswerCount | Saved: @option.Saved | Submitted: @option.Submitted | Requested: @option.Requested | SavedDate: @savedDate | SubmittedDate: @submittedDate | RequestedDate: @requestedDate
                         </option>
                     }
                 </select>
@@ -193,6 +199,7 @@
         const previewImportForm = document.querySelector('form[asp-page-handler="PreviewImport"]') || document.querySelector('form[action*="handler=PreviewImport"]');
         const applyImportForm = document.querySelector('form[action*="handler=ApplyImport"]');
         const createMissingAnswersForm = document.getElementById('createMissingAnswersForm');
+        const answersExportForm = document.getElementById('answersExportForm');
 
         let timerId = null;
 
@@ -237,6 +244,7 @@
         wire(previewImportForm, 'Previewing import file...');
         wire(applyImportForm, 'Applying import...');
         wire(createMissingAnswersForm, 'Creating missing answers...');
+        wire(answersExportForm, 'Exporting answers...');
     })();
 
     (function () {

@@ -51,7 +51,13 @@ namespace TINWeb.Services
                     CompanyId = company.Id,
                     CompanyName = company.CompanyName,
                     FinancialYear = survey.FinancialYear,
-                    AnswerCount = answerJoin.Select(a => a.QuestionId).Distinct().Count()
+                    AnswerCount = answerJoin.Select(a => a.QuestionId).Distinct().Count(),
+                    Saved = companySurvey.Saved,
+                    Submitted = companySurvey.Submitted,
+                    Requested = companySurvey.Requested,
+                    SavedDate = null,
+                    SubmittedDate = null,
+                    RequestedDate = null
                 };
 
             if (financialYear.HasValue)
@@ -966,6 +972,12 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             public string? CompanyName { get; set; }
             public int FinancialYear { get; set; }
             public int AnswerCount { get; set; }
+            public bool Saved { get; set; }
+            public bool Submitted { get; set; }
+            public bool Requested { get; set; }
+            public DateTime? SavedDate { get; set; }
+            public DateTime? SubmittedDate { get; set; }
+            public DateTime? RequestedDate { get; set; }
         }
     }
 }
