@@ -59,7 +59,10 @@ namespace TINWeb.Pages.Company
                         SurveyId = currentSurvey.Id,
                         Saved = false,
                         Submitted = false,
-                        Requested = true
+                        Requested = true,
+                        SavedDate = null,
+                        SubmittedDate = null,
+                        RequestedDate = DateTime.Now
                     };
 
                     _context.CompanySurvey.Add(companySurvey);
@@ -67,6 +70,7 @@ namespace TINWeb.Pages.Company
                 else
                 {
                     companySurvey.Requested = true;
+                    companySurvey.RequestedDate = DateTime.Now;
                 }
 
                 await _context.SaveChangesAsync();

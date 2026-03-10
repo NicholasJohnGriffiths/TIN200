@@ -134,6 +134,18 @@ namespace TINWeb.Data
                     .HasColumnType("bit")
                     .IsRequired();
 
+                entity.Property(e => e.SavedDate)
+                    .HasColumnName("SavedDate")
+                    .HasColumnType("datetime2");
+
+                entity.Property(e => e.SubmittedDate)
+                    .HasColumnName("SubmittedDate")
+                    .HasColumnType("datetime2");
+
+                entity.Property(e => e.RequestedDate)
+                    .HasColumnName("RequestedDate")
+                    .HasColumnType("datetime2");
+
                 entity.HasOne<Tin200>()
                     .WithMany()
                     .HasForeignKey(e => e.CompanyId)

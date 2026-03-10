@@ -55,9 +55,9 @@ namespace TINWeb.Services
                     Saved = companySurvey.Saved,
                     Submitted = companySurvey.Submitted,
                     Requested = companySurvey.Requested,
-                    SavedDate = null,
-                    SubmittedDate = null,
-                    RequestedDate = null
+                    SavedDate = companySurvey.SavedDate,
+                    SubmittedDate = companySurvey.SubmittedDate,
+                    RequestedDate = companySurvey.RequestedDate
                 };
 
             if (financialYear.HasValue)
@@ -323,7 +323,10 @@ namespace TINWeb.Services
                     SurveyId = surveyId.Value,
                     Saved = false,
                     Submitted = false,
-                    Requested = false
+                    Requested = false,
+                    SavedDate = null,
+                    SubmittedDate = null,
+                    RequestedDate = null
                 });
             }
 
@@ -592,7 +595,10 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
                     SurveyId = surveyId.Value,
                     Saved = false,
                     Submitted = false,
-                    Requested = false
+                    Requested = false,
+                    SavedDate = null,
+                    SubmittedDate = null,
+                    RequestedDate = null
                 });
             }
 

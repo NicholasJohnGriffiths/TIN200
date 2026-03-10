@@ -197,9 +197,11 @@ namespace TINWeb.Pages.Company
             if (companySurvey != null)
             {
                 companySurvey.Saved = true;
+                companySurvey.SavedDate = DateTime.Now;
                 if (string.Equals(FormAction, "submit", StringComparison.OrdinalIgnoreCase))
                 {
                     companySurvey.Submitted = true;
+                    companySurvey.SubmittedDate = DateTime.Now;
                 }
             }
 
@@ -237,7 +239,10 @@ namespace TINWeb.Pages.Company
                 SurveyId = surveyId,
                 Saved = false,
                 Submitted = false,
-                Requested = false
+                Requested = false,
+                SavedDate = null,
+                SubmittedDate = null,
+                RequestedDate = null
             };
 
             _context.CompanySurvey.Add(companySurvey);

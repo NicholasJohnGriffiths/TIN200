@@ -25,5 +25,11 @@ namespace TINWeb.Models
 
         [Required]
         public bool Requested { get; set; }
+
+        public DateTime? SavedDate { get; set; }
+
+        public DateTime? SubmittedDate { get; set; }
+
+        public DateTime? RequestedDate { get; set; }
     }
 }
