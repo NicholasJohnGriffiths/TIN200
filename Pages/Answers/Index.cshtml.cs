@@ -43,24 +43,73 @@ namespace TINWeb.Pages.Answers
             var effectiveYear = financialYear ?? await _answerService.GetCurrentSurveyFinancialYearAsync();
             var rows = await _answerService.GetAnswerExportRowsAsync(effectiveYear);
 
-            var csv = new StringBuilder();
-            csv.AppendLine("Company.ExternalID,Company.Id,CompanyName,Email,Answer.Id,CompanySurveyId,QuestionId,AnswerText,AnswerCurrency,AnswerNumber");
+            var questionIds = rows
+                .Select(r => r.QuestionId)
+                .Distinct()
+                .OrderBy(x => x)
+                .ToList();
 
-            foreach (var row in rows)
+            var csv = new StringBuilder();
+            var headerColumns = new List<string>
             {
-                csv.AppendLine(string.Join(',', new[]
+                "company.externalid",
+                "company.name",
+                "company.email"
+            };
+
+            foreach (var questionId in questionIds)
+            {
+                headerColumns.Add($"answer.id.q{questionId}");
+                headerColumns.Add($"answer.companysurveyid.q{questionId}");
+                headerColumns.Add($"answer.questionid.q{questionId}");
+                headerColumns.Add($"answer.answertext.q{questionId}");
+                headerColumns.Add($"answer.answercurrency.q{questionId}");
+                headerColumns.Add($"answer.answernumber.q{questionId}");
+            }
+
+            csv.AppendLine(string.Join(',', headerColumns.Select(EscapeCsv)));
+
+            var companyGroups = rows
+                .GroupBy(r => new { r.CompanyId, r.CompanyExternalId, r.CompanyName, r.CompanyEmail })
+                .OrderBy(g => g.Key.CompanyName)
+                .ThenBy(g => g.Key.CompanyId);
+
+            foreach (var companyGroup in companyGroups)
+            {
+                var values = new List<string>
                 {
-                    EscapeCsv(row.CompanyExternalId),
-                    EscapeCsv(row.CompanyId.ToString()),
-                    EscapeCsv(row.CompanyName),
-                    EscapeCsv(row.CompanyEmail),
-                    EscapeCsv(row.AnswerId.ToString()),
-                    EscapeCsv(row.CompanySurveyId.ToString()),
-                    EscapeCsv(row.QuestionId.ToString()),
-                    EscapeCsv(row.AnswerText),
-                    EscapeCsv(row.AnswerCurrency?.ToString() ?? string.Empty),
-                    EscapeCsv(row.AnswerNumber?.ToString() ?? string.Empty)
-                }));
+                    EscapeCsv(companyGroup.Key.CompanyExternalId),
+                    EscapeCsv(companyGroup.Key.CompanyName),
+                    EscapeCsv(companyGroup.Key.CompanyEmail)
+                };
+
+                var latestByQuestion = companyGroup
+                    .GroupBy(x => x.QuestionId)
+                    .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.AnswerId).First());
+
+                foreach (var questionId in questionIds)
+                {
+                    if (latestByQuestion.TryGetValue(questionId, out var answer))
+                    {
+                        values.Add(EscapeCsv(answer.AnswerId.ToString()));
+                        values.Add(EscapeCsv(answer.CompanySurveyId.ToString()));
+                        values.Add(EscapeCsv(answer.QuestionId.ToString()));
+                        values.Add(EscapeCsv(answer.AnswerText));
+                        values.Add(EscapeCsv(answer.AnswerCurrency?.ToString() ?? string.Empty));
+                        values.Add(EscapeCsv(answer.AnswerNumber?.ToString() ?? string.Empty));
+                    }
+                    else
+                    {
+                        values.Add(string.Empty);
+                        values.Add(string.Empty);
+                        values.Add(string.Empty);
+                        values.Add(string.Empty);
+                        values.Add(string.Empty);
+                        values.Add(string.Empty);
+                    }
+                }
+
+                csv.AppendLine(string.Join(',', values));
             }
 
             var yearLabel = effectiveYear?.ToString() ?? "all";
