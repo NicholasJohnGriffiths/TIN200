@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using TINWeb.Services;
 using System.Collections.Concurrent;
+using System.Text;
 
 namespace TINWeb.Pages.Answers
 {
@@ -35,6 +36,37 @@ namespace TINWeb.Pages.Answers
         {
             var hasExplicitFilters = Request.Query.ContainsKey("financialYear") || Request.Query.ContainsKey("companySurveyId");
             await LoadPageDataAsync(financialYear, companySurveyId, hasExplicitFilters);
+        }
+
+        public async Task<IActionResult> OnGetExportAsync(int? financialYear)
+        {
+            var effectiveYear = financialYear ?? await _answerService.GetCurrentSurveyFinancialYearAsync();
+            var rows = await _answerService.GetAnswerExportRowsAsync(effectiveYear);
+
+            var csv = new StringBuilder();
+            csv.AppendLine("CompanyExternalId,CompanyId,CompanyName,CompanyEmail,AnswerId,CompanySurveyId,QuestionId,AnswerText,AnswerCurrency,AnswerNumber");
+
+            foreach (var row in rows)
+            {
+                csv.AppendLine(string.Join(',', new[]
+                {
+                    EscapeCsv(row.CompanyExternalId),
+                    EscapeCsv(row.CompanyId.ToString()),
+                    EscapeCsv(row.CompanyName),
+                    EscapeCsv(row.CompanyEmail),
+                    EscapeCsv(row.AnswerId.ToString()),
+                    EscapeCsv(row.CompanySurveyId.ToString()),
+                    EscapeCsv(row.QuestionId.ToString()),
+                    EscapeCsv(row.AnswerText),
+                    EscapeCsv(row.AnswerCurrency?.ToString() ?? string.Empty),
+                    EscapeCsv(row.AnswerNumber?.ToString() ?? string.Empty)
+                }));
+            }
+
+            var yearLabel = effectiveYear?.ToString() ?? "all";
+            var fileName = $"answers-export-fy-{yearLabel}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.csv";
+            var bytes = Encoding.UTF8.GetBytes(csv.ToString());
+            return File(bytes, "text/csv", fileName);
         }
 
         private async Task LoadPageDataAsync(int? financialYear, int? companySurveyId, bool preserveExplicitFilters = false)
@@ -245,6 +277,17 @@ namespace TINWeb.Pages.Answers
                     }
                 }
             }
+        }
+
+        private static string EscapeCsv(string? value)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                return string.Empty;
+            }
+
+            var escaped = value.Replace("\"", "\"\"");
+            return $"\"{escaped}\"";
         }
 
         private sealed class PendingAnswerImport

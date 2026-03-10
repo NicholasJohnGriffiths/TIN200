@@ -40,6 +40,8 @@
                     <button type="submit" class="btn btn-outline-secondary btn-sm">Create Missing Answers</button>
                 </form>
 
+                <a asp-page="./Index" asp-page-handler="Export" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-outline-success btn-sm">Export</a>
+
                 <form method="post" asp-page-handler="DeleteAllAnswers" id="deleteAllAnswersForm" class="d-inline">
                     <input type="hidden" name="deleteConfirmation" id="deleteConfirmationInput" />
                     <button type="button" class="btn btn-danger btn-sm" id="deleteAllAnswersButton">Delete All Answers</button>

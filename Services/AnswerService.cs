@@ -116,6 +116,39 @@ namespace TINWeb.Services
             return await query.ToListAsync();
         }
 
+        public async Task<List<AnswerExportRow>> GetAnswerExportRowsAsync(int? financialYear)
+        {
+            var query =
+                from answer in _context.Answer
+                join companySurvey in _context.CompanySurvey on answer.CompanySurveyId equals companySurvey.Id
+                join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
+                join company in _context.Tin200 on companySurvey.CompanyId equals company.Id
+                select new AnswerExportRow
+                {
+                    CompanyExternalId = company.ExternalId,
+                    CompanyId = company.Id,
+                    CompanyName = company.CompanyName,
+                    CompanyEmail = company.Email,
+                    AnswerId = answer.Id,
+                    CompanySurveyId = answer.CompanySurveyId,
+                    QuestionId = answer.QuestionId,
+                    AnswerText = answer.AnswerText,
+                    AnswerCurrency = answer.AnswerCurrency,
+                    AnswerNumber = answer.AnswerNumber,
+                    FinancialYear = survey.FinancialYear
+                };
+
+            if (financialYear.HasValue)
+            {
+                query = query.Where(x => x.FinancialYear == financialYear.Value);
+            }
+
+            return await query
+                .OrderBy(x => x.CompanyName)
+                .ThenBy(x => x.AnswerId)
+                .ToListAsync();
+        }
+
         public async Task<AnswerEditRow?> GetAnswerForEditAsync(int answerId)
         {
             var row = await (
@@ -906,6 +939,21 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             public string? AnswerText { get; set; }
             public double? AnswerNumber { get; set; }
             public decimal? AnswerCurrency { get; set; }
+        }
+
+        public class AnswerExportRow
+        {
+            public string? CompanyExternalId { get; set; }
+            public int CompanyId { get; set; }
+            public string? CompanyName { get; set; }
+            public string? CompanyEmail { get; set; }
+            public int AnswerId { get; set; }
+            public int CompanySurveyId { get; set; }
+            public int QuestionId { get; set; }
+            public string? AnswerText { get; set; }
+            public decimal? AnswerCurrency { get; set; }
+            public double? AnswerNumber { get; set; }
+            public int FinancialYear { get; set; }
         }
 
         public class CompanySurveyOption
