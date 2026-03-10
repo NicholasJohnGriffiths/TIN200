@@ -18,7 +18,7 @@
 
     <div class="row mb-3">
         <div class="col-12">
-            <form method="get" class="d-flex">
+            <form method="get" class="d-flex" id="companyFilterForm">
                 <label class="me-2 align-self-center">Filter Year:</label>
                 <select name="year" class="form-select me-2" aria-label="Financial Year">
                     <option value="">All</option>
@@ -28,9 +28,20 @@
                     }
                 </select>
                 <button class="btn btn-outline-primary" type="submit">Apply</button>
-                <button class="btn btn-success ms-2" type="submit" formaction="@Url.Page("./Export")">Export</button>
+                <button class="btn btn-success ms-2" id="companyExportButton" type="submit" formaction="@Url.Page("./Export")">Export</button>
+                <button class="btn btn-outline-success ms-2" id="companySmExportButton" type="submit" formaction="@Url.Page("./ExportSurveyMonkey")">SM Export</button>
                 <a class="btn btn-link ms-2" href="@Url.Page("./Index")">Clear</a>
             </form>
+        </div>
+    </div>
+
+    <div id="companyExportProgressContainer" class="mb-3" style="display:none;">
+        <div class="d-flex justify-content-between small mb-1">
+            <span id="companyExportProgressLabel">Exporting companies...</span>
+            <span id="companyExportProgressPercent">0%</span>
+        </div>
+        <div class="progress" role="progressbar" aria-label="Company export progress" aria-valuemin="0" aria-valuemax="100">
+            <div id="companyExportProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
         </div>
     </div>
 
@@ -142,6 +153,53 @@
                     asc = !asc;
                 });
             });
+        });
+    })();
+</script>
+<script>
+    (function () {
+        const form = document.getElementById('companyFilterForm');
+        const exportButton = document.getElementById('companyExportButton');
+        const smExportButton = document.getElementById('companySmExportButton');
+        const progressContainer = document.getElementById('companyExportProgressContainer');
+        const progressBar = document.getElementById('companyExportProgressBar');
+        const progressPercent = document.getElementById('companyExportProgressPercent');
+        const progressLabel = document.getElementById('companyExportProgressLabel');
+
+        if (!form || !exportButton || !smExportButton || !progressContainer || !progressBar || !progressPercent || !progressLabel) {
+            return;
+        }
+
+        let timerId = null;
+
+        function startProgress() {
+            if (timerId) {
+                window.clearInterval(timerId);
+            }
+
+            let value = 8;
+            progressLabel.textContent = 'Exporting companies...';
+            progressContainer.style.display = '';
+
+            function render() {
+                progressBar.style.width = value + '%';
+                progressPercent.textContent = value + '%';
+            }
+
+            render();
+
+            timerId = window.setInterval(function () {
+                if (value < 90) {
+                    value += 4;
+                    render();
+                }
+            }, 250);
+        }
+
+        form.addEventListener('submit', function (event) {
+            if (event.submitter && (event.submitter.id === 'companyExportButton' || event.submitter.id === 'companySmExportButton')) {
+                startProgress();
+            }
         });
     })();
 </script>
