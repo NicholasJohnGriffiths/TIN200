@@ -126,7 +126,7 @@
                         var submittedDate = option.SubmittedDate?.ToString("dd/MM/yyyy") ?? string.Empty;
                         var requestedDate = option.RequestedDate?.ToString("dd/MM/yyyy") ?? string.Empty;
                         <option value="@option.CompanySurveyId" selected="@(Model.SelectedCompanySurveyId == option.CompanySurveyId ? "selected" : null)">
-                            CompanySurvey: #@option.CompanySurveyId | @option.CompanyName | FY: @option.FinancialYear | Answers: @option.AnswerCount | Saved: @option.Saved | Submitted: @option.Submitted | Requested: @option.Requested | SavedDate: @savedDate | SubmittedDate: @submittedDate | RequestedDate: @requestedDate
+                            CompanySurvey: #@option.CompanySurveyId | @option.CompanyName | FY: @option.FinancialYear | Answers: @option.AnswerCount | SavedDate: @savedDate | SubmittedDate: @submittedDate | RequestedDate: @requestedDate
                         </option>
                     }
                 </select>
