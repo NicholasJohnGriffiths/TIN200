@@ -35,11 +35,15 @@ namespace TINWeb.Services
                 select new CompanySurveyListRow
                 {
                     Id = companySurvey.Id,
+                    CompanyId = companySurvey.CompanyId,
                     CompanyName = company.CompanyName,
                     FinancialYear = survey.FinancialYear,
                     Saved = companySurvey.Saved,
                     Submitted = companySurvey.Submitted,
-                    Requested = companySurvey.Requested
+                    Requested = companySurvey.Requested,
+                    SavedDate = companySurvey.SavedDate,
+                    SubmittedDate = companySurvey.SubmittedDate,
+                    RequestedDate = companySurvey.RequestedDate
                 };
 
             if (financialYear.HasValue)
@@ -108,11 +112,15 @@ namespace TINWeb.Services
         public class CompanySurveyListRow
         {
             public int Id { get; set; }
+            public int CompanyId { get; set; }
             public string? CompanyName { get; set; }
             public int FinancialYear { get; set; }
             public bool Saved { get; set; }
             public bool Submitted { get; set; }
             public bool Requested { get; set; }
+            public DateTime? SavedDate { get; set; }
+            public DateTime? SubmittedDate { get; set; }
+            public DateTime? RequestedDate { get; set; }
         }
     }
 }

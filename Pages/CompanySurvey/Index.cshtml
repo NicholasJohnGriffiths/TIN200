@@ -9,9 +9,6 @@
         <div class="col-md-8">
             <h1>Company Survey Records</h1>
         </div>
-        <div class="col-md-4 text-end">
-            <a asp-page="./Create" class="btn btn-primary">Add New Record</a>
-        </div>
     </div>
 
     <div class="row mb-3">
@@ -36,9 +33,12 @@
                 <tr>
                     <th>Company Name</th>
                     <th>Saved</th>
+                    <th>Saved Date</th>
                     <th>Submitted</th>
-                    <th>Request</th>
-                    <th>Answers</th>
+                    <th>Submitted Date</th>
+                    <th>Requested</th>
+                    <th>Requested Date</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -47,10 +47,14 @@
                     <tr>
                         <td>@record.CompanyName</td>
                         <td>@record.Saved</td>
+                        <td>@(record.SavedDate?.ToString("dd/MM/yyyy") ?? string.Empty)</td>
                         <td>@record.Submitted</td>
+                        <td>@(record.SubmittedDate?.ToString("dd/MM/yyyy") ?? string.Empty)</td>
                         <td>@record.Requested</td>
-                        <td>
+                        <td>@(record.RequestedDate?.ToString("dd/MM/yyyy") ?? string.Empty)</td>
+                        <td class="actions-col">
                             <a asp-page="/Answers/Index" asp-route-companySurveyId="@record.Id" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-sm btn-primary">Open Answers</a>
+                            <a asp-page="/Company/SendSurvey" asp-route-id="@record.CompanyId" class="btn btn-sm btn-outline-primary">Send Survey Link Email</a>
                         </td>
                     </tr>
                 }
