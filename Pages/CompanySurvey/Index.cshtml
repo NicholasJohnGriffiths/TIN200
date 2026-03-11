@@ -54,7 +54,11 @@
                         <td>@(record.RequestedDate?.ToString("dd/MM/yyyy") ?? string.Empty)</td>
                         <td class="actions-col">
                             <a asp-page="/Answers/Index" asp-route-companySurveyId="@record.Id" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-sm btn-primary">Open Answers</a>
-                            <a asp-page="/Company/SendSurvey" asp-route-id="@record.CompanyId" class="btn btn-sm btn-outline-primary">Send Survey Link Email</a>
+                            <a asp-page="/Company/SendSurvey"
+                               asp-route-id="@record.CompanyId"
+                               class="btn btn-sm btn-outline-primary send-survey-email-btn"
+                               data-company-name="@record.CompanyName"
+                               data-financial-year="@record.FinancialYear">Send Survey Link Email</a>
                         </td>
                     </tr>
                 }
@@ -66,3 +70,24 @@
         <div class="alert alert-info">No company survey records found.</div>
     }
 </div>
+
+<script>
+    (function () {
+        const buttons = document.querySelectorAll('.send-survey-email-btn');
+        if (!buttons.length) {
+            return;
+        }
+
+        buttons.forEach(function (button) {
+            button.addEventListener('click', function (event) {
+                const companyName = button.getAttribute('data-company-name') || '';
+                const financialYear = button.getAttribute('data-financial-year') || '';
+                const message = `Do you want to continue?\n\nFinancial Year: ${financialYear}\nCompany: ${companyName}`;
+
+                if (!window.confirm(message)) {
+                    event.preventDefault();
+                }
+            });
+        });
+    })();
+</script>
