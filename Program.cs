@@ -61,17 +61,6 @@ builder.Services.Configure<FormOptions>(options =>
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
-{
-    var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    await dbContext.Database.ExecuteSqlRawAsync(@"
-IF COL_LENGTH('dbo.Question', 'GroupDescription') IS NULL
-BEGIN
-    ALTER TABLE [dbo].[Question]
-    ADD [GroupDescription] [varchar](max) NULL;
-END;");
-}
-
 var urls = builder.Configuration["ASPNETCORE_URLS"];
 var httpsPort = builder.Configuration["ASPNETCORE_HTTPS_PORT"] ?? builder.Configuration["HTTPS_PORT"];
 var shouldUseHttpsRedirection = !app.Environment.IsDevelopment()
