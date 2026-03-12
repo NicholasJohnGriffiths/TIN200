@@ -180,6 +180,10 @@ namespace TINWeb.Data
                     .HasColumnName("GroupTitle")
                     .HasColumnType("varchar(max)");
 
+                entity.Property(e => e.GroupDescription)
+                    .HasColumnName("GroupDescription")
+                    .HasColumnType("varchar(max)");
+
                 entity.Property(e => e.QuestionText)
                     .HasColumnName("Question")
                     .HasColumnType("varchar(max)");

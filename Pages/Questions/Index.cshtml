@@ -39,7 +39,9 @@
                 <thead class="table-dark">
                     <tr>
                         <th>Order</th>
+                        <th>Group</th>
                         <th class="title-col">Title</th>
+                        <th>Group Description</th>
                         <th class="question-col">Question</th>
                         <th>Answer Type</th>
                         <th>Actions</th>
@@ -52,7 +54,9 @@
                     var isFocused = Model.FocusId.HasValue && Model.FocusId.Value == record.Id;
                     <tr id="question-@record.Id" class="@(isFocused ? "focused-question-row" : string.Empty)">
                         <td>@record.OrderNumber</td>
+                        <td>@(!string.IsNullOrWhiteSpace(record.GroupTitle) ? "Yes" : string.Empty)</td>
                         <td class="title-col">@record.Title</td>
+                        <td>@record.GroupDescription</td>
                         <td class="question-col">@record.QuestionText</td>
                         <td>@record.AnswerType</td>
                         <td class="actions-col">

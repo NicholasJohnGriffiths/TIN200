@@ -8,6 +8,9 @@
 <div class="container mt-4">
     <div class="row justify-content-center">
         <div class="col-md-10">
+            <div class="mb-3 text-center">
+                <img src="/images/SurveyHeader.jpg" alt="Survey Header" class="img-fluid" />
+            </div>
             <h1>Survey Answers</h1>
             <p class="text-muted">Please complete the survey answers for the current survey year.</p>
             <hr />
@@ -27,9 +30,25 @@
 
             <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
+            <div class="alert alert-light border d-flex justify-content-between align-items-center py-2 mb-3">
+                <div class="fw-semibold" id="currentSectionHeader">Section 1 of 1</div>
+                <div class="small text-body-secondary" id="currentSectionSubheader"></div>
+            </div>
+
+            <div class="mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label class="form-label mb-0">Progress</label>
+                    <span id="surveyProgressText" class="small text-body-secondary">0 / 0 progressed</span>
+                </div>
+                <div class="progress" role="progressbar" aria-label="Survey completion progress" aria-valuemin="0" aria-valuemax="100">
+                    <div id="surveyProgressBar" class="progress-bar" style="width: 0%">0%</div>
+                </div>
+            </div>
+
             <form method="post" asp-route-id="@Model.Company.Id" asp-route-token="@Model.Token">
                 <input type="hidden" asp-for="Token" />
                 <input type="hidden" asp-for="CompanyId" />
+                <input type="hidden" asp-for="CurrentGroupIndex" id="CurrentGroupIndex" />
 
                 <div class="row mb-3">
                     <div class="col-md-6">
@@ -43,124 +62,191 @@
                 </div>
 
                 @{
-                    string? currentGroupTitle = null;
-                }
+                    var sectionTitles = new List<string>();
+                    var sectionDescriptions = new List<string>();
+                    var sectionRowIndexes = new List<List<int>>();
 
-                @for (var i = 0; i < Model.Rows.Count; i++)
-                {
-                    var answerType = (Model.Rows[i].AnswerType ?? string.Empty).Trim();
-                    var groupTitle = Model.Rows[i].GroupTitle?.Trim();
-                    var hasPreviousYearValue = !string.IsNullOrWhiteSpace(Model.Rows[i].PreviousYearValue);
-                    var previousYearText = Model.Rows[i].PreviousYearAnswerText ?? string.Empty;
-                    var previousYearNumber = Model.Rows[i].PreviousYearAnswerNumber?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
-                    var previousYearCurrency = Model.Rows[i].PreviousYearAnswerCurrency?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+                    var bufferedBeforeFirstSection = new List<int>();
+                    var activeSectionIndex = -1;
 
-                    if (!string.IsNullOrWhiteSpace(groupTitle) && !string.Equals(currentGroupTitle, groupTitle, StringComparison.Ordinal))
+                    for (var i = 0; i < Model.Rows.Count; i++)
                     {
-                        currentGroupTitle = groupTitle;
-                        <div class="card mb-2">
-                            <div class="card-header small fw-semibold text-body-secondary py-2">@groupTitle</div>
-                        </div>
+                        var candidateTitle = Model.Rows[i].GroupTitle?.Trim();
+                        if (!string.IsNullOrWhiteSpace(candidateTitle))
+                        {
+                            sectionTitles.Add(candidateTitle);
+                            sectionDescriptions.Add((Model.Rows[i].GroupDescription ?? string.Empty).Trim());
+                            sectionRowIndexes.Add(new List<int>());
+                            activeSectionIndex = sectionTitles.Count - 1;
+
+                            if (bufferedBeforeFirstSection.Count > 0)
+                            {
+                                sectionRowIndexes[activeSectionIndex].AddRange(bufferedBeforeFirstSection);
+                                bufferedBeforeFirstSection.Clear();
+                            }
+
+                            sectionRowIndexes[activeSectionIndex].Add(i);
+                            continue;
+                        }
+
+                        if (activeSectionIndex >= 0)
+                        {
+                            sectionRowIndexes[activeSectionIndex].Add(i);
+
+                            if (string.IsNullOrWhiteSpace(sectionDescriptions[activeSectionIndex]))
+                            {
+                                var candidateDescription = (Model.Rows[i].GroupDescription ?? string.Empty).Trim();
+                                if (!string.IsNullOrWhiteSpace(candidateDescription))
+                                {
+                                    sectionDescriptions[activeSectionIndex] = candidateDescription;
+                                }
+                            }
+                        }
+                        else
+                        {
+                            bufferedBeforeFirstSection.Add(i);
+                        }
                     }
 
-                    <div class="mb-3 pb-3 border-bottom">
-                        <div class="d-flex justify-content-between align-items-start mb-2">
-                            <div>
-                                <div class="small text-muted">Question @(Model.Rows[i].OrderNumber?.ToString() ?? "-")</div>
-                                <label class="form-label fw-semibold mb-0">@Model.Rows[i].QuestionText</label>
-                            </div>
-                            <span class="badge text-bg-secondary">@Model.Rows[i].AnswerType</span>
-                        </div>
+                    if (sectionTitles.Count == 0)
+                    {
+                        sectionTitles.Add("Survey");
+                        sectionDescriptions.Add(string.Empty);
+                        sectionRowIndexes.Add(Enumerable.Range(0, Model.Rows.Count).ToList());
+                    }
+                    else if (bufferedBeforeFirstSection.Count > 0)
+                    {
+                        sectionRowIndexes[0].InsertRange(0, bufferedBeforeFirstSection);
+                    }
+                }
 
-                        <input type="hidden" asp-for="Rows[i].QuestionId" />
-                        <input type="hidden" asp-for="Rows[i].OrderNumber" />
-                        <input type="hidden" asp-for="Rows[i].GroupTitle" />
-                        <input type="hidden" asp-for="Rows[i].QuestionText" />
-                        <input type="hidden" asp-for="Rows[i].AnswerType" />
-
-                        <div class="row g-3 align-items-start survey-answer-row" data-row-index="@i">
-                            <div class="col-md-8">
-                                @if (answerType.Equals("Number", StringComparison.OrdinalIgnoreCase))
+                @for (var groupIndex = 0; groupIndex < sectionTitles.Count; groupIndex++)
+                {
+                    <div class="survey-group-page" data-group-index="@groupIndex" data-group-title="@sectionTitles[groupIndex]" data-group-description="@sectionDescriptions[groupIndex]" style="display:none;">
+                        <div class="card mb-3">
+                            <div class="card-header py-2">
+                                <div class="fw-semibold">@sectionTitles[groupIndex]</div>
+                                @if (!string.IsNullOrWhiteSpace(sectionDescriptions[groupIndex]))
                                 {
-                                    <input asp-for="Rows[i].AnswerNumber" class="form-control" placeholder="Enter number" />
-                                    <input type="hidden" asp-for="Rows[i].AnswerText" />
-                                    <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
-                                }
-                                else if (answerType.Equals("Currency", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    <input asp-for="Rows[i].AnswerCurrency" class="form-control" placeholder="Enter currency" />
-                                    <input type="hidden" asp-for="Rows[i].AnswerText" />
-                                    <input type="hidden" asp-for="Rows[i].AnswerNumber" />
-                                }
-                                else if (answerType.Equals("SingleChoice", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    <select asp-for="Rows[i].AnswerText" class="form-select">
-                                        <option value="">Select an option</option>
-                                        @foreach (var option in Model.Rows[i].ChoiceOptions)
-                                        {
-                                            <option value="@option">@option</option>
-                                        }
-                                    </select>
-                                    <input type="hidden" asp-for="Rows[i].AnswerNumber" />
-                                    <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
-                                }
-                                else if (answerType.Equals("Multichoice", StringComparison.OrdinalIgnoreCase) || answerType.Equals("MultiChoice", StringComparison.OrdinalIgnoreCase))
-                                {
-                                    if (Model.Rows[i].ChoiceOptions.Count == 0)
-                                    {
-                                        <div class="text-muted small">No options available for this question.</div>
-                                    }
-                                    else
-                                    {
-                                        for (var optionIndex = 0; optionIndex < Model.Rows[i].ChoiceOptions.Count; optionIndex++)
-                                        {
-                                            var option = Model.Rows[i].ChoiceOptions[optionIndex];
-                                            var optionId = $"row_{i}_opt_{optionIndex}";
-                                            var isChecked = Model.Rows[i].SelectedChoices.Contains(option, StringComparer.Ordinal);
-
-                                            <div class="form-check">
-                                                <input
-                                                    class="form-check-input"
-                                                    type="checkbox"
-                                                    name="Rows[@i].SelectedChoices"
-                                                    value="@option"
-                                                    id="@optionId"
-                                                    @(isChecked ? "checked" : null) />
-                                                <label class="form-check-label" for="@optionId">@option</label>
-                                            </div>
-                                        }
-                                    }
-
-                                    <input type="hidden" asp-for="Rows[i].AnswerText" />
-                                    <input type="hidden" asp-for="Rows[i].AnswerNumber" />
-                                    <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
-                                }
-                                else
-                                {
-                                    <input asp-for="Rows[i].AnswerText" class="form-control" placeholder="Enter answer" />
-                                    <input type="hidden" asp-for="Rows[i].AnswerNumber" />
-                                    <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
-                                }
-                            </div>
-                            <div class="col-md-4 text-md-end">
-                                <div class="small text-body-secondary">prev year: @(Model.Rows[i].PreviousYearValue ?? "—")</div>
-                                @if (hasPreviousYearValue)
-                                {
-                                    <button
-                                        type="button"
-                                        class="btn btn-sm btn-outline-secondary mt-1 copy-prev-year-btn"
-                                        data-row-index="@i"
-                                        data-answer-type="@answerType"
-                                        data-prev-text="@previousYearText"
-                                        data-prev-number="@previousYearNumber"
-                                        data-prev-currency="@previousYearCurrency">
-                                        Copy prev year
-                                    </button>
+                                    <div class="small text-body-secondary mt-1">@sectionDescriptions[groupIndex]</div>
                                 }
                             </div>
                         </div>
+
+                        @foreach (var i in sectionRowIndexes[groupIndex])
+                        {
+                            var answerType = (Model.Rows[i].AnswerType ?? string.Empty).Trim();
+                            var hasPreviousYearValue = !string.IsNullOrWhiteSpace(Model.Rows[i].PreviousYearValue);
+                            var previousYearText = Model.Rows[i].PreviousYearAnswerText ?? string.Empty;
+                            var previousYearNumber = Model.Rows[i].PreviousYearAnswerNumber?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+                            var previousYearCurrency = Model.Rows[i].PreviousYearAnswerCurrency?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+
+                            <div class="mb-3 pb-3 border-bottom">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <div>
+                                        <div class="small text-muted">Question @(Model.Rows[i].OrderNumber?.ToString() ?? "-")</div>
+                                        <label class="form-label fw-semibold mb-0">@Model.Rows[i].QuestionText</label>
+                                    </div>
+                                    <span class="badge text-bg-secondary">@Model.Rows[i].AnswerType</span>
+                                </div>
+
+                                <input type="hidden" asp-for="Rows[i].QuestionId" />
+                                <input type="hidden" asp-for="Rows[i].OrderNumber" />
+                                <input type="hidden" asp-for="Rows[i].GroupTitle" />
+                                <input type="hidden" asp-for="Rows[i].QuestionText" />
+                                <input type="hidden" asp-for="Rows[i].AnswerType" />
+
+                                <div class="row g-3 align-items-start survey-answer-row" data-row-index="@i">
+                                    <div class="col-md-8">
+                                        @if (answerType.Equals("Number", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <input asp-for="Rows[i].AnswerNumber" class="form-control" placeholder="Enter number" />
+                                            <input type="hidden" asp-for="Rows[i].AnswerText" />
+                                            <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
+                                        }
+                                        else if (answerType.Equals("Currency", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <input asp-for="Rows[i].AnswerCurrency" class="form-control" placeholder="Enter currency" />
+                                            <input type="hidden" asp-for="Rows[i].AnswerText" />
+                                            <input type="hidden" asp-for="Rows[i].AnswerNumber" />
+                                        }
+                                        else if (answerType.Equals("SingleChoice", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            <select asp-for="Rows[i].AnswerText" class="form-select">
+                                                <option value="">Select an option</option>
+                                                @foreach (var option in Model.Rows[i].ChoiceOptions)
+                                                {
+                                                    <option value="@option">@option</option>
+                                                }
+                                            </select>
+                                            <input type="hidden" asp-for="Rows[i].AnswerNumber" />
+                                            <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
+                                        }
+                                        else if (answerType.Equals("Multichoice", StringComparison.OrdinalIgnoreCase) || answerType.Equals("MultiChoice", StringComparison.OrdinalIgnoreCase))
+                                        {
+                                            if (Model.Rows[i].ChoiceOptions.Count == 0)
+                                            {
+                                                <div class="text-muted small">No options available for this question.</div>
+                                            }
+                                            else
+                                            {
+                                                for (var optionIndex = 0; optionIndex < Model.Rows[i].ChoiceOptions.Count; optionIndex++)
+                                                {
+                                                    var option = Model.Rows[i].ChoiceOptions[optionIndex];
+                                                    var optionId = $"row_{i}_opt_{optionIndex}";
+                                                    var isChecked = Model.Rows[i].SelectedChoices.Contains(option, StringComparer.Ordinal);
+
+                                                    <div class="form-check">
+                                                        <input
+                                                            class="form-check-input"
+                                                            type="checkbox"
+                                                            name="Rows[@i].SelectedChoices"
+                                                            value="@option"
+                                                            id="@optionId"
+                                                            @(isChecked ? "checked" : null) />
+                                                        <label class="form-check-label" for="@optionId">@option</label>
+                                                    </div>
+                                                }
+                                            }
+
+                                            <input type="hidden" asp-for="Rows[i].AnswerText" />
+                                            <input type="hidden" asp-for="Rows[i].AnswerNumber" />
+                                            <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
+                                        }
+                                        else
+                                        {
+                                            <input asp-for="Rows[i].AnswerText" class="form-control" placeholder="Enter answer" />
+                                            <input type="hidden" asp-for="Rows[i].AnswerNumber" />
+                                            <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
+                                        }
+                                    </div>
+                                    <div class="col-md-4 text-md-end">
+                                        <div class="small text-body-secondary">prev year: @(Model.Rows[i].PreviousYearValue ?? "—")</div>
+                                        @if (hasPreviousYearValue)
+                                        {
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm btn-outline-secondary mt-1 copy-prev-year-btn"
+                                                data-row-index="@i"
+                                                data-answer-type="@answerType"
+                                                data-prev-text="@previousYearText"
+                                                data-prev-number="@previousYearNumber"
+                                                data-prev-currency="@previousYearCurrency">
+                                                Copy prev year
+                                            </button>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
                     </div>
                 }
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <button type="button" class="btn btn-outline-secondary" id="groupPrevButton">Previous Group</button>
+                    <div id="groupPaginationText" class="small text-body-secondary"></div>
+                    <button type="button" class="btn btn-outline-secondary" id="groupNextButton">Next Group</button>
+                </div>
 
                 <div class="d-flex gap-2">
                     <button type="submit" name="FormAction" value="save" class="btn btn-secondary">Save for Later</button>
@@ -179,6 +265,52 @@
                 return (value || '').trim().toLowerCase();
             }
 
+            function isRowAnswered(row) {
+                var checkboxes = row.querySelectorAll("input[type='checkbox']");
+                if (checkboxes.length > 0) {
+                    return Array.from(checkboxes).some(function (checkbox) { return checkbox.checked; });
+                }
+
+                var select = row.querySelector('select');
+                if (select) {
+                    return !!(select.value || '').trim();
+                }
+
+                var answerInput = row.querySelector("input[type='text'], input[type='number']");
+                if (answerInput) {
+                    return !!(answerInput.value || '').trim();
+                }
+
+                return false;
+            }
+
+            function updateProgress() {
+                var rows = Array.from(document.querySelectorAll('.survey-answer-row'));
+                var total = rows.length;
+                var furthestAnsweredIndex = -1;
+
+                rows.forEach(function (row, index) {
+                    if (isRowAnswered(row)) {
+                        furthestAnsweredIndex = index;
+                    }
+                });
+
+                var progressed = furthestAnsweredIndex + 1;
+                var percent = total === 0 ? 0 : Math.round((progressed / total) * 100);
+
+                var progressBar = document.getElementById('surveyProgressBar');
+                var progressText = document.getElementById('surveyProgressText');
+                if (progressBar) {
+                    progressBar.style.width = percent + '%';
+                    progressBar.textContent = percent + '%';
+                    progressBar.setAttribute('aria-valuenow', percent.toString());
+                }
+
+                if (progressText) {
+                    progressText.textContent = progressed + ' / ' + total + ' progressed';
+                }
+            }
+
             function splitChoices(text) {
                 if (!text) {
                     return [];
@@ -188,6 +320,79 @@
                     .split(/[;,|\n\r]+/)
                     .map(function (x) { return x.trim(); })
                     .filter(function (x) { return x.length > 0; });
+            }
+
+            var groupPages = Array.from(document.querySelectorAll('.survey-group-page'));
+            var groupPrevButton = document.getElementById('groupPrevButton');
+            var groupNextButton = document.getElementById('groupNextButton');
+            var groupPaginationText = document.getElementById('groupPaginationText');
+            var currentSectionHeader = document.getElementById('currentSectionHeader');
+            var currentSectionSubheader = document.getElementById('currentSectionSubheader');
+            var currentGroupIndexInput = document.getElementById('CurrentGroupIndex');
+
+            var currentGroupIndex = parseInt((currentGroupIndexInput && currentGroupIndexInput.value) || '0', 10);
+            if (isNaN(currentGroupIndex)) {
+                currentGroupIndex = 0;
+            }
+
+            function showGroup(index) {
+                if (groupPages.length === 0) {
+                    if (currentSectionHeader) {
+                        currentSectionHeader.textContent = 'Section 0 of 0';
+                    }
+                    if (currentSectionSubheader) {
+                        currentSectionSubheader.textContent = '';
+                    }
+                    return;
+                }
+
+                currentGroupIndex = Math.max(0, Math.min(index, groupPages.length - 1));
+
+                groupPages.forEach(function (groupPage, pageIndex) {
+                    groupPage.style.display = pageIndex === currentGroupIndex ? '' : 'none';
+                });
+
+                if (groupPrevButton) {
+                    groupPrevButton.disabled = currentGroupIndex <= 0;
+                }
+
+                if (groupNextButton) {
+                    groupNextButton.disabled = currentGroupIndex >= groupPages.length - 1;
+                }
+
+                var sectionNumber = currentGroupIndex + 1;
+                var totalSections = groupPages.length;
+                var currentTitle = groupPages[currentGroupIndex].getAttribute('data-group-title') || '';
+
+                if (groupPaginationText) {
+                    groupPaginationText.textContent = 'Section ' + sectionNumber + ' of ' + totalSections;
+                }
+
+                if (currentSectionHeader) {
+                    currentSectionHeader.textContent = 'Section ' + sectionNumber + ' of ' + totalSections;
+                }
+
+                if (currentSectionSubheader) {
+                    currentSectionSubheader.textContent = currentTitle;
+                }
+
+                if (currentGroupIndexInput) {
+                    currentGroupIndexInput.value = currentGroupIndex.toString();
+                }
+            }
+
+            if (groupPrevButton) {
+                groupPrevButton.addEventListener('click', function () {
+                    showGroup(currentGroupIndex - 1);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
+            }
+
+            if (groupNextButton) {
+                groupNextButton.addEventListener('click', function () {
+                    showGroup(currentGroupIndex + 1);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
             }
 
             document.querySelectorAll('.copy-prev-year-btn').forEach(function (button) {
@@ -236,6 +441,14 @@
                     }
                 });
             });
+
+            document.querySelectorAll('.survey-answer-row input, .survey-answer-row select').forEach(function (control) {
+                control.addEventListener('input', updateProgress);
+                control.addEventListener('change', updateProgress);
+            });
+
+            showGroup(currentGroupIndex);
+            updateProgress();
         })();
     </script>
 }

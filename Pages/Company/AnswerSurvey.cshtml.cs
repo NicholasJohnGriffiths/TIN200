@@ -36,6 +36,9 @@ namespace TINWeb.Pages.Company
         [BindProperty]
         public List<AnswerEditRow> Rows { get; set; } = new();
 
+        [BindProperty(SupportsGet = true)]
+        public int CurrentGroupIndex { get; set; }
+
         public bool Saved { get; set; }
         public bool Submitted { get; set; }
 
@@ -278,6 +281,7 @@ namespace TINWeb.Pages.Company
                         QuestionId = question.Id,
                         OrderNumber = question.OrderNumber,
                         GroupTitle = question.GroupTitle,
+                        GroupDescription = question.GroupDescription,
                         QuestionText = question.QuestionText,
                         AnswerType = question.AnswerType,
                         ChoiceOptions = GetChoiceOptions(question),
@@ -496,6 +500,7 @@ namespace TINWeb.Pages.Company
             public int QuestionId { get; set; }
             public int? OrderNumber { get; set; }
             public string? GroupTitle { get; set; }
+            public string? GroupDescription { get; set; }
             public string? QuestionText { get; set; }
             public string? AnswerType { get; set; }
             public List<string> ChoiceOptions { get; set; } = new();

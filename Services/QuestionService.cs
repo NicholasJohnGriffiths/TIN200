@@ -105,6 +105,7 @@ namespace TINWeb.Services
             existingRecord.Title = record.Title;
             existingRecord.Description = record.Description;
             existingRecord.GroupTitle = record.GroupTitle;
+            existingRecord.GroupDescription = record.GroupDescription;
             existingRecord.QuestionText = record.QuestionText;
             existingRecord.ImportColumnName = record.ImportColumnName;
             existingRecord.AnswerType = record.AnswerType;

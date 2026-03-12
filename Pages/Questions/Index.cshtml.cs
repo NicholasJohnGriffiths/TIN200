@@ -56,7 +56,7 @@ namespace TINWeb.Pages.Questions
                 .ToList();
 
             var csv = new StringBuilder();
-            csv.AppendLine("OrderNumber,Title,GroupTitle,Question,Description,AnswerType,Choices,ImportColumnName");
+            csv.AppendLine("OrderNumber,Title,GroupTitle,GroupDescription,Question,Description,AnswerType,Choices,ImportColumnName");
 
             foreach (var record in exportRecords)
             {
@@ -79,6 +79,7 @@ namespace TINWeb.Pages.Questions
                     EscapeCsv(record.OrderNumber?.ToString() ?? string.Empty),
                     EscapeCsv(record.Title),
                     EscapeCsv(record.GroupTitle),
+                    EscapeCsv(record.GroupDescription),
                     EscapeCsv(record.QuestionText),
                     EscapeCsv(record.Description),
                     EscapeCsv(record.AnswerType),
