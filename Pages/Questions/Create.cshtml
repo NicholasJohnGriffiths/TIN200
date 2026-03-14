@@ -28,13 +28,8 @@
         </div>
 
         <div class="form-group mb-3">
-            <label asp-for="Record.GroupTitle" class="form-label">Group Title</label>
-            <input asp-for="Record.GroupTitle" class="form-control" />
-        </div>
-
-        <div class="form-group mb-3">
-            <label asp-for="Record.GroupDescription" class="form-label">Group Description</label>
-            <textarea asp-for="Record.GroupDescription" class="form-control" rows="3"></textarea>
+            <label asp-for="Record.GroupId" class="form-label">Question Group</label>
+            <select asp-for="Record.GroupId" asp-items="Model.QuestionGroupOptions" class="form-select"></select>
         </div>
 
         <div class="form-group mb-3">

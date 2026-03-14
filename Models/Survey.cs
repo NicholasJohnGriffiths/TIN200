@@ -16,5 +16,8 @@ namespace TINWeb.Models
         [Display(Name = "Current Survey")]
         [Required]
         public bool CurrentSurvey { get; set; }
+
+        [Display(Name = "Header Image")]
+        public int? HeaderImageId { get; set; }
     }
 }

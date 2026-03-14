@@ -48,6 +48,7 @@ builder.Services.AddScoped<SurveyService>();
 builder.Services.AddScoped<CompanySurveyService>();
 builder.Services.AddScoped<AnswerService>();
 builder.Services.AddScoped<QuestionService>();
+builder.Services.AddScoped<QuestionGroupService>();
 builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("SmtpSettings"));
 builder.Services.Configure<AzureCommunicationEmailSettings>(builder.Configuration.GetSection("AzureCommunicationEmail"));
 builder.Services.Configure<SurveyLinkSettings>(builder.Configuration.GetSection("SurveyLinkSettings"));

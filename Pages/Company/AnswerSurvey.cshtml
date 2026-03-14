@@ -9,7 +9,10 @@
     <div class="row justify-content-center">
         <div class="col-md-10">
             <div class="mb-3 text-center">
-                <img src="/images/SurveyHeader.jpg" alt="Survey Header" class="img-fluid" />
+                @if (!string.IsNullOrWhiteSpace(Model.SurveyHeaderImageUrl))
+                {
+                    <img src="@Model.SurveyHeaderImageUrl" alt="Survey Header" class="img-fluid" />
+                }
             </div>
             <h1>Survey Answers</h1>
             <p class="text-muted">Please complete the survey answers for the current survey year.</p>
@@ -62,76 +65,115 @@
                 </div>
 
                 @{
+                    var sectionIndexByKey = new Dictionary<string, int>(StringComparer.Ordinal);
                     var sectionTitles = new List<string>();
                     var sectionDescriptions = new List<string>();
+                    var sectionGroupIds = new List<int?>();
+                    var sectionImageId1 = new List<int?>();
+                    var sectionImageId2 = new List<int?>();
+                    var sectionImageId3 = new List<int?>();
                     var sectionRowIndexes = new List<List<int>>();
-
-                    var bufferedBeforeFirstSection = new List<int>();
-                    var activeSectionIndex = -1;
 
                     for (var i = 0; i < Model.Rows.Count; i++)
                     {
-                        var candidateTitle = Model.Rows[i].GroupTitle?.Trim();
-                        if (!string.IsNullOrWhiteSpace(candidateTitle))
+                        var row = Model.Rows[i];
+                        var sectionKey = row.GroupId.HasValue ? $"group-{row.GroupId.Value}" : "ungrouped";
+
+                        if (!sectionIndexByKey.TryGetValue(sectionKey, out var sectionIndex))
                         {
-                            sectionTitles.Add(candidateTitle);
-                            sectionDescriptions.Add((Model.Rows[i].GroupDescription ?? string.Empty).Trim());
+                            sectionIndex = sectionTitles.Count;
+                            sectionIndexByKey[sectionKey] = sectionIndex;
+
+                            sectionTitles.Add(!string.IsNullOrWhiteSpace(row.GroupTitle) ? row.GroupTitle.Trim() : "Ungrouped Questions");
+                            sectionDescriptions.Add((row.GroupDescription ?? string.Empty).Trim());
+                            sectionGroupIds.Add(row.GroupId);
+                            sectionImageId1.Add(row.GroupImageId1);
+                            sectionImageId2.Add(row.GroupImageId2);
+                            sectionImageId3.Add(row.GroupImageId3);
                             sectionRowIndexes.Add(new List<int>());
-                            activeSectionIndex = sectionTitles.Count - 1;
-
-                            if (bufferedBeforeFirstSection.Count > 0)
-                            {
-                                sectionRowIndexes[activeSectionIndex].AddRange(bufferedBeforeFirstSection);
-                                bufferedBeforeFirstSection.Clear();
-                            }
-
-                            sectionRowIndexes[activeSectionIndex].Add(i);
-                            continue;
                         }
 
-                        if (activeSectionIndex >= 0)
+                        if (string.IsNullOrWhiteSpace(sectionDescriptions[sectionIndex]))
                         {
-                            sectionRowIndexes[activeSectionIndex].Add(i);
+                            sectionDescriptions[sectionIndex] = (row.GroupDescription ?? string.Empty).Trim();
+                        }
 
-                            if (string.IsNullOrWhiteSpace(sectionDescriptions[activeSectionIndex]))
-                            {
-                                var candidateDescription = (Model.Rows[i].GroupDescription ?? string.Empty).Trim();
-                                if (!string.IsNullOrWhiteSpace(candidateDescription))
-                                {
-                                    sectionDescriptions[activeSectionIndex] = candidateDescription;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            bufferedBeforeFirstSection.Add(i);
-                        }
+                        sectionImageId1[sectionIndex] ??= row.GroupImageId1;
+                        sectionImageId2[sectionIndex] ??= row.GroupImageId2;
+                        sectionImageId3[sectionIndex] ??= row.GroupImageId3;
+                        sectionRowIndexes[sectionIndex].Add(i);
                     }
 
                     if (sectionTitles.Count == 0)
                     {
                         sectionTitles.Add("Survey");
                         sectionDescriptions.Add(string.Empty);
+                        sectionGroupIds.Add(null);
+                        sectionImageId1.Add(null);
+                        sectionImageId2.Add(null);
+                        sectionImageId3.Add(null);
                         sectionRowIndexes.Add(Enumerable.Range(0, Model.Rows.Count).ToList());
-                    }
-                    else if (bufferedBeforeFirstSection.Count > 0)
-                    {
-                        sectionRowIndexes[0].InsertRange(0, bufferedBeforeFirstSection);
                     }
                 }
 
                 @for (var groupIndex = 0; groupIndex < sectionTitles.Count; groupIndex++)
                 {
                     <div class="survey-group-page" data-group-index="@groupIndex" data-group-title="@sectionTitles[groupIndex]" data-group-description="@sectionDescriptions[groupIndex]" style="display:none;">
-                        <div class="card mb-3">
-                            <div class="card-header py-2">
-                                <div class="fw-semibold">@sectionTitles[groupIndex]</div>
-                                @if (!string.IsNullOrWhiteSpace(sectionDescriptions[groupIndex]))
+                        @{
+                            var hasTitle = !string.IsNullOrWhiteSpace(sectionTitles[groupIndex]);
+                            var hasDescription = !string.IsNullOrWhiteSpace(sectionDescriptions[groupIndex]);
+                            var groupImageIds = new List<int>();
+                            var groupId = sectionGroupIds[groupIndex];
+
+                            if (groupId.HasValue)
+                            {
+                                groupImageIds = new[]
                                 {
-                                    <div class="small text-body-secondary mt-1">@sectionDescriptions[groupIndex]</div>
+                                    sectionImageId1[groupIndex],
+                                    sectionImageId2[groupIndex],
+                                    sectionImageId3[groupIndex]
+                                }
+                                .Where(x => x.HasValue)
+                                .Select(x => x!.Value)
+                                .Distinct()
+                                .ToList();
+                            }
+
+                            var hasImages = groupImageIds.Count > 0;
+                            var showSectionCard = hasTitle || hasDescription || hasImages;
+                        }
+
+                        @if (showSectionCard)
+                        {
+                            <div class="card mb-3">
+                                @if (hasTitle || hasDescription)
+                                {
+                                    <div class="card-header py-2">
+                                        @if (hasTitle)
+                                        {
+                                            <div class="fw-semibold">@sectionTitles[groupIndex]</div>
+                                        }
+                                        @if (hasDescription)
+                                        {
+                                            <div class="small text-body-secondary mt-1">@sectionDescriptions[groupIndex]</div>
+                                        }
+                                    </div>
+                                }
+
+                                @if (hasImages && groupId.HasValue)
+                                {
+                                    <div class="card-body pt-3 pb-2">
+                                        <div class="d-flex flex-wrap gap-3 align-items-start">
+                                            @foreach (var groupImageId in groupImageIds)
+                                            {
+                                                var groupImageUrl = Url.Page("./AnswerSurvey", "GroupImage", new { id = Model.Company.Id, token = Model.Token, groupId = groupId.Value, imageId = groupImageId });
+                                                <img src="@groupImageUrl" alt="@sectionTitles[groupIndex] image" class="img-thumbnail" style="max-width: 660px; max-height: 480px;" />
+                                            }
+                                        </div>
+                                    </div>
                                 }
                             </div>
-                        </div>
+                        }
 
                         @foreach (var i in sectionRowIndexes[groupIndex])
                         {
@@ -152,7 +194,12 @@
 
                                 <input type="hidden" asp-for="Rows[i].QuestionId" />
                                 <input type="hidden" asp-for="Rows[i].OrderNumber" />
+                                <input type="hidden" asp-for="Rows[i].GroupId" />
                                 <input type="hidden" asp-for="Rows[i].GroupTitle" />
+                                <input type="hidden" asp-for="Rows[i].GroupDescription" />
+                                <input type="hidden" asp-for="Rows[i].GroupImageId1" />
+                                <input type="hidden" asp-for="Rows[i].GroupImageId2" />
+                                <input type="hidden" asp-for="Rows[i].GroupImageId3" />
                                 <input type="hidden" asp-for="Rows[i].QuestionText" />
                                 <input type="hidden" asp-for="Rows[i].AnswerType" />
 
@@ -248,6 +295,8 @@
                     <button type="button" class="btn btn-outline-secondary" id="groupNextButton">Next Group</button>
                 </div>
 
+                <div id="groupNumberNav" class="d-flex flex-wrap gap-2 mb-3" aria-label="Group Number Navigation"></div>
+
                 <div class="d-flex gap-2">
                     <button type="submit" name="FormAction" value="save" class="btn btn-secondary">Save for Later</button>
                     <button type="submit" name="FormAction" value="submit" class="btn btn-primary">Submit Final</button>
@@ -326,6 +375,7 @@
             var groupPrevButton = document.getElementById('groupPrevButton');
             var groupNextButton = document.getElementById('groupNextButton');
             var groupPaginationText = document.getElementById('groupPaginationText');
+            var groupNumberNav = document.getElementById('groupNumberNav');
             var currentSectionHeader = document.getElementById('currentSectionHeader');
             var currentSectionSubheader = document.getElementById('currentSectionSubheader');
             var currentGroupIndexInput = document.getElementById('CurrentGroupIndex');
@@ -333,6 +383,31 @@
             var currentGroupIndex = parseInt((currentGroupIndexInput && currentGroupIndexInput.value) || '0', 10);
             if (isNaN(currentGroupIndex)) {
                 currentGroupIndex = 0;
+            }
+
+            function renderGroupNumberNav() {
+                if (!groupNumberNav) {
+                    return;
+                }
+
+                groupNumberNav.innerHTML = '';
+
+                groupPages.forEach(function (_, pageIndex) {
+                    var button = document.createElement('button');
+                    button.type = 'button';
+                    button.textContent = (pageIndex + 1).toString();
+                    button.className = pageIndex === currentGroupIndex
+                        ? 'btn btn-sm btn-primary'
+                        : 'btn btn-sm btn-outline-secondary';
+                    button.setAttribute('aria-label', 'Go to section ' + (pageIndex + 1));
+
+                    button.addEventListener('click', function () {
+                        showGroup(pageIndex);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                    });
+
+                    groupNumberNav.appendChild(button);
+                });
             }
 
             function showGroup(index) {
@@ -379,6 +454,8 @@
                 if (currentGroupIndexInput) {
                     currentGroupIndexInput.value = currentGroupIndex.toString();
                 }
+
+                renderGroupNumberNav();
             }
 
             if (groupPrevButton) {

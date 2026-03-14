@@ -106,6 +106,7 @@ namespace TINWeb.Services
             existingRecord.Description = record.Description;
             existingRecord.GroupTitle = record.GroupTitle;
             existingRecord.GroupDescription = record.GroupDescription;
+            existingRecord.GroupId = record.GroupId;
             existingRecord.QuestionText = record.QuestionText;
             existingRecord.ImportColumnName = record.ImportColumnName;
             existingRecord.AnswerType = record.AnswerType;
@@ -193,6 +194,80 @@ namespace TINWeb.Services
         public async Task<bool> ExistsAsync(int id)
         {
             return await _context.Question.AnyAsync(q => q.Id == id);
+        }
+
+        public async Task<List<Question>> GetByGroupIdAsync(int groupId)
+        {
+            return await _context.Question
+                .Where(q => q.GroupId == groupId)
+                .OrderBy(q => q.OrderNumber ?? int.MaxValue)
+                .ThenBy(q => q.Id)
+                .ToListAsync();
+        }
+
+        public async Task<List<Question>> GetUngroupedAsync()
+        {
+            return await _context.Question
+                .Where(q => q.GroupId == null)
+                .OrderBy(q => q.OrderNumber ?? int.MaxValue)
+                .ThenBy(q => q.Id)
+                .ToListAsync();
+        }
+
+        public async Task<Dictionary<int, string>> GetQuestionGroupTitlesByQuestionIdAsync(IEnumerable<int> questionIds)
+        {
+            var ids = questionIds.Distinct().ToList();
+            if (ids.Count == 0)
+            {
+                return new Dictionary<int, string>();
+            }
+
+            var questionGroups = await (
+                from question in _context.Question
+                join questionGroupEntity in _context.QuestionGroup on question.GroupId equals questionGroupEntity.Id into groupJoin
+                from questionGroup in groupJoin.DefaultIfEmpty()
+                where ids.Contains(question.Id)
+                select new
+                {
+                    QuestionId = question.Id,
+                    GroupTitle = questionGroup != null ? questionGroup.Title : null
+                })
+                .ToListAsync();
+
+            return questionGroups.ToDictionary(
+                x => x.QuestionId,
+                x => x.GroupTitle ?? string.Empty);
+        }
+
+        public async Task SetGroupMembershipAsync(int groupId, IEnumerable<int> selectedQuestionIds)
+        {
+            var selectedIds = selectedQuestionIds.Distinct().ToHashSet();
+
+            var currentlyGrouped = await _context.Question
+                .Where(q => q.GroupId == groupId)
+                .ToListAsync();
+
+            foreach (var question in currentlyGrouped)
+            {
+                if (!selectedIds.Contains(question.Id))
+                {
+                    question.GroupId = null;
+                }
+            }
+
+            if (selectedIds.Count > 0)
+            {
+                var selectedUngrouped = await _context.Question
+                    .Where(q => selectedIds.Contains(q.Id) && q.GroupId == null)
+                    .ToListAsync();
+
+                foreach (var question in selectedUngrouped)
+                {
+                    question.GroupId = groupId;
+                }
+            }
+
+            await _context.SaveChangesAsync();
         }
     }
 }

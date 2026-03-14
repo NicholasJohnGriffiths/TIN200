@@ -1,0 +1,175 @@
+@page "{id:int}"
+@model TINWeb.Pages.QuestionGroups.EditModel
+@{
+    ViewData["Title"] = "Edit Question Group";
+}
+
+<div class="container mt-4">
+    <h1>Edit Question Group</h1>
+    <hr />
+
+    <form method="post" enctype="multipart/form-data">
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+        <input type="hidden" asp-for="Record.Id" />
+
+        <div class="form-group mb-3">
+            <label asp-for="Record.OrderNumber" class="form-label"></label>
+            <input asp-for="Record.OrderNumber" class="form-control" />
+        </div>
+
+        <div class="form-group mb-3">
+            <label asp-for="Record.Title" class="form-label"></label>
+            <input asp-for="Record.Title" class="form-control" />
+        </div>
+
+        <div class="form-group mb-3">
+            <label asp-for="Record.Description" class="form-label"></label>
+            <textarea asp-for="Record.Description" class="form-control" rows="4"></textarea>
+        </div>
+
+        <div class="form-group mb-3">
+            <label class="form-label">Image 1</label>
+            <input asp-for="Image1File" type="file" class="form-control" accept="image/*" />
+            <div class="form-check mt-1">
+                <input asp-for="ClearImage1" class="form-check-input" />
+                <label asp-for="ClearImage1" class="form-check-label">Clear Image 1</label>
+            </div>
+            @if (Model.Image1Details != null)
+            {
+                <div class="mt-2 border rounded p-2 bg-light">
+                    <div><strong>Name:</strong> @Model.Image1Details.FileName</div>
+                    <div><strong>Path:</strong> @Model.Image1Details.FilePath</div>
+                    <div class="mt-2">
+                        <img src="@Model.Image1Details.ThumbnailUrl" alt="Image 1 thumbnail" class="img-thumbnail" style="max-width: 270px; max-height: 180px;" />
+                    </div>
+                </div>
+            }
+            else
+            {
+                <small class="text-muted">Current: None</small>
+            }
+        </div>
+
+        <div class="form-group mb-3">
+            <label class="form-label">Image 2</label>
+            <input asp-for="Image2File" type="file" class="form-control" accept="image/*" />
+            <div class="form-check mt-1">
+                <input asp-for="ClearImage2" class="form-check-input" />
+                <label asp-for="ClearImage2" class="form-check-label">Clear Image 2</label>
+            </div>
+            @if (Model.Image2Details != null)
+            {
+                <div class="mt-2 border rounded p-2 bg-light">
+                    <div><strong>Name:</strong> @Model.Image2Details.FileName</div>
+                    <div><strong>Path:</strong> @Model.Image2Details.FilePath</div>
+                    <div class="mt-2">
+                        <img src="@Model.Image2Details.ThumbnailUrl" alt="Image 2 thumbnail" class="img-thumbnail" style="max-width: 270px; max-height: 180px;" />
+                    </div>
+                </div>
+            }
+            else
+            {
+                <small class="text-muted">Current: None</small>
+            }
+        </div>
+
+        <div class="form-group mb-3">
+            <label class="form-label">Image 3</label>
+            <input asp-for="Image3File" type="file" class="form-control" accept="image/*" />
+            <div class="form-check mt-1">
+                <input asp-for="ClearImage3" class="form-check-input" />
+                <label asp-for="ClearImage3" class="form-check-label">Clear Image 3</label>
+            </div>
+            @if (Model.Image3Details != null)
+            {
+                <div class="mt-2 border rounded p-2 bg-light">
+                    <div><strong>Name:</strong> @Model.Image3Details.FileName</div>
+                    <div><strong>Path:</strong> @Model.Image3Details.FilePath</div>
+                    <div class="mt-2">
+                        <img src="@Model.Image3Details.ThumbnailUrl" alt="Image 3 thumbnail" class="img-thumbnail" style="max-width: 270px; max-height: 180px;" />
+                    </div>
+                </div>
+            }
+            else
+            {
+                <small class="text-muted">Current: None</small>
+            }
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header fw-semibold">Questions Linked to Group</div>
+            <div class="card-body">
+                <div class="row g-3 align-items-center">
+                    <div class="col-md-5">
+                        <label class="form-label">In this group</label>
+                        <select id="groupQuestionsList" name="SelectedQuestionIds" class="form-select" multiple size="12">
+                            @foreach (var item in Model.GroupQuestions)
+                            {
+                                <option value="@item.Value">@item.Text</option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="col-md-2 d-flex flex-column gap-2 align-items-center">
+                        <button type="button" class="btn btn-outline-primary" id="removeFromGroupButton">&gt;&gt;</button>
+                        <button type="button" class="btn btn-outline-primary" id="addToGroupButton">&lt;&lt;</button>
+                    </div>
+
+                    <div class="col-md-5">
+                        <label class="form-label">Available (not grouped)</label>
+                        <select id="availableQuestionsList" class="form-select" multiple size="12">
+                            @foreach (var item in Model.AvailableQuestions)
+                            {
+                                <option value="@item.Value">@item.Text</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Save</button>
+        <a asp-page="./Index" class="btn btn-secondary">Back to List</a>
+    </form>
+</div>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+    <script>
+        (function () {
+            const groupedList = document.getElementById('groupQuestionsList');
+            const availableList = document.getElementById('availableQuestionsList');
+            const addButton = document.getElementById('addToGroupButton');
+            const removeButton = document.getElementById('removeFromGroupButton');
+
+            if (!groupedList || !availableList || !addButton || !removeButton) {
+                return;
+            }
+
+            function moveSelected(source, target) {
+                const selected = Array.from(source.options).filter(option => option.selected);
+                selected.forEach(option => {
+                    option.selected = false;
+                    target.appendChild(option);
+                });
+            }
+
+            addButton.addEventListener('click', function () {
+                moveSelected(availableList, groupedList);
+            });
+
+            removeButton.addEventListener('click', function () {
+                moveSelected(groupedList, availableList);
+            });
+
+            const form = groupedList.closest('form');
+            if (form) {
+                form.addEventListener('submit', function () {
+                    Array.from(groupedList.options).forEach(option => {
+                        option.selected = true;
+                    });
+                });
+            }
+        })();
+    </script>
+}

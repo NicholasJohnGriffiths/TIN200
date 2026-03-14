@@ -41,9 +41,8 @@
                         <th>Order</th>
                         <th>Group</th>
                         <th class="title-col">Title</th>
-                        <th>Group Description</th>
                         <th class="question-col">Question</th>
-                        <th>Answer Type</th>
+                        <th class="answer-type-col">Answer Type</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -54,11 +53,10 @@
                     var isFocused = Model.FocusId.HasValue && Model.FocusId.Value == record.Id;
                     <tr id="question-@record.Id" class="@(isFocused ? "focused-question-row" : string.Empty)">
                         <td>@record.OrderNumber</td>
-                        <td>@(!string.IsNullOrWhiteSpace(record.GroupTitle) ? "Yes" : string.Empty)</td>
+                        <td>@(Model.GroupTitlesByQuestionId.TryGetValue(record.Id, out var groupTitle) ? groupTitle : string.Empty)</td>
                         <td class="title-col">@record.Title</td>
-                        <td>@record.GroupDescription</td>
                         <td class="question-col">@record.QuestionText</td>
-                        <td>@record.AnswerType</td>
+                        <td class="answer-type-col">@record.AnswerType</td>
                         <td class="actions-col">
                             <div class="d-inline-flex gap-1 flex-nowrap">
                                 <form method="post" asp-page-handler="MoveUp" class="d-inline">
@@ -93,6 +91,11 @@
 
     .question-col {
         width: 50%;
+    }
+
+    .answer-type-col {
+        min-width: 140px;
+        width: 140px;
     }
 
     .actions-col {

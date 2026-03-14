@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.StaticFiles;
 using TINWeb.Data;
 using TINWeb.Models;
 using TINWeb.Services;
@@ -38,6 +39,8 @@ namespace TINWeb.Pages.Company
 
         [BindProperty(SupportsGet = true)]
         public int CurrentGroupIndex { get; set; }
+
+        public string? SurveyHeaderImageUrl { get; set; }
 
         public bool Saved { get; set; }
         public bool Submitted { get; set; }
@@ -86,10 +89,93 @@ namespace TINWeb.Pages.Company
             }
 
             FinancialYear = survey.FinancialYear;
+            SurveyHeaderImageUrl = await BuildSurveyHeaderImageUrlAsync(company.Id, Token, survey);
             var companySurveyId = await EnsureCompanySurveyAsync(company.Id, survey.Id);
 
             Rows = await LoadAnswerRowsAsync(company.Id, companySurveyId, survey.FinancialYear);
             return Page();
+        }
+
+        public async Task<IActionResult> OnGetGroupImageAsync(int id, int groupId, int imageId, string? token)
+        {
+            var effectiveToken = GetEffectiveToken(token);
+            var hasSurveyAccessCookie = Request.Cookies.TryGetValue($"{AccessCookiePrefix}{id}", out var accessCookieValue)
+                && string.Equals(accessCookieValue, "1", StringComparison.Ordinal);
+            var hasValidToken = !string.IsNullOrWhiteSpace(effectiveToken) && _surveyLinkTokenService.IsTokenValid(id, effectiveToken);
+
+            if (!hasValidToken && !hasSurveyAccessCookie)
+            {
+                return NotFound();
+            }
+
+            var group = await _context.QuestionGroup.FirstOrDefaultAsync(g => g.Id == groupId);
+            if (group == null)
+            {
+                return NotFound();
+            }
+
+            if (group.ImageId1 != imageId && group.ImageId2 != imageId && group.ImageId3 != imageId)
+            {
+                return NotFound();
+            }
+
+            var image = await _context.Image.FirstOrDefaultAsync(x => x.Id == imageId);
+            if (image == null || string.IsNullOrWhiteSpace(image.FilePath))
+            {
+                return NotFound();
+            }
+
+            var normalizedRelativePath = image.FilePath
+                .Replace('/', Path.DirectorySeparatorChar)
+                .TrimStart(Path.DirectorySeparatorChar);
+
+            var fullPath = Path.Combine(Directory.GetCurrentDirectory(), normalizedRelativePath);
+            if (!System.IO.File.Exists(fullPath))
+            {
+                return NotFound();
+            }
+
+            var contentTypeProvider = new FileExtensionContentTypeProvider();
+            var extension = Path.GetExtension(fullPath);
+            if (!contentTypeProvider.TryGetContentType($"file{extension}", out var contentType))
+            {
+                contentType = "application/octet-stream";
+            }
+
+            return PhysicalFile(fullPath, contentType);
+        }
+
+        public async Task<IActionResult> OnGetSurveyHeaderImageAsync(int id, string? token)
+        {
+            var effectiveToken = GetEffectiveToken(token);
+            var hasSurveyAccessCookie = Request.Cookies.TryGetValue($"{AccessCookiePrefix}{id}", out var accessCookieValue)
+                && string.Equals(accessCookieValue, "1", StringComparison.Ordinal);
+            var hasValidToken = !string.IsNullOrWhiteSpace(effectiveToken) && _surveyLinkTokenService.IsTokenValid(id, effectiveToken);
+
+            if (!hasValidToken && !hasSurveyAccessCookie)
+            {
+                return NotFound();
+            }
+
+            var survey = await GetCurrentSurveyAsync();
+            if (survey?.HeaderImageId == null)
+            {
+                return NotFound();
+            }
+
+            var image = await _context.Image.FirstOrDefaultAsync(x => x.Id == survey.HeaderImageId.Value);
+            if (image == null || string.IsNullOrWhiteSpace(image.FilePath))
+            {
+                return NotFound();
+            }
+
+            if (!TryResolvePhysicalImagePath(image.FilePath, out var fullPath))
+            {
+                return NotFound();
+            }
+
+            var contentType = GetContentTypeFromPath(fullPath);
+            return PhysicalFile(fullPath, contentType);
         }
 
         public async Task<IActionResult> OnPostAsync(int id, string? token)
@@ -130,6 +216,7 @@ namespace TINWeb.Pages.Company
             }
 
             FinancialYear = survey.FinancialYear;
+            SurveyHeaderImageUrl = await BuildSurveyHeaderImageUrlAsync(company.Id, Token, survey);
             var companySurveyId = await EnsureCompanySurveyAsync(company.Id, survey.Id);
 
             var questionById = await _context.Question
@@ -217,6 +304,49 @@ namespace TINWeb.Pages.Company
             return Page();
         }
 
+        private async Task<string?> BuildSurveyHeaderImageUrlAsync(int companyId, string token, Models.Survey survey)
+        {
+            if (!survey.HeaderImageId.HasValue)
+            {
+                return null;
+            }
+
+            var image = await _context.Image.FirstOrDefaultAsync(x => x.Id == survey.HeaderImageId.Value);
+            if (image == null || string.IsNullOrWhiteSpace(image.FilePath))
+            {
+                return null;
+            }
+
+            if (!TryResolvePhysicalImagePath(image.FilePath, out _))
+            {
+                return null;
+            }
+
+            return Url.Page("./AnswerSurvey", "SurveyHeaderImage", new { id = companyId, token });
+        }
+
+        private static bool TryResolvePhysicalImagePath(string relativePath, out string fullPath)
+        {
+            var normalizedRelativePath = relativePath
+                .Replace('/', Path.DirectorySeparatorChar)
+                .TrimStart(Path.DirectorySeparatorChar);
+
+            fullPath = Path.Combine(Directory.GetCurrentDirectory(), normalizedRelativePath);
+            return System.IO.File.Exists(fullPath);
+        }
+
+        private static string GetContentTypeFromPath(string fullPath)
+        {
+            var contentTypeProvider = new FileExtensionContentTypeProvider();
+            var extension = Path.GetExtension(fullPath);
+            if (!contentTypeProvider.TryGetContentType($"file{extension}", out var contentType))
+            {
+                return "application/octet-stream";
+            }
+
+            return contentType;
+        }
+
         private async Task<Models.Survey?> GetCurrentSurveyAsync()
         {
             return await _context.Survey
@@ -260,6 +390,16 @@ namespace TINWeb.Pages.Company
                 .ThenBy(q => q.Id)
                 .ToListAsync();
 
+            var groupIds = questions
+                .Where(q => q.GroupId.HasValue)
+                .Select(q => q.GroupId!.Value)
+                .Distinct()
+                .ToList();
+
+            var groupsById = await _context.QuestionGroup
+                .Where(g => groupIds.Contains(g.Id))
+                .ToDictionaryAsync(g => g.Id);
+
             var previousYearAnswersByQuestionId = await GetPreviousYearAnswersByQuestionIdAsync(companyId, currentFinancialYear);
 
             var answers = await _context.Answer
@@ -276,12 +416,18 @@ namespace TINWeb.Pages.Company
                 {
                     latestAnswerByQuestionId.TryGetValue(question.Id, out var answer);
                     previousYearAnswersByQuestionId.TryGetValue(question.Id, out var previousYearAnswer);
+                    groupsById.TryGetValue(question.GroupId ?? 0, out var group);
+
                     return new AnswerEditRow
                     {
                         QuestionId = question.Id,
                         OrderNumber = question.OrderNumber,
-                        GroupTitle = question.GroupTitle,
-                        GroupDescription = question.GroupDescription,
+                        GroupId = question.GroupId,
+                        GroupTitle = group?.Title,
+                        GroupDescription = group?.Description,
+                        GroupImageId1 = group?.ImageId1,
+                        GroupImageId2 = group?.ImageId2,
+                        GroupImageId3 = group?.ImageId3,
                         QuestionText = question.QuestionText,
                         AnswerType = question.AnswerType,
                         ChoiceOptions = GetChoiceOptions(question),
@@ -499,8 +645,12 @@ namespace TINWeb.Pages.Company
         {
             public int QuestionId { get; set; }
             public int? OrderNumber { get; set; }
+            public int? GroupId { get; set; }
             public string? GroupTitle { get; set; }
             public string? GroupDescription { get; set; }
+            public int? GroupImageId1 { get; set; }
+            public int? GroupImageId2 { get; set; }
+            public int? GroupImageId3 { get; set; }
             public string? QuestionText { get; set; }
             public string? AnswerType { get; set; }
             public List<string> ChoiceOptions { get; set; } = new();

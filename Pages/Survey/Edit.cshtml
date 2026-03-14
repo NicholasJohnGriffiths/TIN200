@@ -8,7 +8,7 @@
     <h1>Edit Survey</h1>
     <hr />
 
-    <form method="post">
+    <form method="post" enctype="multipart/form-data">
         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
         <input type="hidden" asp-for="Record.Id" />
 
@@ -23,6 +23,34 @@
             <label asp-for="Record.CurrentSurvey" class="form-check-label"></label>
             <span asp-validation-for="Record.CurrentSurvey" class="text-danger"></span>
         </div>
+
+        <div class="form-group mb-3">
+            <label asp-for="Record.HeaderImageId" class="form-label"></label>
+            <select asp-for="Record.HeaderImageId" asp-items="Model.HeaderImageOptions" class="form-select"></select>
+            <span asp-validation-for="Record.HeaderImageId" class="text-danger"></span>
+        </div>
+
+        <div class="form-group mb-3">
+            <label asp-for="HeaderImageFile" class="form-label">Upload New Header Image</label>
+            <input asp-for="HeaderImageFile" type="file" class="form-control" accept="image/*" />
+            <div class="form-text">If a file is uploaded, it will be saved and selected as the survey header image.</div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.HeaderImageThumbnailUrl))
+        {
+            <div class="form-group mb-3">
+                <label class="form-label">Current Header Image</label>
+                <div class="border rounded p-2 bg-light">
+                    @if (!string.IsNullOrWhiteSpace(Model.HeaderImageFileName))
+                    {
+                        <div><strong>Name:</strong> @Model.HeaderImageFileName</div>
+                    }
+                    <div class="mt-2">
+                        <img src="@Model.HeaderImageThumbnailUrl" alt="Survey header image thumbnail" class="img-thumbnail" style="max-width: 270px; max-height: 180px;" />
+                    </div>
+                </div>
+            </div>
+        }
 
         <button type="submit" class="btn btn-primary">Save</button>
         <a asp-page="./Index" class="btn btn-secondary">Back to List</a>

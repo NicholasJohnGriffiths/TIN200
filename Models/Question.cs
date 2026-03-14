@@ -18,6 +18,8 @@ namespace TINWeb.Models
 
         public string? GroupDescription { get; set; }
 
+        public int? GroupId { get; set; }
+
         public string? QuestionText { get; set; }
 
         [StringLength(255)]

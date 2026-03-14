@@ -11,6 +11,7 @@ namespace TINWeb.Pages.Questions
         private readonly QuestionService _service;
 
         public List<Question> Records { get; set; } = new();
+        public Dictionary<int, string> GroupTitlesByQuestionId { get; set; } = new();
 
         [BindProperty(SupportsGet = true)]
         public int? FocusId { get; set; }
@@ -26,6 +27,7 @@ namespace TINWeb.Pages.Questions
         public async Task OnGetAsync()
         {
             Records = await _service.GetAllAsync();
+            GroupTitlesByQuestionId = await _service.GetQuestionGroupTitlesByQuestionIdAsync(Records.Select(x => x.Id));
         }
 
         public async Task<IActionResult> OnGetExportAsync()

@@ -1,0 +1,73 @@
+@page "{id:int}"
+@model TINWeb.Pages.QuestionGroups.DetailsModel
+@{
+    ViewData["Title"] = "Question Group Details";
+}
+
+<div class="container mt-4">
+    <h1>Question Group Details</h1>
+    <hr />
+
+    <dl class="row">
+        <dt class="col-sm-3">ID</dt><dd class="col-sm-9">@Model.Record.Id</dd>
+        <dt class="col-sm-3">Order</dt><dd class="col-sm-9">@Model.Record.OrderNumber</dd>
+        <dt class="col-sm-3">Title</dt><dd class="col-sm-9">@Model.Record.Title</dd>
+        <dt class="col-sm-3">Description</dt><dd class="col-sm-9">@Model.Record.Description</dd>
+        <dt class="col-sm-3">Image 1</dt>
+        <dd class="col-sm-9">
+            @if (Model.Image1Details != null)
+            {
+                <div class="border rounded p-2 bg-light">
+                    <div><strong>Name:</strong> @Model.Image1Details.FileName</div>
+                    <div><strong>Path:</strong> @Model.Image1Details.FilePath</div>
+                    <div class="mt-2">
+                        <img src="@Model.Image1Details.ThumbnailUrl" alt="Image 1 thumbnail" class="img-thumbnail" style="max-width: 270px; max-height: 180px;" />
+                    </div>
+                </div>
+            }
+            else
+            {
+                <span>None</span>
+            }
+        </dd>
+
+        <dt class="col-sm-3">Image 2</dt>
+        <dd class="col-sm-9">
+            @if (Model.Image2Details != null)
+            {
+                <div class="border rounded p-2 bg-light">
+                    <div><strong>Name:</strong> @Model.Image2Details.FileName</div>
+                    <div><strong>Path:</strong> @Model.Image2Details.FilePath</div>
+                    <div class="mt-2">
+                        <img src="@Model.Image2Details.ThumbnailUrl" alt="Image 2 thumbnail" class="img-thumbnail" style="max-width: 270px; max-height: 180px;" />
+                    </div>
+                </div>
+            }
+            else
+            {
+                <span>None</span>
+            }
+        </dd>
+
+        <dt class="col-sm-3">Image 3</dt>
+        <dd class="col-sm-9">
+            @if (Model.Image3Details != null)
+            {
+                <div class="border rounded p-2 bg-light">
+                    <div><strong>Name:</strong> @Model.Image3Details.FileName</div>
+                    <div><strong>Path:</strong> @Model.Image3Details.FilePath</div>
+                    <div class="mt-2">
+                        <img src="@Model.Image3Details.ThumbnailUrl" alt="Image 3 thumbnail" class="img-thumbnail" style="max-width: 270px; max-height: 180px;" />
+                    </div>
+                </div>
+            }
+            else
+            {
+                <span>None</span>
+            }
+        </dd>
+    </dl>
+
+    <a asp-page="./Edit" asp-route-id="@Model.Record.Id" class="btn btn-warning">Edit</a>
+    <a asp-page="./Index" class="btn btn-secondary">Back to List</a>
+</div>

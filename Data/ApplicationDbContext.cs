@@ -14,6 +14,8 @@ namespace TINWeb.Data
         public DbSet<Survey> Survey { get; set; } = null!;
         public DbSet<CompanySurvey> CompanySurvey { get; set; } = null!;
         public DbSet<Question> Question { get; set; } = null!;
+        public DbSet<QuestionGroup> QuestionGroup { get; set; } = null!;
+        public DbSet<Image> Image { get; set; } = null!;
         public DbSet<Answer> Answer { get; set; } = null!;
         public DbSet<CompanyFinancialAnalytics> CompanyFinancialAnalytics { get; set; } = null!;
         public DbSet<FinancialYearComparison> FinancialYearComparison { get; set; } = null!;
@@ -98,6 +100,15 @@ namespace TINWeb.Data
                     .HasColumnName("CurrentSurvey")
                     .HasColumnType("bit")
                     .IsRequired();
+
+                entity.Property(e => e.HeaderImageId)
+                    .HasColumnName("HeaderImageId")
+                    .HasColumnType("int");
+
+                entity.HasOne<Image>()
+                    .WithMany()
+                    .HasForeignKey(e => e.HeaderImageId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<CompanySurvey>(entity =>
@@ -184,6 +195,10 @@ namespace TINWeb.Data
                     .HasColumnName("GroupDescription")
                     .HasColumnType("varchar(max)");
 
+                entity.Property(e => e.GroupId)
+                    .HasColumnName("GroupId")
+                    .HasColumnType("int");
+
                 entity.Property(e => e.QuestionText)
                     .HasColumnName("Question")
                     .HasColumnType("varchar(max)");
@@ -210,6 +225,105 @@ namespace TINWeb.Data
                 entity.Property(e => e.AnswerType)
                     .HasColumnName("AnswerType")
                     .HasColumnType("nvarchar(50)");
+
+                entity.HasOne<QuestionGroup>()
+                    .WithMany()
+                    .HasForeignKey(e => e.GroupId)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<QuestionGroup>(entity =>
+            {
+                entity.ToTable("QuestionGroup");
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("Id")
+                    .ValueGeneratedOnAdd();
+
+                entity.Property(e => e.Title)
+                    .HasColumnName("Title")
+                    .HasColumnType("nvarchar(max)");
+
+                entity.Property(e => e.Description)
+                    .HasColumnName("Description")
+                    .HasColumnType("nvarchar(max)");
+
+                entity.Property(e => e.OrderNumber)
+                    .HasColumnName("OrderNumber")
+                    .HasColumnType("int");
+
+                entity.Property(e => e.ImageId1)
+                    .HasColumnName("ImageId1")
+                    .HasColumnType("int");
+
+                entity.Property(e => e.ImageId2)
+                    .HasColumnName("ImageId2")
+                    .HasColumnType("int");
+
+                entity.Property(e => e.ImageId3)
+                    .HasColumnName("ImageId3")
+                    .HasColumnType("int");
+
+                entity.HasOne<Image>()
+                    .WithMany()
+                    .HasForeignKey(e => e.ImageId1)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne<Image>()
+                    .WithMany()
+                    .HasForeignKey(e => e.ImageId2)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne<Image>()
+                    .WithMany()
+                    .HasForeignKey(e => e.ImageId3)
+                    .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<Image>(entity =>
+            {
+                entity.ToTable("Image");
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("Id")
+                    .ValueGeneratedOnAdd();
+
+                entity.Property(e => e.EntityType)
+                    .HasColumnName("EntityType")
+                    .HasColumnType("varchar(50)")
+                    .IsRequired();
+
+                entity.Property(e => e.EntityId)
+                    .HasColumnName("EntityId")
+                    .HasColumnType("int")
+                    .IsRequired();
+
+                entity.Property(e => e.FileName)
+                    .HasColumnName("FileName")
+                    .HasColumnType("varchar(255)")
+                    .IsRequired();
+
+                entity.Property(e => e.FilePath)
+                    .HasColumnName("FilePath")
+                    .HasColumnType("varchar(500)")
+                    .IsRequired();
+
+                entity.Property(e => e.FileType)
+                    .HasColumnName("FileType")
+                    .HasColumnType("varchar(50)")
+                    .IsRequired();
+
+                entity.Property(e => e.FileSize)
+                    .HasColumnName("FileSize")
+                    .HasColumnType("int");
+
+                entity.Property(e => e.CreatedDate)
+                    .HasColumnName("CreatedDate")
+                    .HasColumnType("datetime2")
+                    .HasDefaultValueSql("GETDATE()")
+                    .IsRequired();
             });
 
             modelBuilder.Entity<Answer>(entity =>

@@ -1,0 +1,23 @@
+@page "{id:int}"
+@model TINWeb.Pages.QuestionGroups.DeleteModel
+@{
+    ViewData["Title"] = "Delete Question Group";
+}
+
+<div class="container mt-4">
+    <h1>Delete Question Group</h1>
+    <h3>Are you sure you want to delete this group?</h3>
+    <hr />
+
+    <dl class="row">
+        <dt class="col-sm-3">Order</dt><dd class="col-sm-9">@Model.Record.OrderNumber</dd>
+        <dt class="col-sm-3">Title</dt><dd class="col-sm-9">@Model.Record.Title</dd>
+        <dt class="col-sm-3">Description</dt><dd class="col-sm-9">@Model.Record.Description</dd>
+    </dl>
+
+    <form method="post">
+        <input type="hidden" asp-for="Record.Id" />
+        <button type="submit" class="btn btn-danger">Delete</button>
+        <a asp-page="./Index" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
