@@ -174,7 +174,39 @@ namespace TINWeb.Pages.QuestionGroups
             var image = await _service.GetImageByIdAsync(imageId.Value);
             if (image == null)
             {
-                return null;
+                return new ImageDetailsViewModel
+                {
+                    Id = imageId.Value,
+                    IsMissing = true,
+                    MissingMessage = "Image record not found in Image table."
+                };
+            }
+
+            if (string.IsNullOrWhiteSpace(image.FilePath))
+            {
+                return new ImageDetailsViewModel
+                {
+                    Id = image.Id,
+                    FileName = image.FileName,
+                    IsMissing = true,
+                    MissingMessage = "Image path is empty."
+                };
+            }
+
+            var normalizedRelativePath = image.FilePath
+                .Replace('/', Path.DirectorySeparatorChar)
+                .TrimStart(Path.DirectorySeparatorChar);
+            var fullPath = Path.Combine(Directory.GetCurrentDirectory(), normalizedRelativePath);
+            if (!System.IO.File.Exists(fullPath))
+            {
+                return new ImageDetailsViewModel
+                {
+                    Id = image.Id,
+                    FileName = image.FileName,
+                    FilePath = image.FilePath,
+                    IsMissing = true,
+                    MissingMessage = "Image file not found on disk."
+                };
             }
 
             return new ImageDetailsViewModel
@@ -192,6 +224,8 @@ namespace TINWeb.Pages.QuestionGroups
             public string FileName { get; set; } = string.Empty;
             public string FilePath { get; set; } = string.Empty;
             public string ThumbnailUrl { get; set; } = string.Empty;
+            public bool IsMissing { get; set; }
+            public string MissingMessage { get; set; } = string.Empty;
         }
     }
 }

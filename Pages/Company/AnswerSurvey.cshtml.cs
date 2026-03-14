@@ -44,6 +44,7 @@ namespace TINWeb.Pages.Company
 
         public bool Saved { get; set; }
         public bool Submitted { get; set; }
+        public HashSet<int> AvailableGroupImageIds { get; set; } = new();
 
         public async Task<IActionResult> OnGetAsync(int id, string token, bool saved = false, bool submitted = false)
         {
@@ -93,6 +94,7 @@ namespace TINWeb.Pages.Company
             var companySurveyId = await EnsureCompanySurveyAsync(company.Id, survey.Id);
 
             Rows = await LoadAnswerRowsAsync(company.Id, companySurveyId, survey.FinancialYear);
+            AvailableGroupImageIds = await GetAvailableGroupImageIdsAsync(Rows);
             return Page();
         }
 
@@ -301,7 +303,33 @@ namespace TINWeb.Pages.Company
             Saved = !Submitted;
 
             Rows = await LoadAnswerRowsAsync(company.Id, companySurveyId, survey.FinancialYear);
+            AvailableGroupImageIds = await GetAvailableGroupImageIdsAsync(Rows);
             return Page();
+        }
+
+        private async Task<HashSet<int>> GetAvailableGroupImageIdsAsync(List<AnswerEditRow> rows)
+        {
+            var candidateIds = rows
+                .SelectMany(r => new[] { r.GroupImageId1, r.GroupImageId2, r.GroupImageId3 })
+                .Where(x => x.HasValue)
+                .Select(x => x!.Value)
+                .Distinct()
+                .ToList();
+
+            if (candidateIds.Count == 0)
+            {
+                return new HashSet<int>();
+            }
+
+            var images = await _context.Image
+                .Where(x => candidateIds.Contains(x.Id) && !string.IsNullOrWhiteSpace(x.FilePath))
+                .Select(x => new { x.Id, x.FilePath })
+                .ToListAsync();
+
+            return images
+                .Where(x => TryResolvePhysicalImagePath(x.FilePath!, out _))
+                .Select(x => x.Id)
+                .ToHashSet();
         }
 
         private async Task<string?> BuildSurveyHeaderImageUrlAsync(int companyId, string token, Models.Survey survey)

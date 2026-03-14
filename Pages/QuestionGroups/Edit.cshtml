@@ -40,7 +40,15 @@
                     <div><strong>Name:</strong> @Model.Image1Details.FileName</div>
                     <div><strong>Path:</strong> @Model.Image1Details.FilePath</div>
                     <div class="mt-2">
-                        <img src="@Model.Image1Details.ThumbnailUrl" alt="Image 1 thumbnail" class="img-thumbnail" style="max-width: 270px; max-height: 180px;" />
+                        @if (Model.Image1Details.IsMissing)
+                        {
+                            <span class="badge text-bg-warning">Missing file</span>
+                            <div class="small text-danger mt-1">@Model.Image1Details.MissingMessage</div>
+                        }
+                        else
+                        {
+                            <img src="@Model.Image1Details.ThumbnailUrl" alt="Image 1 thumbnail" class="img-thumbnail" style="max-width: 270px; max-height: 180px;" />
+                        }
                     </div>
                 </div>
             }
@@ -63,7 +71,15 @@
                     <div><strong>Name:</strong> @Model.Image2Details.FileName</div>
                     <div><strong>Path:</strong> @Model.Image2Details.FilePath</div>
                     <div class="mt-2">
-                        <img src="@Model.Image2Details.ThumbnailUrl" alt="Image 2 thumbnail" class="img-thumbnail" style="max-width: 270px; max-height: 180px;" />
+                        @if (Model.Image2Details.IsMissing)
+                        {
+                            <span class="badge text-bg-warning">Missing file</span>
+                            <div class="small text-danger mt-1">@Model.Image2Details.MissingMessage</div>
+                        }
+                        else
+                        {
+                            <img src="@Model.Image2Details.ThumbnailUrl" alt="Image 2 thumbnail" class="img-thumbnail" style="max-width: 270px; max-height: 180px;" />
+                        }
                     </div>
                 </div>
             }
@@ -86,7 +102,15 @@
                     <div><strong>Name:</strong> @Model.Image3Details.FileName</div>
                     <div><strong>Path:</strong> @Model.Image3Details.FilePath</div>
                     <div class="mt-2">
-                        <img src="@Model.Image3Details.ThumbnailUrl" alt="Image 3 thumbnail" class="img-thumbnail" style="max-width: 270px; max-height: 180px;" />
+                        @if (Model.Image3Details.IsMissing)
+                        {
+                            <span class="badge text-bg-warning">Missing file</span>
+                            <div class="small text-danger mt-1">@Model.Image3Details.MissingMessage</div>
+                        }
+                        else
+                        {
+                            <img src="@Model.Image3Details.ThumbnailUrl" alt="Image 3 thumbnail" class="img-thumbnail" style="max-width: 270px; max-height: 180px;" />
+                        }
                     </div>
                 </div>
             }

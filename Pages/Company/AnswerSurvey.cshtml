@@ -135,6 +135,7 @@
                                 }
                                 .Where(x => x.HasValue)
                                 .Select(x => x!.Value)
+                                .Where(x => Model.AvailableGroupImageIds.Contains(x))
                                 .Distinct()
                                 .ToList();
                             }

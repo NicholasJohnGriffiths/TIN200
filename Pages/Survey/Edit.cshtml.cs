@@ -24,6 +24,8 @@ namespace TINWeb.Pages.Survey
         public List<SelectListItem> HeaderImageOptions { get; set; } = new();
         public string? HeaderImageThumbnailUrl { get; set; }
         public string? HeaderImageFileName { get; set; }
+        public bool HeaderImageMissing { get; set; }
+        public string? HeaderImageMissingMessage { get; set; }
 
         public EditModel(SurveyService service, ApplicationDbContext context, IWebHostEnvironment environment)
         {
@@ -166,6 +168,8 @@ namespace TINWeb.Pages.Survey
         {
             HeaderImageThumbnailUrl = null;
             HeaderImageFileName = null;
+            HeaderImageMissing = false;
+            HeaderImageMissingMessage = null;
 
             if (!Record.HeaderImageId.HasValue)
             {
@@ -175,6 +179,28 @@ namespace TINWeb.Pages.Survey
             var image = await _context.Image.FirstOrDefaultAsync(x => x.Id == Record.HeaderImageId.Value);
             if (image == null)
             {
+                HeaderImageMissing = true;
+                HeaderImageMissingMessage = "Selected header image record is missing from Image table.";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(image.FilePath))
+            {
+                HeaderImageMissing = true;
+                HeaderImageFileName = image.FileName;
+                HeaderImageMissingMessage = "Selected header image has no file path.";
+                return;
+            }
+
+            var normalizedRelativePath = image.FilePath
+                .Replace('/', Path.DirectorySeparatorChar)
+                .TrimStart(Path.DirectorySeparatorChar);
+            var fullPath = Path.Combine(Directory.GetCurrentDirectory(), normalizedRelativePath);
+            if (!System.IO.File.Exists(fullPath))
+            {
+                HeaderImageMissing = true;
+                HeaderImageFileName = image.FileName;
+                HeaderImageMissingMessage = "Selected header image file is missing on disk.";
                 return;
             }
 
