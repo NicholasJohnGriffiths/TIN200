@@ -23,29 +23,28 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-page="/Index">Home</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Company/Index">Companies</a>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-dark" href="#" id="companiesMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">Companies</a>
+                            <ul class="dropdown-menu" aria-labelledby="companiesMenu">
+                                <li><a class="dropdown-item" asp-area="" asp-page="/Company/Index">Companies</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-page="/Company/Import">Import</a></li>
+                            </ul>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Company/Import">Import</a>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-dark" href="#" id="surveysMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">Surveys</a>
+                            <ul class="dropdown-menu" aria-labelledby="surveysMenu">
+                                <li><a class="dropdown-item" asp-area="" asp-page="/Survey/Index">Year Survey</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-page="/CompanySurvey/Index">Companies Survey Summary</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-page="/Company/SendSurvey">Send Survey</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-page="/Answers/Index">Survey Answers</a></li>
+                            </ul>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Company/SendSurvey">Send Survey</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Survey/Index">Surveys</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/CompanySurvey/Index">Company Surveys</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Answers/Index">Answers</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/Questions/Index">Questions</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-page="/QuestionGroups/Index">Question Groups</a>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-dark" href="#" id="questionsMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">Questions</a>
+                            <ul class="dropdown-menu" aria-labelledby="questionsMenu">
+                                <li><a class="dropdown-item" asp-area="" asp-page="/QuestionGroups/Index">Question Groups</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-page="/Questions/Index">Questions</a></li>
+                            </ul>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-page="/Privacy">Privacy</a>
