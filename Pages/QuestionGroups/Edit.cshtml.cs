@@ -11,6 +11,7 @@ namespace TINWeb.Pages.QuestionGroups
     {
         private readonly QuestionGroupService _service;
         private readonly QuestionService _questionService;
+        private readonly IImageStorageService _imageStorageService;
 
         [BindProperty]
         public QuestionGroup Record { get; set; } = new();
@@ -43,10 +44,11 @@ namespace TINWeb.Pages.QuestionGroups
         public List<SelectListItem> GroupQuestions { get; set; } = new();
         public List<SelectListItem> AvailableQuestions { get; set; } = new();
 
-        public EditModel(QuestionGroupService service, QuestionService questionService)
+        public EditModel(QuestionGroupService service, QuestionService questionService, IImageStorageService imageStorageService)
         {
             _service = service;
             _questionService = questionService;
+            _imageStorageService = imageStorageService;
         }
 
         public async Task<IActionResult> OnGetAsync(int id)
@@ -76,24 +78,13 @@ namespace TINWeb.Pages.QuestionGroups
                 return NotFound();
             }
 
-            var normalizedRelativePath = image.FilePath
-                .Replace('/', Path.DirectorySeparatorChar)
-                .TrimStart(Path.DirectorySeparatorChar);
-
-            var fullPath = Path.Combine(Directory.GetCurrentDirectory(), normalizedRelativePath);
-            if (!System.IO.File.Exists(fullPath))
+            var stream = await _imageStorageService.OpenReadAsync(image.FilePath);
+            if (stream == null)
             {
                 return NotFound();
             }
 
-            var contentTypeProvider = new FileExtensionContentTypeProvider();
-            var extension = Path.GetExtension(fullPath);
-            if (!contentTypeProvider.TryGetContentType($"file{extension}", out var contentType))
-            {
-                contentType = "application/octet-stream";
-            }
-
-            return PhysicalFile(fullPath, contentType);
+            return File(stream, GetContentTypeFromPath(image.FilePath));
         }
 
         public async Task<IActionResult> OnPostAsync()
@@ -193,11 +184,7 @@ namespace TINWeb.Pages.QuestionGroups
                 };
             }
 
-            var normalizedRelativePath = image.FilePath
-                .Replace('/', Path.DirectorySeparatorChar)
-                .TrimStart(Path.DirectorySeparatorChar);
-            var fullPath = Path.Combine(Directory.GetCurrentDirectory(), normalizedRelativePath);
-            if (!System.IO.File.Exists(fullPath))
+            if (!await _imageStorageService.ExistsAsync(image.FilePath))
             {
                 return new ImageDetailsViewModel
                 {
@@ -216,6 +203,18 @@ namespace TINWeb.Pages.QuestionGroups
                 FilePath = image.FilePath,
                 ThumbnailUrl = Url.Page("./Edit", "Image", new { id = groupId, imageId = image.Id }) ?? string.Empty
             };
+        }
+
+        private static string GetContentTypeFromPath(string filePath)
+        {
+            var contentTypeProvider = new FileExtensionContentTypeProvider();
+            var extension = Path.GetExtension(filePath);
+            if (!contentTypeProvider.TryGetContentType($"file{extension}", out var contentType))
+            {
+                return "application/octet-stream";
+            }
+
+            return contentType;
         }
 
         public class ImageDetailsViewModel

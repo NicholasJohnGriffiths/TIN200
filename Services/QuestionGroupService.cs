@@ -8,15 +8,15 @@ namespace TINWeb.Services
     public class QuestionGroupService
     {
         private readonly ApplicationDbContext _context;
-        private readonly IWebHostEnvironment _environment;
+        private readonly IImageStorageService _imageStorageService;
         private const string EntityTypeName = "questiongroup";
         private static readonly SemaphoreSlim SchemaLock = new(1, 1);
         private static bool _schemaEnsured;
 
-        public QuestionGroupService(ApplicationDbContext context, IWebHostEnvironment environment)
+        public QuestionGroupService(ApplicationDbContext context, IImageStorageService imageStorageService)
         {
             _context = context;
-            _environment = environment;
+            _imageStorageService = imageStorageService;
         }
 
         public async Task<List<QuestionGroup>> GetAllAsync()
@@ -236,22 +236,14 @@ END;
                 extension = ".bin";
             }
 
-            var fileName = $"{EntityTypeName}_{entityId}_{Guid.NewGuid():N}{extension}";
-            var imagesFolderPath = Path.Combine(_environment.ContentRootPath, "Images");
-            Directory.CreateDirectory(imagesFolderPath);
-
-            var fullFilePath = Path.Combine(imagesFolderPath, fileName);
-            await using (var stream = File.Create(fullFilePath))
-            {
-                await file.CopyToAsync(stream);
-            }
+            var storagePath = await _imageStorageService.SaveImageAsync(file, EntityTypeName, entityId);
 
             var image = new Image
             {
                 EntityType = EntityTypeName,
                 EntityId = entityId,
                 FileName = file.FileName,
-                FilePath = Path.Combine("Images", fileName).Replace("\\", "/"),
+                FilePath = storagePath,
                 FileType = extension.TrimStart('.').ToLowerInvariant(),
                 FileSize = file.Length > int.MaxValue ? int.MaxValue : (int)file.Length,
                 CreatedDate = DateTime.UtcNow
@@ -278,12 +270,7 @@ END;
 
             if (!string.IsNullOrWhiteSpace(image.FilePath))
             {
-                var normalizedRelativePath = image.FilePath.Replace('/', Path.DirectorySeparatorChar).TrimStart(Path.DirectorySeparatorChar);
-                var physicalPath = Path.Combine(_environment.ContentRootPath, normalizedRelativePath);
-                if (File.Exists(physicalPath))
-                {
-                    File.Delete(physicalPath);
-                }
+                await _imageStorageService.DeleteIfExistsAsync(image.FilePath);
             }
 
             _context.Image.Remove(image);

@@ -15,11 +15,13 @@ namespace TINWeb.Pages.Company
         private const string AccessCookiePrefix = "survey_access_";
         private readonly ApplicationDbContext _context;
         private readonly ISurveyLinkTokenService _surveyLinkTokenService;
+        private readonly IImageStorageService _imageStorageService;
 
-        public AnswerSurveyModel(ApplicationDbContext context, ISurveyLinkTokenService surveyLinkTokenService)
+        public AnswerSurveyModel(ApplicationDbContext context, ISurveyLinkTokenService surveyLinkTokenService, IImageStorageService imageStorageService)
         {
             _context = context;
             _surveyLinkTokenService = surveyLinkTokenService;
+            _imageStorageService = imageStorageService;
         }
 
         public Tin200 Company { get; set; } = new();
@@ -127,24 +129,13 @@ namespace TINWeb.Pages.Company
                 return NotFound();
             }
 
-            var normalizedRelativePath = image.FilePath
-                .Replace('/', Path.DirectorySeparatorChar)
-                .TrimStart(Path.DirectorySeparatorChar);
-
-            var fullPath = Path.Combine(Directory.GetCurrentDirectory(), normalizedRelativePath);
-            if (!System.IO.File.Exists(fullPath))
+            var stream = await _imageStorageService.OpenReadAsync(image.FilePath);
+            if (stream == null)
             {
                 return NotFound();
             }
 
-            var contentTypeProvider = new FileExtensionContentTypeProvider();
-            var extension = Path.GetExtension(fullPath);
-            if (!contentTypeProvider.TryGetContentType($"file{extension}", out var contentType))
-            {
-                contentType = "application/octet-stream";
-            }
-
-            return PhysicalFile(fullPath, contentType);
+            return File(stream, GetContentTypeFromPath(image.FilePath));
         }
 
         public async Task<IActionResult> OnGetSurveyHeaderImageAsync(int id, string? token)
@@ -171,13 +162,14 @@ namespace TINWeb.Pages.Company
                 return NotFound();
             }
 
-            if (!TryResolvePhysicalImagePath(image.FilePath, out var fullPath))
+            var stream = await _imageStorageService.OpenReadAsync(image.FilePath);
+            if (stream == null)
             {
                 return NotFound();
             }
 
-            var contentType = GetContentTypeFromPath(fullPath);
-            return PhysicalFile(fullPath, contentType);
+            var contentType = GetContentTypeFromPath(image.FilePath);
+            return File(stream, contentType);
         }
 
         public async Task<IActionResult> OnPostAsync(int id, string? token)
@@ -326,10 +318,16 @@ namespace TINWeb.Pages.Company
                 .Select(x => new { x.Id, x.FilePath })
                 .ToListAsync();
 
-            return images
-                .Where(x => TryResolvePhysicalImagePath(x.FilePath!, out _))
-                .Select(x => x.Id)
-                .ToHashSet();
+            var availableIds = new HashSet<int>();
+            foreach (var image in images)
+            {
+                if (image.FilePath != null && await _imageStorageService.ExistsAsync(image.FilePath))
+                {
+                    availableIds.Add(image.Id);
+                }
+            }
+
+            return availableIds;
         }
 
         private async Task<string?> BuildSurveyHeaderImageUrlAsync(int companyId, string token, Models.Survey survey)
@@ -345,7 +343,7 @@ namespace TINWeb.Pages.Company
                 return null;
             }
 
-            if (!TryResolvePhysicalImagePath(image.FilePath, out _))
+            if (!await _imageStorageService.ExistsAsync(image.FilePath))
             {
                 return null;
             }
@@ -353,20 +351,10 @@ namespace TINWeb.Pages.Company
             return Url.Page("./AnswerSurvey", "SurveyHeaderImage", new { id = companyId, token });
         }
 
-        private static bool TryResolvePhysicalImagePath(string relativePath, out string fullPath)
-        {
-            var normalizedRelativePath = relativePath
-                .Replace('/', Path.DirectorySeparatorChar)
-                .TrimStart(Path.DirectorySeparatorChar);
-
-            fullPath = Path.Combine(Directory.GetCurrentDirectory(), normalizedRelativePath);
-            return System.IO.File.Exists(fullPath);
-        }
-
-        private static string GetContentTypeFromPath(string fullPath)
+        private static string GetContentTypeFromPath(string filePath)
         {
             var contentTypeProvider = new FileExtensionContentTypeProvider();
-            var extension = Path.GetExtension(fullPath);
+            var extension = Path.GetExtension(filePath);
             if (!contentTypeProvider.TryGetContentType($"file{extension}", out var contentType))
             {
                 return "application/octet-stream";

@@ -13,7 +13,7 @@ namespace TINWeb.Pages.Survey
     {
         private readonly SurveyService _service;
         private readonly ApplicationDbContext _context;
-        private readonly IWebHostEnvironment _environment;
+        private readonly IImageStorageService _imageStorageService;
 
         [BindProperty]
         public Models.Survey Record { get; set; } = new();
@@ -27,11 +27,11 @@ namespace TINWeb.Pages.Survey
         public bool HeaderImageMissing { get; set; }
         public string? HeaderImageMissingMessage { get; set; }
 
-        public EditModel(SurveyService service, ApplicationDbContext context, IWebHostEnvironment environment)
+        public EditModel(SurveyService service, ApplicationDbContext context, IImageStorageService imageStorageService)
         {
             _service = service;
             _context = context;
-            _environment = environment;
+            _imageStorageService = imageStorageService;
         }
 
         public async Task<IActionResult> OnGetAsync(int? id)
@@ -67,24 +67,13 @@ namespace TINWeb.Pages.Survey
                 return NotFound();
             }
 
-            var normalizedRelativePath = image.FilePath
-                .Replace('/', Path.DirectorySeparatorChar)
-                .TrimStart(Path.DirectorySeparatorChar);
-
-            var fullPath = Path.Combine(Directory.GetCurrentDirectory(), normalizedRelativePath);
-            if (!System.IO.File.Exists(fullPath))
+            var stream = await _imageStorageService.OpenReadAsync(image.FilePath);
+            if (stream == null)
             {
                 return NotFound();
             }
 
-            var contentTypeProvider = new FileExtensionContentTypeProvider();
-            var extension = Path.GetExtension(fullPath);
-            if (!contentTypeProvider.TryGetContentType($"file{extension}", out var contentType))
-            {
-                contentType = "application/octet-stream";
-            }
-
-            return PhysicalFile(fullPath, contentType);
+            return File(stream, GetContentTypeFromPath(image.FilePath));
         }
 
         public async Task<IActionResult> OnPostAsync()
@@ -118,22 +107,14 @@ namespace TINWeb.Pages.Survey
                 extension = ".bin";
             }
 
-            var generatedFileName = $"survey_{surveyId}_{Guid.NewGuid():N}{extension}";
-            var imagesFolderPath = Path.Combine(_environment.ContentRootPath, "Images");
-            Directory.CreateDirectory(imagesFolderPath);
-
-            var physicalFilePath = Path.Combine(imagesFolderPath, generatedFileName);
-            await using (var stream = System.IO.File.Create(physicalFilePath))
-            {
-                await file.CopyToAsync(stream);
-            }
+            var storagePath = await _imageStorageService.SaveImageAsync(file, "survey", surveyId);
 
             var image = new Image
             {
                 EntityType = "survey",
                 EntityId = surveyId,
                 FileName = file.FileName,
-                FilePath = Path.Combine("Images", generatedFileName).Replace("\\", "/"),
+                FilePath = storagePath,
                 FileType = extension.TrimStart('.').ToLowerInvariant(),
                 FileSize = file.Length > int.MaxValue ? int.MaxValue : (int)file.Length,
                 CreatedDate = DateTime.UtcNow
@@ -192,20 +173,28 @@ namespace TINWeb.Pages.Survey
                 return;
             }
 
-            var normalizedRelativePath = image.FilePath
-                .Replace('/', Path.DirectorySeparatorChar)
-                .TrimStart(Path.DirectorySeparatorChar);
-            var fullPath = Path.Combine(Directory.GetCurrentDirectory(), normalizedRelativePath);
-            if (!System.IO.File.Exists(fullPath))
+            if (!await _imageStorageService.ExistsAsync(image.FilePath))
             {
                 HeaderImageMissing = true;
                 HeaderImageFileName = image.FileName;
-                HeaderImageMissingMessage = "Selected header image file is missing on disk.";
+                HeaderImageMissingMessage = "Selected header image file is missing from storage.";
                 return;
             }
 
             HeaderImageFileName = image.FileName;
             HeaderImageThumbnailUrl = Url.Page("./Edit", "HeaderImage", new { id = Record.Id, imageId = image.Id });
+        }
+
+        private static string GetContentTypeFromPath(string filePath)
+        {
+            var contentTypeProvider = new FileExtensionContentTypeProvider();
+            var extension = Path.GetExtension(filePath);
+            if (!contentTypeProvider.TryGetContentType($"file{extension}", out var contentType))
+            {
+                return "application/octet-stream";
+            }
+
+            return contentType;
         }
     }
 }
