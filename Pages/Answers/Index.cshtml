@@ -29,10 +29,16 @@
         </div>
         <div class="col-md-4 text-end">
             <div class="d-inline-flex align-items-center gap-2 flex-wrap justify-content-end">
-                <form method="post" asp-page-handler="PreviewImport" enctype="multipart/form-data" class="d-inline-flex align-items-center gap-2">
+                <form method="post" asp-page-handler="PreviewImport" enctype="multipart/form-data" id="previewImportForm" class="d-inline-flex align-items-center gap-2">
                     <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
                     <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="max-width: 220px;" />
                     <button type="submit" class="btn btn-outline-primary btn-sm">Preview Import</button>
+                </form>
+
+                <form method="post" asp-page-handler="PreviewGlobalImport" enctype="multipart/form-data" id="previewGlobalImportForm" class="d-inline-flex align-items-center gap-2">
+                    <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
+                    <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="max-width: 220px;" />
+                    <button type="submit" class="btn btn-outline-dark btn-sm">Import Global File</button>
                 </form>
 
                 <form method="post" asp-page-handler="CreateMissingAnswers" id="createMissingAnswersForm" class="d-inline">
@@ -72,7 +78,25 @@
                 <p class="mb-1"><strong>Records to update:</strong> @Model.ImportPreview.UpdatedCount</p>
                 <p class="mb-1"><strong>Matched companies:</strong> @Model.ImportPreview.MatchedExternalIds.Count</p>
                 <p class="mb-1"><strong>Non-matched companies:</strong> @Model.ImportPreview.UnmatchedExternalIds.Count</p>
+                <p class="mb-1"><strong>Identifier match:</strong> @Model.ImportPreview.IdentifierFieldMatch</p>
                 <p class="mb-3 text-warning"><strong>Company records to create on apply:</strong> @Model.ImportPreview.UnmatchedExternalIds.Count</p>
+
+                @if (Model.ImportPreview.AvailableHeaders.Any())
+                {
+                    <p class="mb-1"><strong>Detected headers (row 2):</strong></p>
+                    <div class="small text-muted mb-3">@string.Join(", ", Model.ImportPreview.AvailableHeaders)</div>
+                }
+
+                @if (Model.ImportPreview.MatchedFields.Any())
+                {
+                    <p class="mb-1"><strong>Matched question fields:</strong></p>
+                    <ul class="small text-muted mb-3">
+                        @foreach (var matchedField in Model.ImportPreview.MatchedFields.Take(30))
+                        {
+                            <li>@matchedField</li>
+                        }
+                    </ul>
+                }
 
                 @if (Model.ImportPreview.MatchedExternalIds.Any())
                 {
@@ -97,9 +121,70 @@
                     </ul>
                 }
 
-                <form method="post" asp-page-handler="ApplyImport" class="d-inline">
+                <form method="post" asp-page-handler="ApplyImport" id="applyImportForm" class="d-inline">
                     <input type="hidden" name="previewToken" value="@Model.PendingImportToken" />
                     <button type="submit" class="btn btn-primary">Apply Import</button>
+                </form>
+            </div>
+        </div>
+    }
+
+    @if (Model.GlobalImportPreview != null)
+    {
+        <div class="card mb-3 border-dark">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Global Import Summary (FY @Model.GlobalImportPreview.FinancialYear)</h5>
+                <p class="mb-1"><strong>Records to add:</strong> @Model.GlobalImportPreview.InsertedCount</p>
+                <p class="mb-1"><strong>Records to update:</strong> @Model.GlobalImportPreview.UpdatedCount</p>
+                <p class="mb-1"><strong>Matched rows:</strong> @Model.GlobalImportPreview.MatchedExternalIds.Count</p>
+                <p class="mb-1"><strong>Unmatched rows:</strong> @Model.GlobalImportPreview.UnmatchedExternalIds.Count</p>
+                <p class="mb-1"><strong>Skipped (already submitted):</strong> @Model.GlobalImportPreview.SkippedSubmittedRowKeys.Count</p>
+                <p class="mb-1"><strong>Identifier match:</strong> @Model.GlobalImportPreview.IdentifierFieldMatch</p>
+                <p class="mb-3 text-muted">Matching used: Excel <strong>ID</strong> to Company <strong>ExternalId</strong>, then fallback Excel <strong>Name</strong> to Company <strong>CompanyName</strong>. Question columns matched by <strong>ImportColumnNameAlt</strong>.</p>
+
+                @if (Model.GlobalImportPreview.AvailableHeaders.Any())
+                {
+                    <p class="mb-1"><strong>Detected headers (row 2):</strong></p>
+                    <div class="small text-muted mb-3">@string.Join(", ", Model.GlobalImportPreview.AvailableHeaders)</div>
+                }
+
+                @if (Model.GlobalImportPreview.MatchedFields.Any())
+                {
+                    <p class="mb-1"><strong>Matched question fields:</strong></p>
+                    <ul class="small text-muted mb-3">
+                        @foreach (var matchedField in Model.GlobalImportPreview.MatchedFields.Take(30))
+                        {
+                            <li>@matchedField</li>
+                        }
+                    </ul>
+                }
+
+                @if (Model.GlobalImportPreview.UnmatchedExternalIds.Any())
+                {
+                    <p class="mb-1 text-warning"><strong>Unmatched row keys (ID|Name):</strong></p>
+                    <div class="small text-danger mb-3">@string.Join(", ", Model.GlobalImportPreview.UnmatchedExternalIds.Take(50))</div>
+                }
+
+                @if (Model.GlobalImportPreview.SkippedSubmittedRowKeys.Any())
+                {
+                    <p class="mb-1 text-warning"><strong>Skipped row keys (already submitted for selected year):</strong></p>
+                    <div class="small text-warning mb-3">@string.Join(", ", Model.GlobalImportPreview.SkippedSubmittedRowKeys.Take(50))</div>
+                }
+
+                @if (Model.GlobalImportPreview.Errors.Any())
+                {
+                    <p class="mb-1 text-danger"><strong>Preview errors:</strong></p>
+                    <ul class="small text-danger mb-3">
+                        @foreach (var error in Model.GlobalImportPreview.Errors.Take(10))
+                        {
+                            <li>@error</li>
+                        }
+                    </ul>
+                }
+
+                <form method="post" asp-page-handler="ApplyGlobalImport" id="applyGlobalImportForm" class="d-inline">
+                    <input type="hidden" name="previewToken" value="@Model.PendingGlobalImportToken" />
+                    <button type="submit" class="btn btn-dark">Apply Global Import</button>
                 </form>
             </div>
         </div>
@@ -200,8 +285,10 @@
         const progressBar = document.getElementById('importProgressBar');
         const progressPercent = document.getElementById('importProgressPercent');
         const progressLabel = document.getElementById('importProgressLabel');
-        const previewImportForm = document.querySelector('form[asp-page-handler="PreviewImport"]') || document.querySelector('form[action*="handler=PreviewImport"]');
-        const applyImportForm = document.querySelector('form[action*="handler=ApplyImport"]');
+        const previewImportForm = document.getElementById('previewImportForm');
+        const previewGlobalImportForm = document.getElementById('previewGlobalImportForm');
+        const applyImportForm = document.getElementById('applyImportForm');
+        const applyGlobalImportForm = document.getElementById('applyGlobalImportForm');
         const createMissingAnswersForm = document.getElementById('createMissingAnswersForm');
         const answersExportForm = document.getElementById('answersExportForm');
 
@@ -246,7 +333,9 @@
         }
 
         wire(previewImportForm, 'Previewing import file...');
+        wire(previewGlobalImportForm, 'Previewing global import file...');
         wire(applyImportForm, 'Applying import...');
+        wire(applyGlobalImportForm, 'Applying global import...');
         wire(createMissingAnswersForm, 'Creating missing answers...');
         wire(answersExportForm, 'Exporting answers...');
     })();

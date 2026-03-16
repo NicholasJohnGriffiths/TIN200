@@ -14,6 +14,9 @@ namespace TINWeb.Pages.CompanySurvey
         [BindProperty]
         public Models.CompanySurvey Record { get; set; } = new();
 
+        [BindProperty(SupportsGet = true)]
+        public int? FinancialYear { get; set; }
+
         public string? CompanyName { get; set; }
 
         public EditModel(CompanySurveyService service, ApplicationDbContext context)
@@ -22,8 +25,10 @@ namespace TINWeb.Pages.CompanySurvey
             _context = context;
         }
 
-        public async Task<IActionResult> OnGetAsync(int? id)
+        public async Task<IActionResult> OnGetAsync(int? id, int? financialYear)
         {
+            FinancialYear = financialYear;
+
             if (id == null)
             {
                 return NotFound();
@@ -36,6 +41,7 @@ namespace TINWeb.Pages.CompanySurvey
             }
 
             Record = record;
+            Record.Estimate ??= false;
             CompanyName = await _context.Tin200
                 .Where(c => c.Id == record.CompanyId)
                 .Select(c => c.CompanyName)
@@ -55,8 +61,9 @@ namespace TINWeb.Pages.CompanySurvey
                 return NotFound();
             }
 
+            Record.Estimate ??= false;
             await _service.UpdateAsync(Record);
-            return RedirectToPage("./Index");
+            return RedirectToPage("./Index", new { financialYear = FinancialYear });
         }
     }
 }

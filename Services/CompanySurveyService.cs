@@ -41,6 +41,7 @@ namespace TINWeb.Services
                     Saved = companySurvey.Saved,
                     Submitted = companySurvey.Submitted,
                     Requested = companySurvey.Requested,
+                    Estimate = companySurvey.Estimate ?? false,
                     SavedDate = companySurvey.SavedDate,
                     SubmittedDate = companySurvey.SubmittedDate,
                     RequestedDate = companySurvey.RequestedDate,
@@ -152,6 +153,7 @@ namespace TINWeb.Services
             public bool Saved { get; set; }
             public bool Submitted { get; set; }
             public bool Requested { get; set; }
+            public bool Estimate { get; set; }
             public DateTime? SavedDate { get; set; }
             public DateTime? SubmittedDate { get; set; }
             public DateTime? RequestedDate { get; set; }

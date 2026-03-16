@@ -20,7 +20,9 @@ namespace TINWeb.Pages.Answers
         public int QuestionCount { get; set; }
         public int AnsweredCount { get; set; }
         public AnswerService.AnswerImportPreviewResult? ImportPreview { get; set; }
+        public AnswerService.AnswerImportPreviewResult? GlobalImportPreview { get; set; }
         public string? PendingImportToken { get; set; }
+        public string? PendingGlobalImportToken { get; set; }
 
         [TempData]
         public string? StatusMessage { get; set; }
@@ -281,6 +283,7 @@ namespace TINWeb.Pages.Answers
             {
                 Token = token,
                 FinancialYear = effectiveYear.Value,
+                Kind = "Standard",
                 TempFilePath = tempFilePath,
                 CreatedUtc = DateTime.UtcNow
             };
@@ -291,11 +294,66 @@ namespace TINWeb.Pages.Answers
             return Page();
         }
 
+        public async Task<IActionResult> OnPostPreviewGlobalImportAsync(IFormFile? importFile, int? financialYear)
+        {
+            if (importFile == null || importFile.Length == 0)
+            {
+                ErrorMessage = "Global import failed: please select an Excel file.";
+                return RedirectToPage(new { financialYear });
+            }
+
+            var fileName = importFile.FileName ?? string.Empty;
+            if (!fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                ErrorMessage = "Global import failed: only .xlsx Excel files are supported.";
+                return RedirectToPage(new { financialYear });
+            }
+
+            var effectiveYear = financialYear ?? await _answerService.GetCurrentSurveyFinancialYearAsync();
+            if (!effectiveYear.HasValue)
+            {
+                ErrorMessage = "Global import failed: no financial year is selected and no current survey year is configured.";
+                return RedirectToPage();
+            }
+
+            CleanupExpiredPendingImports();
+
+            var token = Guid.NewGuid().ToString("N");
+            var tempDir = Path.Combine(Path.GetTempPath(), "tinweb-answer-import");
+            Directory.CreateDirectory(tempDir);
+            var tempFilePath = Path.Combine(tempDir, $"{token}.xlsx");
+
+            await using (var tempFileStream = System.IO.File.Create(tempFilePath))
+            {
+                await importFile.CopyToAsync(tempFileStream);
+            }
+
+            AnswerService.AnswerImportPreviewResult preview;
+            await using (var readStream = System.IO.File.OpenRead(tempFilePath))
+            {
+                preview = await _answerService.PreviewGlobalAnswersImportFromExcelAsync(readStream, effectiveYear.Value);
+            }
+
+            PendingImports[token] = new PendingAnswerImport
+            {
+                Token = token,
+                FinancialYear = effectiveYear.Value,
+                Kind = "Global",
+                TempFilePath = tempFilePath,
+                CreatedUtc = DateTime.UtcNow
+            };
+
+            await LoadPageDataAsync(effectiveYear.Value, null);
+            GlobalImportPreview = preview;
+            PendingGlobalImportToken = token;
+            return Page();
+        }
+
         public async Task<IActionResult> OnPostApplyImportAsync(string? previewToken)
         {
             CleanupExpiredPendingImports();
 
-            if (string.IsNullOrWhiteSpace(previewToken) || !PendingImports.TryGetValue(previewToken, out var pendingImport))
+            if (string.IsNullOrWhiteSpace(previewToken) || !PendingImports.TryGetValue(previewToken, out var pendingImport) || pendingImport.Kind != "Standard")
             {
                 ErrorMessage = "Apply import failed: preview session not found or expired. Please preview the file again.";
                 return RedirectToPage();
@@ -312,6 +370,41 @@ namespace TINWeb.Pages.Answers
                 else
                 {
                     StatusMessage = $"Import completed. Inserted: {result.InsertedCount}, Updated: {result.UpdatedCount}.";
+                }
+            }
+            finally
+            {
+                PendingImports.TryRemove(previewToken, out _);
+                if (System.IO.File.Exists(pendingImport.TempFilePath))
+                {
+                    System.IO.File.Delete(pendingImport.TempFilePath);
+                }
+            }
+
+            return RedirectToPage(new { financialYear = pendingImport.FinancialYear });
+        }
+
+        public async Task<IActionResult> OnPostApplyGlobalImportAsync(string? previewToken)
+        {
+            CleanupExpiredPendingImports();
+
+            if (string.IsNullOrWhiteSpace(previewToken) || !PendingImports.TryGetValue(previewToken, out var pendingImport) || pendingImport.Kind != "Global")
+            {
+                ErrorMessage = "Apply global import failed: preview session not found or expired. Please preview the file again.";
+                return RedirectToPage();
+            }
+
+            try
+            {
+                await using var stream = System.IO.File.OpenRead(pendingImport.TempFilePath);
+                var result = await _answerService.ImportGlobalAnswersFromExcelAsync(stream, pendingImport.FinancialYear);
+                if (result.Errors.Any())
+                {
+                    StatusMessage = $"Global import completed with warnings. Inserted: {result.InsertedCount}, Updated: {result.UpdatedCount}. Warnings: {string.Join(" ", result.Errors.Take(5))}";
+                }
+                else
+                {
+                    StatusMessage = $"Global import completed. Inserted: {result.InsertedCount}, Updated: {result.UpdatedCount}.";
                 }
             }
             finally
@@ -357,6 +450,7 @@ namespace TINWeb.Pages.Answers
         {
             public string Token { get; set; } = string.Empty;
             public int FinancialYear { get; set; }
+            public string Kind { get; set; } = "Standard";
             public string TempFilePath { get; set; } = string.Empty;
             public DateTime CreatedUtc { get; set; }
         }

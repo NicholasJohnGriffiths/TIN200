@@ -11,6 +11,7 @@
     <form method="post">
         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
         <input type="hidden" asp-for="Record.Id" />
+        <input type="hidden" asp-for="FinancialYear" />
 
         <div class="form-group mb-3">
             <label class="form-label">Company Name</label>
@@ -43,8 +44,19 @@
             <label asp-for="Record.Requested" class="form-check-label"></label>
         </div>
 
+        <div class="form-check mb-3">
+            <input type="hidden" name="Record.Estimate" value="false" />
+            <input type="checkbox"
+                   class="form-check-input"
+                   id="Record_Estimate"
+                   name="Record.Estimate"
+                   value="true"
+                   checked="@(Model.Record.Estimate == true)" />
+            <label class="form-check-label" for="Record_Estimate">Estimate</label>
+        </div>
+
         <button type="submit" class="btn btn-primary">Save</button>
-        <a asp-page="./Index" class="btn btn-secondary">Back to List</a>
+        <a asp-page="./Index" asp-route-financialYear="@Model.FinancialYear" class="btn btn-secondary">Back to List</a>
     </form>
 </div>
 

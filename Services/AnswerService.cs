@@ -324,6 +324,7 @@ namespace TINWeb.Services
                     Saved = false,
                     Submitted = false,
                     Requested = false,
+                    Estimate = false,
                     SavedDate = null,
                     SubmittedDate = null,
                     RequestedDate = null
@@ -437,7 +438,7 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
 
         public async Task<AnswerImportPreviewResult> PreviewAnswersImportFromExcelAsync(Stream excelStream, int financialYear)
         {
-            var plan = await BuildImportPlanAsync(excelStream, financialYear);
+            var plan = await BuildImportPlanAsync(excelStream, financialYear, ImportPlanMode.Standard);
             return new AnswerImportPreviewResult
             {
                 FinancialYear = financialYear,
@@ -445,7 +446,29 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
                 UpdatedCount = plan.UpdatedCount,
                 MatchedExternalIds = plan.MatchedExternalIds.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
                 UnmatchedExternalIds = plan.UnmatchedExternalIds.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
-                Errors = plan.Errors.ToList()
+                SkippedSubmittedRowKeys = plan.SkippedSubmittedRowKeys.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
+                Errors = plan.Errors.ToList(),
+                AvailableHeaders = plan.AvailableHeaders.ToList(),
+                MatchedFields = plan.MatchedFields.ToList(),
+                IdentifierFieldMatch = plan.IdentifierFieldMatch
+            };
+        }
+
+        public async Task<AnswerImportPreviewResult> PreviewGlobalAnswersImportFromExcelAsync(Stream excelStream, int financialYear)
+        {
+            var plan = await BuildImportPlanAsync(excelStream, financialYear, ImportPlanMode.GlobalByIdThenName);
+            return new AnswerImportPreviewResult
+            {
+                FinancialYear = financialYear,
+                InsertedCount = plan.InsertedCount,
+                UpdatedCount = plan.UpdatedCount,
+                MatchedExternalIds = plan.MatchedExternalIds.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
+                UnmatchedExternalIds = plan.UnmatchedExternalIds.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
+                SkippedSubmittedRowKeys = plan.SkippedSubmittedRowKeys.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
+                Errors = plan.Errors.ToList(),
+                AvailableHeaders = plan.AvailableHeaders.ToList(),
+                MatchedFields = plan.MatchedFields.ToList(),
+                IdentifierFieldMatch = plan.IdentifierFieldMatch
             };
         }
 
@@ -456,13 +479,13 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             await excelStream.CopyToAsync(bufferedStream);
             bufferedStream.Position = 0;
 
-            var plan = await BuildImportPlanAsync(bufferedStream, financialYear);
+            var plan = await BuildImportPlanAsync(bufferedStream, financialYear, ImportPlanMode.Standard);
 
             if (plan.UnmatchedExternalIds.Any())
             {
                 await EnsureCompanyAndCompanySurveyRecordsAsync(plan.UnmatchedExternalIds, financialYear);
                 bufferedStream.Position = 0;
-                plan = await BuildImportPlanAsync(bufferedStream, financialYear);
+                plan = await BuildImportPlanAsync(bufferedStream, financialYear, ImportPlanMode.Standard);
             }
 
             foreach (var error in plan.Errors)
@@ -504,6 +527,97 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
                         AnswerNumber = operation.Value.AnswerNumber,
                         AnswerCurrency = operation.Value.AnswerCurrency
                     });
+                }
+            }
+
+            var affectedCompanySurveyIds = plan.Operations
+                .Select(o => o.CompanySurveyId)
+                .Distinct()
+                .ToList();
+
+            if (affectedCompanySurveyIds.Any())
+            {
+                var affectedCompanySurveys = await _context.CompanySurvey
+                    .Where(cs => affectedCompanySurveyIds.Contains(cs.Id))
+                    .ToListAsync();
+
+                foreach (var companySurvey in affectedCompanySurveys)
+                {
+                    companySurvey.Estimate = true;
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            result.InsertedCount = plan.InsertedCount;
+            result.UpdatedCount = plan.UpdatedCount;
+
+            return result;
+        }
+
+        public async Task<AnswerImportResult> ImportGlobalAnswersFromExcelAsync(Stream excelStream, int financialYear)
+        {
+            var result = new AnswerImportResult();
+            using var bufferedStream = new MemoryStream();
+            await excelStream.CopyToAsync(bufferedStream);
+            bufferedStream.Position = 0;
+
+            var plan = await BuildImportPlanAsync(bufferedStream, financialYear, ImportPlanMode.GlobalByIdThenName);
+
+            foreach (var error in plan.Errors)
+            {
+                result.Errors.Add(error);
+            }
+
+            var updateIds = plan.Operations
+                .Where(o => o.ExistingAnswerId.HasValue)
+                .Select(o => o.ExistingAnswerId!.Value)
+                .Distinct()
+                .ToList();
+
+            var existingById = await _context.Answer
+                .Where(a => updateIds.Contains(a.Id))
+                .ToDictionaryAsync(a => a.Id);
+
+            foreach (var operation in plan.Operations)
+            {
+                if (operation.ExistingAnswerId.HasValue)
+                {
+                    if (!existingById.TryGetValue(operation.ExistingAnswerId.Value, out var existingAnswer))
+                    {
+                        result.Errors.Add($"Unable to find existing answer Id {operation.ExistingAnswerId.Value} during apply.");
+                        continue;
+                    }
+
+                    existingAnswer.AnswerText = operation.Value.AnswerText;
+                    existingAnswer.AnswerNumber = operation.Value.AnswerNumber;
+                    existingAnswer.AnswerCurrency = operation.Value.AnswerCurrency;
+                }
+                else
+                {
+                    _context.Answer.Add(new Answer
+                    {
+                        CompanySurveyId = operation.CompanySurveyId,
+                        QuestionId = operation.QuestionId,
+                        AnswerText = operation.Value.AnswerText,
+                        AnswerNumber = operation.Value.AnswerNumber,
+                        AnswerCurrency = operation.Value.AnswerCurrency
+                    });
+                }
+            }
+
+            var affectedCompanySurveyIds = plan.MatchedCompanySurveyIds.Any()
+                ? plan.MatchedCompanySurveyIds.ToList()
+                : plan.Operations.Select(o => o.CompanySurveyId).Distinct().ToList();
+
+            if (affectedCompanySurveyIds.Any())
+            {
+                var affectedCompanySurveys = await _context.CompanySurvey
+                    .Where(cs => affectedCompanySurveyIds.Contains(cs.Id))
+                    .ToListAsync();
+
+                foreach (var companySurvey in affectedCompanySurveys)
+                {
+                    companySurvey.Estimate = true;
                 }
             }
 
@@ -596,6 +710,7 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
                     Saved = false,
                     Submitted = false,
                     Requested = false,
+                    Estimate = false,
                     SavedDate = null,
                     SubmittedDate = null,
                     RequestedDate = null
@@ -608,7 +723,7 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             }
         }
 
-        private async Task<ImportPlanResult> BuildImportPlanAsync(Stream excelStream, int financialYear)
+        private async Task<ImportPlanResult> BuildImportPlanAsync(Stream excelStream, int financialYear, ImportPlanMode mode)
         {
             var plan = new ImportPlanResult();
 
@@ -620,10 +735,11 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
                 return plan;
             }
 
-            var firstRow = worksheet.FirstRowUsed();
-            if (firstRow == null)
+            const int headerRowNumber = 2;
+            var firstRow = worksheet.Row(headerRowNumber);
+            if (firstRow == null || firstRow.IsEmpty())
             {
-                plan.Errors.Add("The worksheet is empty.");
+                plan.Errors.Add("The worksheet must contain column headers on row 2.");
                 return plan;
             }
 
@@ -643,31 +759,122 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
                 }
             }
 
-            if (!columnByHeader.TryGetValue("External ID", out var externalIdColumn))
+            plan.AvailableHeaders = columnByHeader.Keys.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
+
+            var normalizedColumnByHeader = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var header in columnByHeader)
             {
-                plan.Errors.Add("Missing required column header: External ID.");
-                return plan;
+                var normalized = NormalizeHeader(header.Key);
+                if (!string.IsNullOrWhiteSpace(normalized) && !normalizedColumnByHeader.ContainsKey(normalized))
+                {
+                    normalizedColumnByHeader[normalized] = header.Value;
+                }
             }
 
-            var questions = await _context.Question
-                .Where(q => !string.IsNullOrWhiteSpace(q.ImportColumnName))
-                .OrderBy(q => q.OrderNumber)
-                .ThenBy(q => q.Id)
-                .ToListAsync();
+            var headerByColumnNumber = columnByHeader.ToDictionary(k => k.Value, v => v.Key);
+
+            bool TryGetColumn(out int columnNumber, out string matchedHeader, params string[] aliases)
+            {
+                foreach (var alias in aliases)
+                {
+                    if (columnByHeader.TryGetValue(alias, out columnNumber))
+                    {
+                        matchedHeader = alias;
+                        return true;
+                    }
+
+                    var normalizedAlias = NormalizeHeader(alias);
+                    if (!string.IsNullOrWhiteSpace(normalizedAlias)
+                        && normalizedColumnByHeader.TryGetValue(normalizedAlias, out columnNumber))
+                    {
+                        matchedHeader = headerByColumnNumber.TryGetValue(columnNumber, out var resolvedHeader)
+                            ? resolvedHeader
+                            : alias;
+                        return true;
+                    }
+                }
+
+                columnNumber = 0;
+                matchedHeader = string.Empty;
+                return false;
+            }
+
+            int externalIdColumn = 0;
+            int idColumn = 0;
+            var hasNameColumn = false;
+            var nameColumn = 0;
+
+            if (mode == ImportPlanMode.Standard)
+            {
+                if (!TryGetColumn(out externalIdColumn, out var matchedExternalIdHeader, "External ID", "ExternalID", "ID"))
+                {
+                    var available = plan.AvailableHeaders.Any() ? string.Join(", ", plan.AvailableHeaders) : "(none)";
+                    plan.Errors.Add($"Missing required column header: External ID (or ID). Available headers on row 2: {available}");
+                    return plan;
+                }
+
+                plan.IdentifierFieldMatch = $"External ID match column: {matchedExternalIdHeader}";
+            }
+            else
+            {
+                if (!TryGetColumn(out idColumn, out var matchedIdHeader, "ID", "External ID", "ExternalID"))
+                {
+                    var available = plan.AvailableHeaders.Any() ? string.Join(", ", plan.AvailableHeaders) : "(none)";
+                    plan.Errors.Add($"Missing required column header: ID (or External ID). Available headers on row 2: {available}");
+                    return plan;
+                }
+
+                hasNameColumn = TryGetColumn(out nameColumn, out var matchedNameHeader, "Name", "Company Name", "CompanyName");
+                plan.IdentifierFieldMatch = hasNameColumn
+                    ? $"ID match column: {matchedIdHeader}; Name fallback column: {matchedNameHeader}"
+                    : $"ID match column: {matchedIdHeader}; Name fallback column: (not found)";
+            }
+
+            var questions = mode == ImportPlanMode.Standard
+                ? await _context.Question
+                    .Where(q => !string.IsNullOrWhiteSpace(q.ImportColumnName))
+                    .OrderBy(q => q.OrderNumber)
+                    .ThenBy(q => q.Id)
+                    .ToListAsync()
+                : await _context.Question
+                    .Where(q => !string.IsNullOrWhiteSpace(q.ImportColumnNameAlt))
+                    .OrderBy(q => q.OrderNumber)
+                    .ThenBy(q => q.Id)
+                    .ToListAsync();
 
             if (!questions.Any())
             {
-                plan.Errors.Add("No questions have ImportColumnName configured.");
+                plan.Errors.Add(mode == ImportPlanMode.Standard
+                    ? "No questions have ImportColumnName configured."
+                    : "No questions have ImportColumnNameAlt configured.");
                 return plan;
             }
 
-            var mappedQuestions = questions
-                .Where(q => columnByHeader.ContainsKey(q.ImportColumnName!.Trim()))
-                .ToList();
+            var mappedQuestions = new List<(Question Question, int ColumnNumber, string ImportColumnName)>();
+            foreach (var question in questions)
+            {
+                var configuredColumnName = mode == ImportPlanMode.Standard
+                    ? question.ImportColumnName
+                    : question.ImportColumnNameAlt;
+
+                if (string.IsNullOrWhiteSpace(configuredColumnName))
+                {
+                    continue;
+                }
+
+                var importColumnName = configuredColumnName.Trim();
+                if (TryGetColumn(out var columnNumber, out var matchedHeaderName, importColumnName))
+                {
+                    mappedQuestions.Add((question, columnNumber, importColumnName));
+                    plan.MatchedFields.Add($"Q{question.Id} ({question.Title ?? question.QuestionText ?? "Untitled"}): {importColumnName} -> {matchedHeaderName}");
+                }
+            }
 
             if (!mappedQuestions.Any())
             {
-                plan.Errors.Add("No question ImportColumnName values match any Excel column headers.");
+                plan.Errors.Add(mode == ImportPlanMode.Standard
+                    ? "No question ImportColumnName values match any Excel column headers."
+                    : "No question ImportColumnNameAlt values match any Excel column headers.");
                 return plan;
             }
 
@@ -675,11 +882,13 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
                 from companySurvey in _context.CompanySurvey
                 join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
                 join company in _context.Tin200 on companySurvey.CompanyId equals company.Id
-                where survey.FinancialYear == financialYear && company.ExternalId != null
+                where survey.FinancialYear == financialYear
                 select new
                 {
                     companySurvey.Id,
-                    company.ExternalId
+                    Submitted = EF.Property<bool?>(companySurvey, nameof(CompanySurvey.Submitted)),
+                    company.ExternalId,
+                    company.CompanyName
                 }
             )
             .ToListAsync();
@@ -689,17 +898,50 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
                 .GroupBy(x => x.ExternalId!.Trim(), StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(
                     g => g.Key,
-                    g => g.OrderByDescending(x => x.Id).First().Id,
+                    g =>
+                    {
+                        var selected = g.OrderByDescending(x => x.Id).First();
+                        return (selected.Id, selected.Submitted);
+                    },
                     StringComparer.OrdinalIgnoreCase);
 
-            if (!companySurveyByExternalId.Any())
+            var companySurveyByCompanyName = companySurveyRows
+                .Where(x => !string.IsNullOrWhiteSpace(x.CompanyName))
+                .GroupBy(x => x.CompanyName!.Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    g => g.Key,
+                    g =>
+                    {
+                        var selected = g.OrderByDescending(x => x.Id).First();
+                        return (selected.Id, selected.Submitted);
+                    },
+                    StringComparer.OrdinalIgnoreCase);
+
+            if (mode == ImportPlanMode.Standard && !companySurveyByExternalId.Any())
             {
                 plan.Errors.Add($"No CompanySurvey records found for financial year {financialYear} with matching External ID values.");
                 return plan;
             }
 
-            var companySurveyIds = companySurveyByExternalId.Values.Distinct().ToList();
-            var questionIds = mappedQuestions.Select(q => q.Id).ToList();
+            if (mode == ImportPlanMode.GlobalByIdThenName && !companySurveyByExternalId.Any() && !companySurveyByCompanyName.Any())
+            {
+                plan.Errors.Add($"No CompanySurvey records found for financial year {financialYear} with matching External ID or Company Name values.");
+                return plan;
+            }
+
+            var companySurveyIds = mode == ImportPlanMode.GlobalByIdThenName
+                ? companySurveyByExternalId.Values
+                    .Concat(companySurveyByCompanyName.Values)
+                    .Where(x => x.Submitted != true)
+                    .Select(x => x.Id)
+                    .Distinct()
+                    .ToList()
+                : companySurveyByExternalId.Values
+                    .Where(x => x.Submitted != true)
+                    .Select(x => x.Id)
+                    .Distinct()
+                    .ToList();
+            var questionIds = mappedQuestions.Select(q => q.Question.Id).ToList();
 
             var existingAnswers = await _context.Answer
                 .Where(a => companySurveyIds.Contains(a.CompanySurveyId) && questionIds.Contains(a.QuestionId))
@@ -718,30 +960,87 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
 
             var operationsByKey = new Dictionary<(int CompanySurveyId, int QuestionId), ImportAnswerOperation>();
 
-            var firstDataRowNumber = firstRow.RowNumber() + 1;
+            var firstDataRowNumber = headerRowNumber + 1;
             var lastRowNumber = worksheet.LastRowUsed()?.RowNumber() ?? firstDataRowNumber - 1;
 
             for (var rowNumber = firstDataRowNumber; rowNumber <= lastRowNumber; rowNumber++)
             {
                 var row = worksheet.Row(rowNumber);
-                var externalId = row.Cell(externalIdColumn).GetString().Trim();
-                if (string.IsNullOrWhiteSpace(externalId))
+                var companySurveyId = 0;
+
+                if (mode == ImportPlanMode.Standard)
                 {
-                    continue;
+                    var externalId = row.Cell(externalIdColumn).GetString().Trim();
+                    if (string.IsNullOrWhiteSpace(externalId))
+                    {
+                        continue;
+                    }
+
+                    if (!companySurveyByExternalId.TryGetValue(externalId, out var externalIdMatch))
+                    {
+                        plan.UnmatchedExternalIds.Add(externalId);
+                        continue;
+                    }
+
+                    if (externalIdMatch.Submitted == true)
+                    {
+                        plan.SkippedSubmittedRowKeys.Add(externalId);
+                        continue;
+                    }
+
+                    companySurveyId = externalIdMatch.Id;
+                    plan.MatchedCompanySurveyIds.Add(companySurveyId);
+
+                    plan.MatchedExternalIds.Add(externalId);
+                }
+                else
+                {
+                    var idValue = row.Cell(idColumn).GetString().Trim();
+                    var nameValue = hasNameColumn ? row.Cell(nameColumn).GetString().Trim() : string.Empty;
+
+                    if (string.IsNullOrWhiteSpace(idValue) && string.IsNullOrWhiteSpace(nameValue))
+                    {
+                        continue;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(idValue) && companySurveyByExternalId.TryGetValue(idValue, out var externalIdMatch))
+                    {
+                        if (externalIdMatch.Submitted == true)
+                        {
+                            plan.SkippedSubmittedRowKeys.Add($"{idValue}|{nameValue}".Trim('|'));
+                            continue;
+                        }
+
+                        companySurveyId = externalIdMatch.Id;
+                        plan.MatchedCompanySurveyIds.Add(companySurveyId);
+                        plan.MatchedExternalIds.Add(idValue);
+                    }
+                    else if (!string.IsNullOrWhiteSpace(nameValue) && companySurveyByCompanyName.TryGetValue(nameValue, out var nameMatch))
+                    {
+                        if (nameMatch.Submitted == true)
+                        {
+                            plan.SkippedSubmittedRowKeys.Add($"{idValue}|{nameValue}".Trim('|'));
+                            continue;
+                        }
+
+                        companySurveyId = nameMatch.Id;
+                        plan.MatchedCompanySurveyIds.Add(companySurveyId);
+                        plan.MatchedExternalIds.Add(string.IsNullOrWhiteSpace(idValue)
+                            ? nameValue
+                            : $"{idValue} (fallback to name: {nameValue})");
+                    }
+                    else
+                    {
+                        plan.UnmatchedExternalIds.Add($"{idValue}|{nameValue}".Trim('|'));
+                        continue;
+                    }
                 }
 
-                if (!companySurveyByExternalId.TryGetValue(externalId, out var companySurveyId))
+                foreach (var mappedQuestion in mappedQuestions)
                 {
-                    plan.UnmatchedExternalIds.Add(externalId);
-                    continue;
-                }
-
-                plan.MatchedExternalIds.Add(externalId);
-
-                foreach (var question in mappedQuestions)
-                {
-                    var importColumnName = question.ImportColumnName!.Trim();
-                    var columnNumber = columnByHeader[importColumnName];
+                    var question = mappedQuestion.Question;
+                    var importColumnName = mappedQuestion.ImportColumnName;
+                    var columnNumber = mappedQuestion.ColumnNumber;
                     var cell = row.Cell(columnNumber);
                     var textValue = cell.GetString().Trim();
                     var key = (companySurveyId, question.Id);
@@ -815,6 +1114,16 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
 
             plan.Operations = operationsByKey.Values.ToList();
             return plan;
+
+            static string NormalizeHeader(string input)
+            {
+                if (string.IsNullOrWhiteSpace(input))
+                {
+                    return string.Empty;
+                }
+
+                return new string(input.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+            }
         }
 
         private static ParsedAnswerValue? BuildAnswerValue(string? answerType, IXLCell cell)
@@ -823,6 +1132,12 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             var normalizedType = answerType?.Trim();
 
             if (string.IsNullOrWhiteSpace(rawValue))
+            {
+                return new ParsedAnswerValue();
+            }
+
+            // Common export placeholders like "$-" or "N/A" should be treated as blank values.
+            if (IsPlaceholderEmptyValue(rawValue))
             {
                 return new ParsedAnswerValue();
             }
@@ -860,6 +1175,25 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             }
 
             return new ParsedAnswerValue { AnswerText = rawValue };
+
+            static bool IsPlaceholderEmptyValue(string value)
+            {
+                var normalized = value.Trim().ToLowerInvariant();
+                if (normalized is "-" or "--" or "n/a" or "na" or "nil" or "none")
+                {
+                    return true;
+                }
+
+                var compact = new string(normalized.Where(c => c != ' ' && c != '\t' && c != ',').ToArray());
+                compact = compact.Replace("$", string.Empty)
+                    .Replace("nz$", string.Empty)
+                    .Replace("usd", string.Empty)
+                    .Replace("aud", string.Empty)
+                    .Replace("eur", string.Empty)
+                    .Replace("gbp", string.Empty);
+
+                return compact is "-" or "--";
+            }
         }
 
         private sealed class ParsedAnswerValue
@@ -867,6 +1201,12 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             public string? AnswerText { get; set; }
             public double? AnswerNumber { get; set; }
             public decimal? AnswerCurrency { get; set; }
+        }
+
+        private enum ImportPlanMode
+        {
+            Standard,
+            GlobalByIdThenName
         }
 
         private sealed class ImportAnswerOperation
@@ -881,9 +1221,14 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
         {
             public int InsertedCount { get; set; }
             public int UpdatedCount { get; set; }
+            public HashSet<int> MatchedCompanySurveyIds { get; } = new();
             public HashSet<string> MatchedExternalIds { get; } = new(StringComparer.OrdinalIgnoreCase);
             public HashSet<string> UnmatchedExternalIds { get; } = new(StringComparer.OrdinalIgnoreCase);
+            public HashSet<string> SkippedSubmittedRowKeys { get; } = new(StringComparer.OrdinalIgnoreCase);
             public List<string> Errors { get; } = new();
+            public List<string> AvailableHeaders { get; set; } = new();
+            public List<string> MatchedFields { get; set; } = new();
+            public string IdentifierFieldMatch { get; set; } = string.Empty;
             public List<ImportAnswerOperation> Operations { get; set; } = new();
         }
 
@@ -901,7 +1246,11 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             public int UpdatedCount { get; set; }
             public List<string> MatchedExternalIds { get; set; } = new();
             public List<string> UnmatchedExternalIds { get; set; } = new();
+            public List<string> SkippedSubmittedRowKeys { get; set; } = new();
             public List<string> Errors { get; set; } = new();
+            public List<string> AvailableHeaders { get; set; } = new();
+            public List<string> MatchedFields { get; set; } = new();
+            public string IdentifierFieldMatch { get; set; } = string.Empty;
         }
 
         public class AnswerListRow

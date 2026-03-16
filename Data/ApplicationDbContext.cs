@@ -145,6 +145,10 @@ namespace TINWeb.Data
                     .HasColumnType("bit")
                     .IsRequired();
 
+                entity.Property(e => e.Estimate)
+                    .HasColumnName("Estimate")
+                    .HasColumnType("bit");
+
                 entity.Property(e => e.SavedDate)
                     .HasColumnName("SavedDate")
                     .HasColumnType("datetime2");
