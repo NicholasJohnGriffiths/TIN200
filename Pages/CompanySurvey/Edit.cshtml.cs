@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.EntityFrameworkCore;
+using TINWeb.Data;
 using TINWeb.Services;
 
 namespace TINWeb.Pages.CompanySurvey
@@ -7,13 +9,17 @@ namespace TINWeb.Pages.CompanySurvey
     public class EditModel : PageModel
     {
         private readonly CompanySurveyService _service;
+        private readonly ApplicationDbContext _context;
 
         [BindProperty]
         public Models.CompanySurvey Record { get; set; } = new();
 
-        public EditModel(CompanySurveyService service)
+        public string? CompanyName { get; set; }
+
+        public EditModel(CompanySurveyService service, ApplicationDbContext context)
         {
             _service = service;
+            _context = context;
         }
 
         public async Task<IActionResult> OnGetAsync(int? id)
@@ -30,6 +36,10 @@ namespace TINWeb.Pages.CompanySurvey
             }
 
             Record = record;
+            CompanyName = await _context.Tin200
+                .Where(c => c.Id == record.CompanyId)
+                .Select(c => c.CompanyName)
+                .FirstOrDefaultAsync();
             return Page();
         }
 

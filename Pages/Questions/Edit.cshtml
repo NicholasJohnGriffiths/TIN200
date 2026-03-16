@@ -44,6 +44,11 @@
         </div>
 
         <div class="form-group mb-3">
+            <label asp-for="Record.ImportColumnNameAlt" class="form-label">Import Column Name Alt</label>
+            <input asp-for="Record.ImportColumnNameAlt" class="form-control" />
+        </div>
+
+        <div class="form-group mb-3">
             <label asp-for="Record.AnswerType" class="form-label"></label>
             <select asp-for="Record.AnswerType" class="form-select" id="answerTypeSelect">
                 @foreach (var option in Model.AnswerTypeOptions)

@@ -43,7 +43,10 @@ namespace TINWeb.Services
                     Requested = companySurvey.Requested,
                     SavedDate = companySurvey.SavedDate,
                     SubmittedDate = companySurvey.SubmittedDate,
-                    RequestedDate = companySurvey.RequestedDate
+                    RequestedDate = companySurvey.RequestedDate,
+                    AnswerCount = _context.Answer.Count(a =>
+                        a.CompanySurveyId == companySurvey.Id &&
+                        (a.AnswerText != null || a.AnswerCurrency != null || a.AnswerNumber != null))
                 };
 
             if (financialYear.HasValue)
@@ -109,6 +112,37 @@ namespace TINWeb.Services
             return await _context.CompanySurvey.AnyAsync(x => x.Id == id);
         }
 
+        public async Task<int> BulkSubmitWithAnswersAsync(int? financialYear)
+        {
+            var surveyIds = financialYear.HasValue
+                ? await _context.Survey
+                    .Where(s => s.FinancialYear == financialYear.Value)
+                    .Select(s => s.Id)
+                    .ToListAsync()
+                : null;
+
+            var query = _context.CompanySurvey
+                .Where(cs => !cs.Submitted)
+                .Where(cs => _context.Answer.Any(a =>
+                    a.CompanySurveyId == cs.Id &&
+                    (a.AnswerText != null || a.AnswerCurrency != null || a.AnswerNumber != null)));
+
+            if (surveyIds != null)
+                query = query.Where(cs => surveyIds.Contains(cs.SurveyId));
+
+            var records = await query.ToListAsync();
+            var submittedDate = new DateTime(2025, 12, 1);
+
+            foreach (var r in records)
+            {
+                r.Submitted = true;
+                r.SubmittedDate = submittedDate;
+            }
+
+            await _context.SaveChangesAsync();
+            return records.Count;
+        }
+
         public class CompanySurveyListRow
         {
             public int Id { get; set; }
@@ -121,6 +155,7 @@ namespace TINWeb.Services
             public DateTime? SavedDate { get; set; }
             public DateTime? SubmittedDate { get; set; }
             public DateTime? RequestedDate { get; set; }
+            public int AnswerCount { get; set; }
         }
     }
 }

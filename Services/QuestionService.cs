@@ -109,6 +109,7 @@ namespace TINWeb.Services
             existingRecord.GroupId = record.GroupId;
             existingRecord.QuestionText = record.QuestionText;
             existingRecord.ImportColumnName = record.ImportColumnName;
+            existingRecord.ImportColumnNameAlt = record.ImportColumnNameAlt;
             existingRecord.AnswerType = record.AnswerType;
             existingRecord.Multi1 = record.Multi1;
             existingRecord.Multi2 = record.Multi2;

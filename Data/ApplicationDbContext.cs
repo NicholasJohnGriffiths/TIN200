@@ -160,7 +160,7 @@ namespace TINWeb.Data
                 entity.HasOne<Tin200>()
                     .WithMany()
                     .HasForeignKey(e => e.CompanyId)
-                    .OnDelete(DeleteBehavior.Restrict)
+                    .OnDelete(DeleteBehavior.Cascade)
                     .HasConstraintName("FK_CompanySurvey_TIN200");
 
                 entity.HasOne<Survey>()
@@ -205,6 +205,10 @@ namespace TINWeb.Data
 
                 entity.Property(e => e.ImportColumnName)
                     .HasColumnName("ImportColumnName")
+                    .HasColumnType("varchar(255)");
+
+                entity.Property(e => e.ImportColumnNameAlt)
+                    .HasColumnName("ImportColumnNameAlt")
                     .HasColumnType("varchar(255)");
 
                 entity.Property(e => e.OrderNumber)
@@ -360,7 +364,8 @@ namespace TINWeb.Data
                 entity.HasOne<CompanySurvey>()
                     .WithMany()
                     .HasForeignKey(e => e.CompanySurveyId)
-                    .OnDelete(DeleteBehavior.Restrict);
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .HasConstraintName("FK_Answer_CompanySurvey");
 
                 entity.HasOne<Question>()
                     .WithMany()

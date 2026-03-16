@@ -25,6 +25,9 @@ namespace TINWeb.Models
         [StringLength(255)]
         public string? ImportColumnName { get; set; }
 
+        [StringLength(255)]
+        public string? ImportColumnNameAlt { get; set; }
+
         public int? OrderNumber { get; set; }
 
         [StringLength(255)]

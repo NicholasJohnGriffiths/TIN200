@@ -13,6 +13,10 @@
         <input type="hidden" asp-for="Record.Id" />
 
         <div class="form-group mb-3">
+            <label class="form-label">Company Name</label>
+            <input type="text" class="form-control" value="@Model.CompanyName" readonly />
+        </div>
+        <div class="form-group mb-3">
             <label asp-for="Record.CompanyId" class="form-label"></label>
             <input asp-for="Record.CompanyId" class="form-control" />
             <span asp-validation-for="Record.CompanyId" class="text-danger"></span>

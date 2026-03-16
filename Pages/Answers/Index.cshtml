@@ -151,23 +151,27 @@
                         <th>Year</th>
                         <th>Order</th>
                         <th>Question</th>
-                        <th>Answer Text</th>
-                        <th>Answer Number</th>
-                        <th>Answer Currency</th>
+                        <th>Answer</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                 @foreach (var row in Model.Rows)
                 {
+                    var answerValue = !string.IsNullOrWhiteSpace(row.AnswerText)
+                        ? row.AnswerText
+                        : row.AnswerNumber.HasValue
+                            ? row.AnswerNumber.Value.ToString()
+                            : row.AnswerCurrency.HasValue
+                                ? row.AnswerCurrency.Value.ToString("C")
+                                : string.Empty;
+
                     <tr>
                         <td>@row.CompanyName</td>
                         <td>@row.FinancialYear</td>
                         <td>@row.QuestionOrderNumber</td>
                         <td>@row.QuestionText</td>
-                        <td>@row.AnswerText</td>
-                        <td>@row.AnswerNumber</td>
-                        <td>@(row.AnswerCurrency.HasValue ? row.AnswerCurrency.Value.ToString("C") : "")</td>
+                        <td>@answerValue</td>
                         <td>
                             @if (row.Id > 0)
                             {

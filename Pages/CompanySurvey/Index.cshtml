@@ -8,6 +8,7 @@
     <div class="row mb-3">
         <div class="col-md-8">
             <h1>Company Survey Records</h1>
+            <p class="text-muted mb-0">Companies with answers: <strong>@Model.TotalCompaniesWithAnswers</strong> of <strong>@Model.Records.Count</strong></p>
         </div>
     </div>
 
@@ -38,6 +39,7 @@
                     <th>Submitted Date</th>
                     <th>Requested</th>
                     <th>Requested Date</th>
+                    <th>Answers</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -52,7 +54,9 @@
                         <td>@(record.SubmittedDate?.ToString("dd/MM/yyyy") ?? string.Empty)</td>
                         <td>@record.Requested</td>
                         <td>@(record.RequestedDate?.ToString("dd/MM/yyyy") ?? string.Empty)</td>
+                        <td>@record.AnswerCount</td>
                         <td class="actions-col">
+                            <a asp-page="/CompanySurvey/Edit" asp-route-id="@record.Id" class="btn btn-sm btn-secondary">Edit</a>
                             <a asp-page="/Answers/Index" asp-route-companySurveyId="@record.Id" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-sm btn-primary">Open Answers</a>
                             <a asp-page="/Company/SendSurvey"
                                asp-route-id="@record.CompanyId"

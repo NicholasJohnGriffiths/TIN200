@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using TINWeb.Services;
 
@@ -10,6 +11,7 @@ namespace TINWeb.Pages.CompanySurvey
         public List<CompanySurveyService.CompanySurveyListRow> Records { get; set; } = new();
         public List<int> FinancialYears { get; set; } = new();
         public int? SelectedFinancialYear { get; set; }
+        public int TotalCompaniesWithAnswers { get; set; }
 
         public IndexModel(CompanySurveyService service)
         {
@@ -23,6 +25,13 @@ namespace TINWeb.Pages.CompanySurvey
             SelectedFinancialYear = financialYear ?? await _service.GetCurrentSurveyFinancialYearAsync();
 
             Records = await _service.GetListRowsAsync(SelectedFinancialYear);
+            TotalCompaniesWithAnswers = Records.Count(r => r.AnswerCount > 0);
+        }
+
+        public async Task<IActionResult> OnPostBulkSubmitWithAnswersAsync(int? financialYear)
+        {
+            await _service.BulkSubmitWithAnswersAsync(financialYear);
+            return RedirectToPage(new { financialYear });
         }
     }
 }

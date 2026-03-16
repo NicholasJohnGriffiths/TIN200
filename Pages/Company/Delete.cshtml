@@ -12,8 +12,8 @@
 
             @if (Model.Record != null)
             {
-                <div class="alert alert-warning" role="alert">
-                    <strong>Warning!</strong> You are about to delete this record. This action cannot be undone.
+                <div class="alert alert-danger" role="alert">
+                    <strong>Warning!</strong> Deleting this company will permanently remove the company record and all related survey and answer data. This action cannot be undone.
                 </div>
 
                 <div class="card mb-3">
@@ -28,9 +28,22 @@
 
                 <form method="post">
                     <input type="hidden" asp-for="Record.Id" />
-                    <button type="submit" class="btn btn-danger me-2">Confirm Delete</button>
+                    <div class="mb-3">
+                        <label for="deleteConfirm" class="form-label">Type <strong>delete</strong> to confirm:</label>
+                        <input type="text" id="deleteConfirm" class="form-control" autocomplete="off" />
+                    </div>
+                    <button type="submit" id="deleteBtn" class="btn btn-danger me-2" disabled>Confirm Delete</button>
                     <a asp-page="./Index" class="btn btn-secondary">Cancel</a>
                 </form>
+                <script>
+                    (function () {
+                        var input = document.getElementById('deleteConfirm');
+                        var btn = document.getElementById('deleteBtn');
+                        input.addEventListener('input', function () {
+                            btn.disabled = input.value.trim().toLowerCase() !== 'delete';
+                        });
+                    })();
+                </script>
             }
             else
             {
