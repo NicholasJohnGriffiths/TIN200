@@ -21,14 +21,20 @@ namespace TINWeb.Pages.Company
         public string? Reason { get; private set; }
         public int? CompanyId { get; private set; }
         public bool RequestRecorded { get; private set; }
+        public bool IsCompanySurveyLocked { get; private set; }
 
         public bool HasSupportEmail => !string.IsNullOrWhiteSpace(RequestNewLinkUrl);
 
-        public void OnGet(int? id, string? reason, bool requested = false)
+        public async Task OnGetAsync(int? id, string? reason, bool requested = false)
         {
             CompanyId = id;
             Reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
             RequestRecorded = requested;
+
+            if (id.HasValue && id.Value > 0)
+            {
+                IsCompanySurveyLocked = await IsLockedForCurrentSurveyAsync(id.Value);
+            }
 
             BuildRequestEmailUrl();
         }
@@ -51,6 +57,11 @@ namespace TINWeb.Pages.Company
                 var companySurvey = await _context.CompanySurvey
                     .FirstOrDefaultAsync(cs => cs.CompanyId == id.Value && cs.SurveyId == currentSurvey.Id);
 
+                if ((companySurvey?.Locked).GetValueOrDefault())
+                {
+                    return RedirectToPage(new { id, reason = "survey-locked", requested = false });
+                }
+
                 if (companySurvey == null)
                 {
                     companySurvey = new Models.CompanySurvey
@@ -60,6 +71,8 @@ namespace TINWeb.Pages.Company
                         Saved = false,
                         Submitted = false,
                         Requested = true,
+                        Locked = false,
+                        Estimate = false,
                         SavedDate = null,
                         SubmittedDate = null,
                         RequestedDate = DateTime.Now
@@ -97,6 +110,26 @@ namespace TINWeb.Pages.Company
             var subject = Uri.EscapeDataString("Request new survey link");
             var body = Uri.EscapeDataString("Hello,\n\nMy survey link is invalid or expired. Please send me a new link.\n\nThank you.");
             RequestNewLinkUrl = $"mailto:{supportEmail}?subject={subject}&body={body}";
+        }
+
+        private async Task<bool> IsLockedForCurrentSurveyAsync(int companyId)
+        {
+            var currentSurveyId = await _context.Survey
+                .Where(s => s.CurrentSurvey)
+                .OrderByDescending(s => s.FinancialYear)
+                .ThenByDescending(s => s.Id)
+                .Select(s => (int?)s.Id)
+                .FirstOrDefaultAsync();
+
+            if (!currentSurveyId.HasValue)
+            {
+                return false;
+            }
+
+            var companySurvey = await _context.CompanySurvey
+                .FirstOrDefaultAsync(cs => cs.CompanyId == companyId && cs.SurveyId == currentSurveyId.Value);
+
+            return (companySurvey?.Locked).GetValueOrDefault();
         }
     }
 }

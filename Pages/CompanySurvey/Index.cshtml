@@ -39,6 +39,7 @@
                     <th>Submitted Date</th>
                     <th>Requested</th>
                     <th>Requested Date</th>
+                    <th>Locked</th>
                     <th>Estimate</th>
                     <th>Answers</th>
                     <th>Actions</th>
@@ -49,13 +50,14 @@
                 {
                     <tr>
                         <td>@record.CompanyName</td>
-                        <td>@record.Saved</td>
+                        <td>@(record.Saved ? "Yes" : "No")</td>
                         <td>@(record.SavedDate?.ToString("dd/MM/yyyy") ?? string.Empty)</td>
-                        <td>@record.Submitted</td>
+                        <td>@(record.Submitted ? "Yes" : "No")</td>
                         <td>@(record.SubmittedDate?.ToString("dd/MM/yyyy") ?? string.Empty)</td>
-                        <td>@record.Requested</td>
+                        <td>@(record.Requested ? "Yes" : "No")</td>
                         <td>@(record.RequestedDate?.ToString("dd/MM/yyyy") ?? string.Empty)</td>
-                        <td>@record.Estimate</td>
+                        <td>@(record.Locked ? "Yes" : "No")</td>
+                        <td>@(record.Estimate ? "Yes" : "No")</td>
                         <td>@record.AnswerCount</td>
                         <td class="actions-col">
                             <a asp-page="/CompanySurvey/Edit" asp-route-id="@record.Id" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-sm btn-secondary">Edit</a>

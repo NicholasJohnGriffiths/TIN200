@@ -1,0 +1,205 @@
+@page
+@model TINWeb.Pages.Answers.ExportGlobalModel
+@{
+    ViewData["Title"] = "Export Excel - Global";
+}
+
+<div class="container mt-4">
+    <div class="row mb-3">
+        <div class="col-md-9">
+            <h1>Export Excel - Global</h1>
+            <p class="text-muted mb-0">Paste column headers, preview matched/unmatched fields by <code>Question.ImportColumnNameAlt</code>, then export CSV.</p>
+        </div>
+    </div>
+
+    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+    <form method="post" id="globalExportForm">
+        <div class="row g-3 align-items-end mb-3">
+            <div class="col-md-3">
+                <label class="form-label" for="SelectedFinancialYear">Survey Financial Year</label>
+                <select asp-for="SelectedFinancialYear" class="form-select" aria-label="Survey Financial Year">
+                    @foreach (var year in Model.FinancialYears)
+                    {
+                        <option value="@year" selected="@(Model.SelectedFinancialYear == year ? "selected" : null)">@year</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-9 text-md-end">
+                <button type="submit" asp-page-handler="Preview" id="previewButton" class="btn btn-outline-primary me-2">Preview</button>
+                <button type="submit" asp-page-handler="Export" id="exportButton" class="btn btn-success">Export CSV</button>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="HeaderList" class="form-label">Column Headers (comma-separated)</label>
+            <textarea asp-for="HeaderList" class="form-control" rows="7" placeholder="Paste headers here, e.g. ID,Name,Description,..."></textarea>
+        </div>
+    </form>
+
+    <div id="globalExportProgressContainer" class="mb-3" style="display:none;">
+        <div class="d-flex justify-content-between small mb-1">
+            <span id="globalExportProgressLabel">Preparing...</span>
+            <span id="globalExportProgressPercent">0%</span>
+        </div>
+        <div class="progress" role="progressbar" aria-label="Global export progress" aria-valuemin="0" aria-valuemax="100">
+            <div id="globalExportProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
+        </div>
+    </div>
+
+    @if (Model.PreviewSummary != null)
+    {
+        <div class="card mb-3">
+            <div class="card-header">Preview Summary</div>
+            <div class="card-body">
+                <div><strong>Selected year:</strong> @Model.PreviewSummary.FinancialYear</div>
+                <div><strong>Records found:</strong> @Model.PreviewSummary.RecordsFound</div>
+                <div><strong>Headers provided:</strong> @Model.PreviewSummary.HeaderCount</div>
+                <div><strong>Matched headers:</strong> @Model.PreviewSummary.MatchedHeaders.Count</div>
+                <div><strong>Unmatched headers:</strong> @Model.PreviewSummary.UnmatchedHeaders.Count</div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-3">
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header">Matched Fields</div>
+                    <div class="card-body" style="max-height: 240px; overflow-y: auto;">
+                        @if (Model.PreviewSummary.MatchedHeaders.Any())
+                        {
+                            <ul class="mb-0">
+                                @foreach (var field in Model.PreviewSummary.MatchedHeaders)
+                                {
+                                    <li>@field</li>
+                                }
+                            </ul>
+                        }
+                        else
+                        {
+                            <span class="text-muted">No matched fields.</span>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card h-100 border-warning">
+                    <div class="card-header bg-warning-subtle">Unmatched Fields</div>
+                    <div class="card-body" style="max-height: 240px; overflow-y: auto;">
+                        @if (Model.PreviewSummary.UnmatchedHeaders.Any())
+                        {
+                            <ul class="mb-0">
+                                @foreach (var field in Model.PreviewSummary.UnmatchedHeaders)
+                                {
+                                    <li>@field</li>
+                                }
+                            </ul>
+                        }
+                        else
+                        {
+                            <span class="text-muted">No unmatched fields.</span>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (Model.PreviewSummary.PreviewRows.Any())
+        {
+            <div class="card">
+                <div class="card-header">Preview Rows (first @Model.PreviewSummary.PreviewRows.Count records)</div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>CompanySurveyId</th>
+                                <th>Company</th>
+                                <th>ExternalId</th>
+                                @foreach (var header in Model.PreviewSummary.Headers)
+                                {
+                                    <th>@header</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.PreviewSummary.PreviewRows)
+                            {
+                                <tr>
+                                    <td>@row.CompanySurveyId</td>
+                                    <td>@row.CompanyName</td>
+                                    <td>@row.ExternalId</td>
+                                    @for (var i = 0; i < row.Values.Count; i++)
+                                    {
+                                        <td>@row.Values[i]</td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const form = document.getElementById('globalExportForm');
+            const previewButton = document.getElementById('previewButton');
+            const exportButton = document.getElementById('exportButton');
+            const progressContainer = document.getElementById('globalExportProgressContainer');
+            const progressBar = document.getElementById('globalExportProgressBar');
+            const progressPercent = document.getElementById('globalExportProgressPercent');
+            const progressLabel = document.getElementById('globalExportProgressLabel');
+
+            if (!form || !previewButton || !exportButton || !progressContainer || !progressBar || !progressPercent || !progressLabel) {
+                return;
+            }
+
+            let timerId = null;
+
+            function startProgress(labelText) {
+                if (timerId) {
+                    window.clearInterval(timerId);
+                }
+
+                let value = 8;
+                progressLabel.textContent = labelText;
+                progressContainer.style.display = '';
+
+                function render() {
+                    progressBar.style.width = value + '%';
+                    progressPercent.textContent = value + '%';
+                }
+
+                render();
+
+                timerId = window.setInterval(function () {
+                    if (value < 100) {
+                        value = Math.min(100, value + 4);
+                        render();
+                    }
+
+                    if (value >= 100 && timerId) {
+                        window.clearInterval(timerId);
+                        timerId = null;
+                    }
+                }, 250);
+            }
+
+            form.addEventListener('submit', function (event) {
+                if (!event.submitter) {
+                    return;
+                }
+
+                if (event.submitter.id === 'previewButton') {
+                    startProgress('Building preview summary...');
+                }
+
+                if (event.submitter.id === 'exportButton') {
+                    startProgress('Exporting global CSV...');
+                }
+            });
+        })();
+    </script>
+}

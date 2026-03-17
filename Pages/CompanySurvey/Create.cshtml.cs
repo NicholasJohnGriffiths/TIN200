@@ -18,6 +18,8 @@ namespace TINWeb.Pages.CompanySurvey
 
         public void OnGet()
         {
+            Record.Locked = false;
+            Record.Estimate = false;
         }
 
         public async Task<IActionResult> OnPostAsync()
@@ -27,6 +29,8 @@ namespace TINWeb.Pages.CompanySurvey
                 return Page();
             }
 
+            Record.Locked ??= false;
+            Record.Estimate ??= false;
             await _service.CreateAsync(Record);
             return RedirectToPage("./Index");
         }

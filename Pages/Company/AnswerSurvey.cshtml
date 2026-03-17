@@ -30,6 +30,12 @@
                     Your answers have been saved.
                 </div>
             }
+            @if (Model.IsLocked)
+            {
+                <div class="alert alert-warning" role="alert">
+                    This survey record is locked. Data changes are disabled. Please contact the Technology Investment Network.
+                </div>
+            }
 
             <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
@@ -299,8 +305,8 @@
                 <div id="groupNumberNav" class="d-flex flex-wrap gap-2 mb-3" aria-label="Group Number Navigation"></div>
 
                 <div class="d-flex gap-2">
-                    <button type="submit" name="FormAction" value="save" class="btn btn-secondary">Save for Later</button>
-                    <button type="submit" name="FormAction" value="submit" class="btn btn-primary">Submit Final</button>
+                    <button type="submit" name="FormAction" value="save" class="btn btn-secondary" disabled="@(Model.IsLocked ? "disabled" : null)">Save for Later</button>
+                    <button type="submit" name="FormAction" value="submit" class="btn btn-primary" disabled="@(Model.IsLocked ? "disabled" : null)">Submit Final</button>
                 </div>
             </form>
         </div>
@@ -311,6 +317,23 @@
     @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
     <script>
         (function () {
+            const surveyIsLocked = @Model.IsLocked.ToString().ToLowerInvariant();
+
+            if (surveyIsLocked) {
+                const editableControls = Array.from(document.querySelectorAll('.survey-answer-row input, .survey-answer-row select, .survey-answer-row textarea'));
+                editableControls.forEach(function (control) {
+                    if ((control.type || '').toLowerCase() === 'hidden') {
+                        return;
+                    }
+                    control.disabled = true;
+                });
+
+                const copyButtons = Array.from(document.querySelectorAll('.copy-prev-year-btn'));
+                copyButtons.forEach(function (btn) {
+                    btn.disabled = true;
+                });
+            }
+
             function normalizeType(value) {
                 return (value || '').trim().toLowerCase();
             }

@@ -19,15 +19,21 @@
             {
                 <p class="small text-body-secondary">Reference: @Model.Reason</p>
             }
-            @if (Model.RequestRecorded)
+            @if (Model.RequestRecorded && !Model.IsCompanySurveyLocked)
             {
                 <div class="alert alert-success mt-3" role="alert">
                     Your request has been recorded. Our team will send a new survey link.
                 </div>
             }
+            @if (Model.IsCompanySurveyLocked)
+            {
+                <div class="alert alert-warning mt-3" role="alert">
+                    This survey record is locked. Please contact the Technology Investment Network.
+                </div>
+            }
             @if (Model.HasSupportEmail)
             {
-                @if (Model.CompanyId.HasValue)
+                @if (Model.CompanyId.HasValue && !Model.IsCompanySurveyLocked)
                 {
                     <form method="post" asp-page-handler="Request" class="d-inline">
                         <input type="hidden" name="id" value="@Model.CompanyId.Value" />
@@ -35,7 +41,7 @@
                         <button type="submit" class="btn btn-outline-primary mt-2 me-2">Request Survey</button>
                     </form>
                 }
-                else
+                else if (!Model.CompanyId.HasValue)
                 {
                     <a href="@Model.RequestNewLinkUrl" class="btn btn-outline-primary mt-2 me-2">Request Survey</a>
                 }

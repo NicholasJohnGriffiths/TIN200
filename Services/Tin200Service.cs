@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TINWeb.Data;
 using TINWeb.Models;
 using System.Data;
+using System.Globalization;
 
 namespace TINWeb.Services
 {
@@ -140,6 +141,279 @@ namespace TINWeb.Services
         public async Task<bool> CompanyExistsAsync(int id)
         {
             return await _context.Tin200.AnyAsync(t => t.Id == id);
+        }
+
+        public async Task<ResetFyeValuesResult> PreviewResetFyeValuesFromSurveyAnswersAsync(int previewLimit = 25)
+        {
+            return await BuildResetFyeValuesResultAsync(applyUpdates: false, previewLimit: previewLimit);
+        }
+
+        public async Task<ResetFyeValuesResult> ResetFyeValuesFromSurveyAnswersAsync()
+        {
+            return await BuildResetFyeValuesResultAsync(applyUpdates: true, previewLimit: 10);
+        }
+
+        private async Task<ResetFyeValuesResult> BuildResetFyeValuesResultAsync(bool applyUpdates, int previewLimit)
+        {
+            const string titleLastFinancialYear = "Total Revenue Last Financial Year";
+            const string titleYearMinus1 = "Total Revenue Year-1";
+            const string titleYearMinus2 = "Total Revenue Year-2";
+
+            var currentSurveyYear = await _context.Survey
+                .Where(s => s.CurrentSurvey)
+                .OrderByDescending(s => s.FinancialYear)
+                .ThenByDescending(s => s.Id)
+                .Select(s => (int?)s.FinancialYear)
+                .FirstOrDefaultAsync();
+
+            if (!currentSurveyYear.HasValue)
+            {
+                return new ResetFyeValuesResult
+                {
+                    HasCurrentSurvey = false,
+                    PreviewRows = new List<ResetFyePreviewRow>()
+                };
+            }
+
+            var currentSurveyId = await _context.Survey
+                .Where(s => s.CurrentSurvey)
+                .OrderByDescending(s => s.FinancialYear)
+                .ThenByDescending(s => s.Id)
+                .Select(s => (int?)s.Id)
+                .FirstOrDefaultAsync();
+
+            if (!currentSurveyId.HasValue)
+            {
+                return new ResetFyeValuesResult
+                {
+                    HasCurrentSurvey = false,
+                    PreviewRows = new List<ResetFyePreviewRow>()
+                };
+            }
+
+            var revenueTitles = new[]
+            {
+                titleLastFinancialYear,
+                titleYearMinus1,
+                titleYearMinus2
+            };
+
+            var revenueQuestionIds = await _context.Question
+                .AsNoTracking()
+                .Select(q => new
+                {
+                    q.Id,
+                    q.Title,
+                    q.QuestionText,
+                    q.ImportColumnName,
+                    q.ImportColumnNameAlt
+                })
+                .ToListAsync();
+
+            var matchedRevenueQuestions = revenueQuestionIds
+                .Select(q => new
+                {
+                    q.Id,
+                    NormalizedTitle = (q.Title ?? string.Empty).Trim()
+                })
+                .Where(q => revenueTitles.Any(t => string.Equals(t, q.NormalizedTitle, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
+
+            var matchedRevenueQuestionIds = matchedRevenueQuestions
+                .Select(q => q.Id)
+                .Distinct()
+                .ToList();
+
+            var questionIdToFyeField = matchedRevenueQuestions
+                .ToDictionary(
+                    q => q.Id,
+                    q => string.Equals(q.NormalizedTitle, titleLastFinancialYear, StringComparison.OrdinalIgnoreCase)
+                        ? "FYE2025"
+                        : string.Equals(q.NormalizedTitle, titleYearMinus1, StringComparison.OrdinalIgnoreCase)
+                            ? "FYE2024"
+                            : "FYE2023");
+
+            if (!matchedRevenueQuestionIds.Any())
+            {
+                return new ResetFyeValuesResult
+                {
+                    HasCurrentSurvey = true,
+                    CurrentSurveyYear = currentSurveyYear.Value,
+                    TotalMatchedCompanies = 0,
+                    UpdatedCompanyCount = 0,
+                    WouldUpdateCompanyCount = 0,
+                    PreviewRows = new List<ResetFyePreviewRow>()
+                };
+            }
+
+            var answerRows = await (
+                from companySurvey in _context.CompanySurvey.AsNoTracking()
+                join answer in _context.Answer.AsNoTracking() on companySurvey.Id equals answer.CompanySurveyId
+                where companySurvey.SurveyId == currentSurveyId.Value
+                    && matchedRevenueQuestionIds.Contains(answer.QuestionId)
+                select new
+                {
+                    companySurvey.CompanyId,
+                    answer.QuestionId,
+                    answer.Id,
+                    answer.AnswerCurrency,
+                    answer.AnswerNumber,
+                    answer.AnswerText
+                })
+                .ToListAsync();
+
+            var latestAnswerByCompanyAndField = answerRows
+                .Where(x => questionIdToFyeField.ContainsKey(x.QuestionId))
+                .Select(x => new
+                {
+                    x.CompanyId,
+                    FyeField = questionIdToFyeField[x.QuestionId],
+                    x.Id,
+                    x.AnswerCurrency,
+                    x.AnswerNumber,
+                    x.AnswerText
+                })
+                .GroupBy(x => new { x.CompanyId, x.FyeField })
+                .ToDictionary(
+                    g => (g.Key.CompanyId, g.Key.FyeField),
+                    g => g.OrderByDescending(x => x.Id).First());
+
+            var companyIds = latestAnswerByCompanyAndField.Keys
+                .Select(x => x.CompanyId)
+                .Distinct()
+                .ToList();
+
+            if (!companyIds.Any())
+            {
+                return new ResetFyeValuesResult
+                {
+                    HasCurrentSurvey = true,
+                    CurrentSurveyYear = currentSurveyYear.Value,
+                    TotalMatchedCompanies = 0,
+                    UpdatedCompanyCount = 0,
+                    WouldUpdateCompanyCount = 0,
+                    PreviewRows = new List<ResetFyePreviewRow>()
+                };
+            }
+
+            var companies = await _context.Tin200
+                .Where(c => companyIds.Contains(c.Id))
+                .ToListAsync();
+
+            var updatedCount = 0;
+            var changedRows = new List<ResetFyePreviewRow>();
+
+            foreach (var company in companies)
+            {
+                latestAnswerByCompanyAndField.TryGetValue((company.Id, "FYE2025"), out var lastFinancialYearAnswer);
+                latestAnswerByCompanyAndField.TryGetValue((company.Id, "FYE2024"), out var yearMinus1Answer);
+                latestAnswerByCompanyAndField.TryGetValue((company.Id, "FYE2023"), out var yearMinus2Answer);
+
+                var newFye2025 = ParseRevenueAnswer(lastFinancialYearAnswer?.AnswerCurrency, lastFinancialYearAnswer?.AnswerNumber, lastFinancialYearAnswer?.AnswerText);
+                var newFye2024 = ParseRevenueAnswer(yearMinus1Answer?.AnswerCurrency, yearMinus1Answer?.AnswerNumber, yearMinus1Answer?.AnswerText);
+                var newFye2023 = ParseRevenueAnswer(yearMinus2Answer?.AnswerCurrency, yearMinus2Answer?.AnswerNumber, yearMinus2Answer?.AnswerText);
+
+                var hasChanges = company.Fye2025 != newFye2025 || company.Fye2024 != newFye2024 || company.Fye2023 != newFye2023;
+
+                if (hasChanges)
+                {
+                    changedRows.Add(new ResetFyePreviewRow
+                    {
+                        CompanyId = company.Id,
+                        CompanyName = company.CompanyName,
+                        CurrentFye2025 = company.Fye2025,
+                        NewFye2025 = newFye2025,
+                        CurrentFye2024 = company.Fye2024,
+                        NewFye2024 = newFye2024,
+                        CurrentFye2023 = company.Fye2023,
+                        NewFye2023 = newFye2023
+                    });
+                }
+
+                if (hasChanges && applyUpdates)
+                {
+                    company.Fye2025 = newFye2025;
+                    company.Fye2024 = newFye2024;
+                    company.Fye2023 = newFye2023;
+                    updatedCount++;
+                }
+            }
+
+            if (applyUpdates && updatedCount > 0)
+            {
+                await _context.SaveChangesAsync();
+            }
+
+            return new ResetFyeValuesResult
+            {
+                HasCurrentSurvey = true,
+                CurrentSurveyYear = currentSurveyYear.Value,
+                TotalMatchedCompanies = companies.Count,
+                UpdatedCompanyCount = updatedCount,
+                WouldUpdateCompanyCount = changedRows.Count,
+                PreviewRows = changedRows
+                    .OrderBy(x => x.CompanyName)
+                    .ThenBy(x => x.CompanyId)
+                    .Take(Math.Max(1, previewLimit))
+                    .ToList()
+            };
+        }
+
+        private static decimal? ParseRevenueAnswer(decimal? answerCurrency, double? answerNumber, string? answerText)
+        {
+            if (answerCurrency.HasValue)
+            {
+                return Math.Round(answerCurrency.Value, 0, MidpointRounding.AwayFromZero);
+            }
+
+            if (answerNumber.HasValue)
+            {
+                return Math.Round((decimal)answerNumber.Value, 0, MidpointRounding.AwayFromZero);
+            }
+
+            if (string.IsNullOrWhiteSpace(answerText))
+            {
+                return null;
+            }
+
+            var cleaned = answerText
+                .Replace("$", string.Empty)
+                .Replace(",", string.Empty)
+                .Trim();
+
+            if (decimal.TryParse(cleaned, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed))
+            {
+                return Math.Round(parsed, 0, MidpointRounding.AwayFromZero);
+            }
+
+            if (decimal.TryParse(cleaned, NumberStyles.Any, CultureInfo.CurrentCulture, out parsed))
+            {
+                return Math.Round(parsed, 0, MidpointRounding.AwayFromZero);
+            }
+
+            return null;
+        }
+
+        public class ResetFyeValuesResult
+        {
+            public bool HasCurrentSurvey { get; set; }
+            public int? CurrentSurveyYear { get; set; }
+            public int TotalMatchedCompanies { get; set; }
+            public int UpdatedCompanyCount { get; set; }
+            public int WouldUpdateCompanyCount { get; set; }
+            public List<ResetFyePreviewRow> PreviewRows { get; set; } = new();
+        }
+
+        public class ResetFyePreviewRow
+        {
+            public int CompanyId { get; set; }
+            public string? CompanyName { get; set; }
+            public decimal? CurrentFye2025 { get; set; }
+            public decimal? NewFye2025 { get; set; }
+            public decimal? CurrentFye2024 { get; set; }
+            public decimal? NewFye2024 { get; set; }
+            public decimal? CurrentFye2023 { get; set; }
+            public decimal? NewFye2023 { get; set; }
         }
 
         private async Task<List<Tin200>> GetAllCompaniesFallbackAsync(int? financialYear = null)

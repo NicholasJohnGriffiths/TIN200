@@ -41,6 +41,7 @@ namespace TINWeb.Services
                     Saved = companySurvey.Saved,
                     Submitted = companySurvey.Submitted,
                     Requested = companySurvey.Requested,
+                    Locked = companySurvey.Locked ?? false,
                     Estimate = companySurvey.Estimate ?? false,
                     SavedDate = companySurvey.SavedDate,
                     SubmittedDate = companySurvey.SubmittedDate,
@@ -144,6 +145,30 @@ namespace TINWeb.Services
             return records.Count;
         }
 
+        public async Task<int> SetLockedAsync(IEnumerable<int> companySurveyIds, bool locked)
+        {
+            var ids = companySurveyIds
+                .Distinct()
+                .ToList();
+
+            if (!ids.Any())
+            {
+                return 0;
+            }
+
+            var rows = await _context.CompanySurvey
+                .Where(cs => ids.Contains(cs.Id))
+                .ToListAsync();
+
+            foreach (var row in rows)
+            {
+                row.Locked = locked;
+            }
+
+            await _context.SaveChangesAsync();
+            return rows.Count;
+        }
+
         public class CompanySurveyListRow
         {
             public int Id { get; set; }
@@ -153,6 +178,7 @@ namespace TINWeb.Services
             public bool Saved { get; set; }
             public bool Submitted { get; set; }
             public bool Requested { get; set; }
+            public bool Locked { get; set; }
             public bool Estimate { get; set; }
             public DateTime? SavedDate { get; set; }
             public DateTime? SubmittedDate { get; set; }

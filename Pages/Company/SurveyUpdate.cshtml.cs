@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.EntityFrameworkCore;
+using TINWeb.Data;
 using TINWeb.Models;
 using TINWeb.Services;
 
@@ -9,11 +11,13 @@ namespace TINWeb.Pages.Company
     {
         private readonly CompanyService _companyService;
         private readonly ISurveyLinkTokenService _surveyLinkTokenService;
+        private readonly ApplicationDbContext _context;
 
-        public SurveyUpdateModel(CompanyService companyService, ISurveyLinkTokenService surveyLinkTokenService)
+        public SurveyUpdateModel(CompanyService companyService, ISurveyLinkTokenService surveyLinkTokenService, ApplicationDbContext context)
         {
             _companyService = companyService;
             _surveyLinkTokenService = surveyLinkTokenService;
+            _context = context;
         }
 
         [BindProperty]
@@ -27,6 +31,7 @@ namespace TINWeb.Pages.Company
 
         public bool Submitted { get; set; }
         public bool Saved { get; set; }
+        public bool IsLocked { get; set; }
 
         public async Task<IActionResult> OnGetAsync(int id, string token, bool submitted = false, bool saved = false)
         {
@@ -45,6 +50,7 @@ namespace TINWeb.Pages.Company
             Token = token;
             Submitted = submitted;
             Saved = saved;
+            IsLocked = await IsLockedForCurrentSurveyAsync(id);
             return Page();
         }
 
@@ -57,6 +63,20 @@ namespace TINWeb.Pages.Company
 
             if (!ModelState.IsValid)
             {
+                return Page();
+            }
+
+            if (await IsLockedForCurrentSurveyAsync(id))
+            {
+                var lockedRecord = await _companyService.GetCompanyByIdAsync(id);
+                if (lockedRecord == null)
+                {
+                    return NotFound();
+                }
+
+                Record = lockedRecord;
+                IsLocked = true;
+                ModelState.AddModelError(string.Empty, "This survey record is locked. Please contact the Technology Investment Network.");
                 return Page();
             }
 
@@ -82,6 +102,26 @@ namespace TINWeb.Pages.Company
             }
 
             return RedirectToPage(new { id, token = Token, submitted = true });
+        }
+
+        private async Task<bool> IsLockedForCurrentSurveyAsync(int companyId)
+        {
+            var currentSurveyId = await _context.Survey
+                .Where(s => s.CurrentSurvey)
+                .OrderByDescending(s => s.FinancialYear)
+                .ThenByDescending(s => s.Id)
+                .Select(s => (int?)s.Id)
+                .FirstOrDefaultAsync();
+
+            if (!currentSurveyId.HasValue)
+            {
+                return false;
+            }
+
+            var companySurvey = await _context.CompanySurvey
+                .FirstOrDefaultAsync(cs => cs.CompanyId == companyId && cs.SurveyId == currentSurveyId.Value);
+
+            return (companySurvey?.Locked).GetValueOrDefault();
         }
     }
 }

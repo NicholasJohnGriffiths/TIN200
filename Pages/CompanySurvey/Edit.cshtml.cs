@@ -41,6 +41,7 @@ namespace TINWeb.Pages.CompanySurvey
             }
 
             Record = record;
+            Record.Locked ??= false;
             Record.Estimate ??= false;
             CompanyName = await _context.Tin200
                 .Where(c => c.Id == record.CompanyId)
@@ -61,6 +62,7 @@ namespace TINWeb.Pages.CompanySurvey
                 return NotFound();
             }
 
+            Record.Locked ??= false;
             Record.Estimate ??= false;
             await _service.UpdateAsync(Record);
             return RedirectToPage("./Index", new { financialYear = FinancialYear });

@@ -85,24 +85,32 @@
                                         <th>
                                             <button type="button" class="btn btn-link p-0 sort-header" data-sort-key="email">Email</button>
                                         </th>
+                                        <th style="width: 120px;">Survey Locked</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @foreach (var clientRow in Model.AvailableClients)
                                     {
                                         var hasEmail = !string.IsNullOrWhiteSpace(clientRow.Email);
+                                        var canSend = hasEmail && !clientRow.IsLocked;
+                                        var disableReason = clientRow.IsLocked
+                                            ? "Survey record is locked. Contact the Technology Investment Network."
+                                            : "Cannot send survey email because no email address is available.";
                                         var searchText = $"{clientRow.Id} {clientRow.CompanyName} {clientRow.Email}".ToLowerInvariant();
                                         var companySort = (clientRow.CompanyName ?? string.Empty).ToLowerInvariant();
                                         var emailSort = (clientRow.Email ?? string.Empty).ToLowerInvariant();
                                         <tr class="@(Model.SelectedClientIds.Contains(clientRow.Id) ? "preselected-client-row" : string.Empty)" data-search="@searchText" data-has-email="@(hasEmail ? "true" : "false")" data-id="@clientRow.Id" data-company="@companySort" data-email="@emailSort">
                                             <td>
-                                                @if (hasEmail)
+                                                @if (canSend)
                                                 {
                                                     <input class="form-check-input client-selector" type="checkbox" name="SelectedClientIds" value="@clientRow.Id" checked="@Model.SelectedClientIds.Contains(clientRow.Id)" />
                                                 }
                                                 else
                                                 {
-                                                    <input class="form-check-input client-selector" type="checkbox" name="SelectedClientIds" value="@clientRow.Id" disabled />
+                                                    <span title="@disableReason">
+                                                        <input class="form-check-input client-selector" type="checkbox" name="SelectedClientIds" value="@clientRow.Id" disabled />
+                                                    </span>
+                                                    <span class="small text-muted ms-1" title="@disableReason">N/A</span>
                                                 }
                                             </td>
                                             <td>@clientRow.Id</td>
@@ -115,6 +123,16 @@
                                                 else
                                                 {
                                                     <span class="text-muted">No email</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (clientRow.IsLocked)
+                                                {
+                                                    <span class="badge bg-warning text-dark">Yes</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">No</span>
                                                 }
                                             </td>
                                         </tr>

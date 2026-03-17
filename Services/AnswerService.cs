@@ -114,6 +114,7 @@ namespace TINWeb.Services
                     QuestionId = question.Id,
                     QuestionOrderNumber = question.OrderNumber,
                     QuestionText = question.QuestionText,
+                    AnswerType = question.AnswerType,
                     AnswerText = answer != null ? answer.AnswerText : null,
                     AnswerNumber = answer != null ? answer.AnswerNumber : null,
                     AnswerCurrency = answer != null ? answer.AnswerCurrency : null
@@ -324,6 +325,7 @@ namespace TINWeb.Services
                     Saved = false,
                     Submitted = false,
                     Requested = false,
+                    Locked = false,
                     Estimate = false,
                     SavedDate = null,
                     SubmittedDate = null,
@@ -710,6 +712,7 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
                     Saved = false,
                     Submitted = false,
                     Requested = false,
+                    Locked = false,
                     Estimate = false,
                     SavedDate = null,
                     SubmittedDate = null,
@@ -1263,6 +1266,7 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             public int QuestionId { get; set; }
             public int? QuestionOrderNumber { get; set; }
             public string? QuestionText { get; set; }
+            public string? AnswerType { get; set; }
             public string? AnswerText { get; set; }
             public double? AnswerNumber { get; set; }
             public decimal? AnswerCurrency { get; set; }

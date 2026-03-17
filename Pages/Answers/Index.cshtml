@@ -243,13 +243,65 @@
                 <tbody>
                 @foreach (var row in Model.Rows)
                 {
-                    var answerValue = !string.IsNullOrWhiteSpace(row.AnswerText)
-                        ? row.AnswerText
-                        : row.AnswerNumber.HasValue
-                            ? row.AnswerNumber.Value.ToString()
-                            : row.AnswerCurrency.HasValue
+                    var answerType = (row.AnswerType ?? string.Empty).Trim();
+                    var isBoolean = answerType.Equals("Boolean", StringComparison.OrdinalIgnoreCase)
+                        || answerType.Equals("Bool", StringComparison.OrdinalIgnoreCase);
+
+                    string answerValue;
+                    if (isBoolean)
+                    {
+                        var normalizedText = (row.AnswerText ?? string.Empty).Trim();
+                        if (!string.IsNullOrWhiteSpace(normalizedText))
+                        {
+                            if (normalizedText == "1"
+                                || normalizedText.Equals("true", StringComparison.OrdinalIgnoreCase)
+                                || normalizedText.Equals("yes", StringComparison.OrdinalIgnoreCase))
+                            {
+                                answerValue = "Yes";
+                            }
+                            else if (normalizedText == "0"
+                                || normalizedText.Equals("false", StringComparison.OrdinalIgnoreCase)
+                                || normalizedText.Equals("no", StringComparison.OrdinalIgnoreCase))
+                            {
+                                answerValue = "No";
+                            }
+                            else
+                            {
+                                answerValue = normalizedText;
+                            }
+                        }
+                        else if (row.AnswerNumber.HasValue)
+                        {
+                            if (Math.Abs(row.AnswerNumber.Value - 1d) < 0.0000001)
+                            {
+                                answerValue = "Yes";
+                            }
+                            else if (Math.Abs(row.AnswerNumber.Value) < 0.0000001)
+                            {
+                                answerValue = "No";
+                            }
+                            else
+                            {
+                                answerValue = row.AnswerNumber.Value.ToString();
+                            }
+                        }
+                        else
+                        {
+                            answerValue = row.AnswerCurrency.HasValue
                                 ? row.AnswerCurrency.Value.ToString("C")
                                 : string.Empty;
+                        }
+                    }
+                    else
+                    {
+                        answerValue = !string.IsNullOrWhiteSpace(row.AnswerText)
+                            ? row.AnswerText
+                            : row.AnswerNumber.HasValue
+                                ? row.AnswerNumber.Value.ToString()
+                                : row.AnswerCurrency.HasValue
+                                    ? row.AnswerCurrency.Value.ToString("C")
+                                    : string.Empty;
+                    }
 
                     <tr>
                         <td>@row.CompanyName</td>

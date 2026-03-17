@@ -38,6 +38,28 @@
             <label asp-for="Record.Requested" class="form-check-label"></label>
         </div>
 
+        <div class="form-check mb-3">
+            <input type="hidden" name="Record.Locked" value="false" />
+            <input type="checkbox"
+                   class="form-check-input"
+                   id="Record_Locked"
+                   name="Record.Locked"
+                   value="true"
+                   checked="@(Model.Record.Locked == true)" />
+            <label class="form-check-label" for="Record_Locked">Locked</label>
+        </div>
+
+        <div class="form-check mb-3">
+            <input type="hidden" name="Record.Estimate" value="false" />
+            <input type="checkbox"
+                   class="form-check-input"
+                   id="Record_Estimate"
+                   name="Record.Estimate"
+                   value="true"
+                   checked="@(Model.Record.Estimate == true)" />
+            <label class="form-check-label" for="Record_Estimate">Estimate</label>
+        </div>
+
         <button type="submit" class="btn btn-primary">Create</button>
         <a asp-page="./Index" class="btn btn-secondary">Back to List</a>
     </form>

@@ -1,0 +1,135 @@
+@page
+@model TINWeb.Pages.CompanySurvey.LockingModel
+@{
+    ViewData["Title"] = "Survey Locking";
+}
+
+<div class="container mt-4">
+    @{
+        var totalRecords = Model.Records.Count;
+        var lockedPercent = totalRecords == 0 ? 0 : (int)Math.Round((double)Model.TotalLockedCompanies * 100 / totalRecords);
+    }
+
+    <div class="row mb-3">
+        <div class="col-md-8">
+            <h1>Survey Locking</h1>
+            <p class="text-muted mb-0">Companies with answers: <strong>@Model.TotalCompaniesWithAnswers</strong> of <strong>@Model.Records.Count</strong></p>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <div class="alert alert-success" role="alert">@Model.StatusMessage</div>
+    }
+
+    <div class="row mb-3">
+        <div class="col-12">
+            <form method="get" class="d-flex">
+                <label class="me-2 align-self-center">Survey Financial Year:</label>
+                <select name="financialYear" class="form-select me-2" aria-label="Survey Financial Year" style="max-width: 180px;">
+                    @foreach (var year in Model.FinancialYears)
+                    {
+                        <option value="@year" selected="@(Model.SelectedFinancialYear == year ? "selected" : null)">@year</option>
+                    }
+                </select>
+                <button class="btn btn-outline-primary" type="submit">Apply</button>
+            </form>
+        </div>
+    </div>
+
+    @if (Model.Records.Any())
+    {
+        <form method="post" id="surveyLockingForm">
+            <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
+
+            <div class="card mb-3">
+                <div class="card-body py-3">
+                    <div class="small fw-semibold mb-1">Lock Progress (Selected Year)</div>
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span id="lockProgressLabel">@Model.TotalLockedCompanies of @totalRecords locked</span>
+                        <span id="lockProgressPercent">@lockedPercent%</span>
+                    </div>
+                    <div class="progress" role="progressbar" aria-label="Lock progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@lockedPercent">
+                        <div id="lockProgressBar" class="progress-bar bg-danger" style="width: @lockedPercent%">@lockedPercent%</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-3 d-flex gap-2">
+                <button type="submit" asp-page-handler="Lock" class="btn btn-danger">Lock Selected</button>
+                <button type="submit" asp-page-handler="Unlock" class="btn btn-success">Unlock Selected</button>
+            </div>
+
+            <table class="table table-striped table-hover company-table">
+                <thead class="table-dark">
+                    <tr>
+                        <th style="width: 48px;">
+                            <input type="checkbox" id="selectAllRows" class="form-check-input" aria-label="Select all rows" />
+                        </th>
+                        <th>Company Name</th>
+                        <th>Saved</th>
+                        <th>Saved Date</th>
+                        <th>Submitted</th>
+                        <th>Submitted Date</th>
+                        <th>Requested</th>
+                        <th>Requested Date</th>
+                        <th>Locked</th>
+                        <th>Estimate</th>
+                        <th>Answers</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var record in Model.Records)
+                    {
+                        <tr>
+                            <td>
+                                <input type="checkbox" class="form-check-input row-selector" name="SelectedCompanySurveyIds" value="@record.Id" aria-label="Select @record.CompanyName" />
+                            </td>
+                            <td>@record.CompanyName</td>
+                            <td>@(record.Saved ? "Yes" : "No")</td>
+                            <td>@(record.SavedDate?.ToString("dd/MM/yyyy") ?? string.Empty)</td>
+                            <td>@(record.Submitted ? "Yes" : "No")</td>
+                            <td>@(record.SubmittedDate?.ToString("dd/MM/yyyy") ?? string.Empty)</td>
+                            <td>@(record.Requested ? "Yes" : "No")</td>
+                            <td>@(record.RequestedDate?.ToString("dd/MM/yyyy") ?? string.Empty)</td>
+                            <td>@(record.Locked ? "Yes" : "No")</td>
+                            <td>@(record.Estimate ? "Yes" : "No")</td>
+                            <td>@record.AnswerCount</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </form>
+    }
+    else
+    {
+        <div class="alert alert-info">No company survey records found.</div>
+    }
+</div>
+
+<script>
+    (function () {
+        const selectAll = document.getElementById('selectAllRows');
+        const rowSelectors = Array.from(document.querySelectorAll('.row-selector'));
+
+        if (!selectAll || !rowSelectors.length) {
+            return;
+        }
+
+        selectAll.addEventListener('change', function () {
+            const checked = selectAll.checked;
+            rowSelectors.forEach(function (checkbox) {
+                checkbox.checked = checked;
+            });
+        });
+
+        rowSelectors.forEach(function (checkbox) {
+            checkbox.addEventListener('change', function () {
+                const allChecked = rowSelectors.every(function (rowCheckbox) { return rowCheckbox.checked; });
+                const anyChecked = rowSelectors.some(function (rowCheckbox) { return rowCheckbox.checked; });
+                selectAll.checked = allChecked;
+                selectAll.indeterminate = anyChecked && !allChecked;
+            });
+        });
+    })();
+</script>

@@ -26,6 +26,8 @@ namespace TINWeb.Models
         [Required]
         public bool Requested { get; set; }
 
+        public bool? Locked { get; set; }
+
         public bool? Estimate { get; set; }
 
         public DateTime? SavedDate { get; set; }

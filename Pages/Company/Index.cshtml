@@ -5,11 +5,75 @@
 }
 
 <div class="container-fluid px-0 mt-3">
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <div class="alert alert-info" role="alert">@Model.StatusMessage</div>
+    }
+
+    @if (Model.PreviewSummary != null)
+    {
+        if (!Model.PreviewSummary.HasCurrentSurvey)
+        {
+            <div class="alert alert-warning" role="alert">
+                No current survey is configured, so no preview is available.
+            </div>
+        }
+        else
+        {
+            <div class="card mb-3 border-warning">
+                <div class="card-header bg-warning-subtle">
+                    Reset Preview Summary (Current survey year: @Model.PreviewSummary.CurrentSurveyYear)
+                </div>
+                <div class="card-body">
+                    <p class="mb-2">
+                        Matched companies: <strong>@Model.PreviewSummary.TotalMatchedCompanies</strong>.<br />
+                        Companies that would be updated: <strong>@Model.PreviewSummary.WouldUpdateCompanyCount</strong>.
+                    </p>
+                    @if (Model.PreviewSummary.PreviewRows.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Company</th>
+                                        <th>FYE Last Financial Year</th>
+                                        <th>FYE Year-1</th>
+                                        <th>FYE Year-2</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var row in Model.PreviewSummary.PreviewRows)
+                                    {
+                                        <tr>
+                                            <td>@row.CompanyName (@row.CompanyId)</td>
+                                            <td>@(row.CurrentFye2025?.ToString("C0") ?? "") -> @(row.NewFye2025?.ToString("C0") ?? "")</td>
+                                            <td>@(row.CurrentFye2024?.ToString("C0") ?? "") -> @(row.NewFye2024?.ToString("C0") ?? "")</td>
+                                            <td>@(row.CurrentFye2023?.ToString("C0") ?? "") -> @(row.NewFye2023?.ToString("C0") ?? "")</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="small text-muted mt-2 mb-0">Showing up to @Model.PreviewSummary.PreviewRows.Count company change row(s).</p>
+                    }
+                </div>
+            </div>
+        }
+    }
+
     <div class="row mb-4">
         <div class="col-md-8">
             <h1>Companies</h1>
         </div>
         <div class="col-md-4 text-end">
+            <form method="post" asp-page-handler="PreviewResetFyeValues" class="d-inline">
+                <input type="hidden" name="year" value="@Model.SelectedYear" />
+                <button type="submit" class="btn btn-outline-secondary me-2" id="companyResetPreviewButton">Preview Summary</button>
+            </form>
+            <form method="post" asp-page-handler="ResetFyeValues" class="d-inline" onsubmit="return confirm('Reset FYE 2025/2024/2023 from survey answers? This will overwrite existing values.');">
+                <input type="hidden" name="year" value="@Model.SelectedYear" />
+                <button type="submit" class="btn btn-outline-warning me-2" id="companyResetButton">Reset FYE Values</button>
+            </form>
             <a asp-page="./Create" class="btn btn-primary">
                 <i class="bi bi-plus-circle"></i> Add New Record
             </a>
@@ -56,9 +120,9 @@
                         <th class="sortable" data-type="string">CEO Name</th>
                         <th class="sortable" data-type="string">Email</th>
                         <th class="sortable" data-type="string">External ID</th>
-                        <th class="sortable" data-type="number">FYE 2025</th>
-                        <th class="sortable" data-type="number">FYE 2024</th>
-                        <th class="sortable" data-type="number">FYE 2023</th>
+                        <th class="sortable" data-type="number">FYE Last Financial Year</th>
+                        <th class="sortable" data-type="number">FYE Year-1</th>
+                        <th class="sortable" data-type="number">FYE Year-2</th>
                         <th class="sortable" data-type="number">Financial Year</th>
                         <th class="actions-header">Actions</th>
                     </tr>
@@ -161,6 +225,10 @@
         const form = document.getElementById('companyFilterForm');
         const exportButton = document.getElementById('companyExportButton');
         const smExportButton = document.getElementById('companySmExportButton');
+        const previewButton = document.getElementById('companyResetPreviewButton');
+        const previewForm = previewButton ? previewButton.closest('form') : null;
+        const resetButton = document.getElementById('companyResetButton');
+        const resetForm = resetButton ? resetButton.closest('form') : null;
         const progressContainer = document.getElementById('companyExportProgressContainer');
         const progressBar = document.getElementById('companyExportProgressBar');
         const progressPercent = document.getElementById('companyExportProgressPercent');
@@ -172,13 +240,13 @@
 
         let timerId = null;
 
-        function startProgress() {
+        function startProgress(labelText) {
             if (timerId) {
                 window.clearInterval(timerId);
             }
 
             let value = 8;
-            progressLabel.textContent = 'Exporting companies...';
+            progressLabel.textContent = labelText;
             progressContainer.style.display = '';
 
             function render() {
@@ -197,10 +265,30 @@
         }
 
         form.addEventListener('submit', function (event) {
-            if (event.submitter && (event.submitter.id === 'companyExportButton' || event.submitter.id === 'companySmExportButton')) {
-                startProgress();
+            if (!event.submitter) {
+                return;
+            }
+
+            if (event.submitter.id === 'companyExportButton') {
+                startProgress('Exporting companies...');
+            }
+
+            if (event.submitter.id === 'companySmExportButton') {
+                startProgress('Exporting SurveyMonkey file...');
             }
         });
+
+        if (resetForm && resetButton) {
+            resetForm.addEventListener('submit', function () {
+                startProgress('Resetting FYE values...');
+            });
+        }
+
+        if (previewForm && previewButton) {
+            previewForm.addEventListener('submit', function () {
+                startProgress('Building reset preview...');
+            });
+        }
     })();
 </script>
 <style>

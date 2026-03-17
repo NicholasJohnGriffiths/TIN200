@@ -46,6 +46,7 @@ namespace TINWeb.Pages.Company
 
         public bool Saved { get; set; }
         public bool Submitted { get; set; }
+        public bool IsLocked { get; set; }
         public HashSet<int> AvailableGroupImageIds { get; set; } = new();
 
         public async Task<IActionResult> OnGetAsync(int id, string token, bool saved = false, bool submitted = false)
@@ -94,6 +95,8 @@ namespace TINWeb.Pages.Company
             FinancialYear = survey.FinancialYear;
             SurveyHeaderImageUrl = await BuildSurveyHeaderImageUrlAsync(company.Id, Token, survey);
             var companySurveyId = await EnsureCompanySurveyAsync(company.Id, survey.Id);
+            var companySurvey = await _context.CompanySurvey.FirstOrDefaultAsync(cs => cs.Id == companySurveyId);
+            IsLocked = (companySurvey?.Locked).GetValueOrDefault();
 
             Rows = await LoadAnswerRowsAsync(company.Id, companySurveyId, survey.FinancialYear);
             AvailableGroupImageIds = await GetAvailableGroupImageIdsAsync(Rows);
@@ -212,6 +215,16 @@ namespace TINWeb.Pages.Company
             FinancialYear = survey.FinancialYear;
             SurveyHeaderImageUrl = await BuildSurveyHeaderImageUrlAsync(company.Id, Token, survey);
             var companySurveyId = await EnsureCompanySurveyAsync(company.Id, survey.Id);
+            var companySurvey = await _context.CompanySurvey.FirstOrDefaultAsync(cs => cs.Id == companySurveyId);
+            IsLocked = (companySurvey?.Locked).GetValueOrDefault();
+
+            if (IsLocked)
+            {
+                ModelState.AddModelError(string.Empty, "This survey record is locked. Please contact the Technology Investment Network.");
+                Rows = await LoadAnswerRowsAsync(company.Id, companySurveyId, survey.FinancialYear);
+                AvailableGroupImageIds = await GetAvailableGroupImageIdsAsync(Rows);
+                return Page();
+            }
 
             var questionById = await _context.Question
                 .Where(q => Rows.Select(r => r.QuestionId).Contains(q.Id))
@@ -277,7 +290,6 @@ namespace TINWeb.Pages.Company
                 }
             }
 
-            var companySurvey = await _context.CompanySurvey.FirstOrDefaultAsync(cs => cs.Id == companySurveyId);
             if (companySurvey != null)
             {
                 companySurvey.Saved = true;
@@ -389,6 +401,8 @@ namespace TINWeb.Pages.Company
                 Saved = false,
                 Submitted = false,
                 Requested = false,
+                    Locked = false,
+                    Estimate = false,
                 SavedDate = null,
                 SubmittedDate = null,
                 RequestedDate = null

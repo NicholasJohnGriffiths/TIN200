@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Options;
+using Microsoft.EntityFrameworkCore;
+using TINWeb.Data;
 using TINWeb.Services;
 
 namespace TINWeb.Pages.Company
@@ -11,17 +13,20 @@ namespace TINWeb.Pages.Company
         private readonly ISurveyEmailService _surveyEmailService;
         private readonly ISurveyLinkTokenService _surveyLinkTokenService;
         private readonly SurveyLinkSettings _surveyLinkSettings;
+        private readonly ApplicationDbContext _context;
 
         public SendSurveyModel(
             CompanyService companyService,
             ISurveyEmailService surveyEmailService,
             ISurveyLinkTokenService surveyLinkTokenService,
-            IOptions<SurveyLinkSettings> surveyLinkSettings)
+            IOptions<SurveyLinkSettings> surveyLinkSettings,
+            ApplicationDbContext context)
         {
             _companyService = companyService;
             _surveyEmailService = surveyEmailService;
             _surveyLinkTokenService = surveyLinkTokenService;
             _surveyLinkSettings = surveyLinkSettings.Value;
+            _context = context;
         }
 
         [BindProperty]
@@ -85,14 +90,22 @@ namespace TINWeb.Pages.Company
 
             var sentCount = 0;
             var skippedNoEmailCount = 0;
+            var skippedLockedCount = 0;
             var failedCount = 0;
             string? firstFailureReason = null;
+            var lockedCompanyIds = await GetLockedCompanyIdsForCurrentSurveyAsync();
 
             foreach (var clientRow in selected)
             {
                 if (string.IsNullOrWhiteSpace(clientRow.Email))
                 {
                     skippedNoEmailCount++;
+                    continue;
+                }
+
+                if (lockedCompanyIds.Contains(clientRow.Id))
+                {
+                    skippedLockedCount++;
                     continue;
                 }
 
@@ -110,7 +123,7 @@ namespace TINWeb.Pages.Company
                 }
             }
 
-            StatusMessage = $"Bulk send complete. Sent: {sentCount}, Skipped (no email): {skippedNoEmailCount}, Failed: {failedCount}.";
+            StatusMessage = $"Bulk send complete. Sent: {sentCount}, Skipped (no email): {skippedNoEmailCount}, Skipped (locked): {skippedLockedCount}, Failed: {failedCount}.";
             BulkSentCount = sentCount;
             BulkSkippedCount = skippedNoEmailCount;
             BulkFailedCount = failedCount;
@@ -122,6 +135,12 @@ namespace TINWeb.Pages.Company
                     ? string.Empty
                     : $" First error: {firstFailureReason}";
                 ModelState.AddModelError(string.Empty, $"Some emails could not be sent. Please check SMTP settings and retry.{detail}");
+                return Page();
+            }
+
+            if (skippedLockedCount > 0)
+            {
+                ModelState.AddModelError(string.Empty, "Locked survey records were skipped and no survey email was sent for them.");
                 return Page();
             }
 
@@ -147,6 +166,8 @@ namespace TINWeb.Pages.Company
         private async Task LoadAvailableClientsAsync()
         {
             var clients = await _companyService.GetAllCompaniesAsync();
+            var lockedCompanyIds = await GetLockedCompanyIdsForCurrentSurveyAsync();
+
             AvailableClients = clients
                 .OrderBy(c => c.CompanyName)
                 .ThenBy(c => c.Id)
@@ -154,9 +175,32 @@ namespace TINWeb.Pages.Company
                 {
                     Id = c.Id,
                     CompanyName = c.CompanyName,
-                    Email = c.Email
+                    Email = c.Email,
+                    IsLocked = lockedCompanyIds.Contains(c.Id)
                 })
                 .ToList();
+        }
+
+        private async Task<HashSet<int>> GetLockedCompanyIdsForCurrentSurveyAsync()
+        {
+            var currentSurveyId = await _context.Survey
+                .Where(s => s.CurrentSurvey)
+                .OrderByDescending(s => s.FinancialYear)
+                .ThenByDescending(s => s.Id)
+                .Select(s => (int?)s.Id)
+                .FirstOrDefaultAsync();
+
+            if (!currentSurveyId.HasValue)
+            {
+                return new HashSet<int>();
+            }
+
+            var lockedIds = await _context.CompanySurvey
+                .Where(cs => cs.SurveyId == currentSurveyId.Value && (cs.Locked ?? false))
+                .Select(cs => cs.CompanyId)
+                .ToListAsync();
+
+            return lockedIds.ToHashSet();
         }
 
         public class SurveyClientRow
@@ -164,6 +208,7 @@ namespace TINWeb.Pages.Company
             public int Id { get; set; }
             public string? CompanyName { get; set; }
             public string? Email { get; set; }
+            public bool IsLocked { get; set; }
         }
     }
 }
