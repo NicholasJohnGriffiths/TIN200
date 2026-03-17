@@ -1,0 +1,13 @@
+{
+  "ResourceGroup": "rg-tinweb-prod",
+  "Location": "australiaeast",
+  "WebAppName": "tinweb-prod-app",
+  "AppServicePlanName": "tinweb-prod-plan",
+  "SqlServerName": "tinweb-prod-sql",
+  "SqlDatabaseName": "TINWeb",
+  "SqlAdminUser": "tinadmin",
+  "SqlAdminPassword": "",
+  "SurveyLinkSecretKey": "",
+  "SurveyLinkExpiryHours": 72,
+  "SurveySupportEmail": ""
+}

@@ -1,26 +1,26 @@
 param(
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [string]$ResourceGroup,
 
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [string]$Location,
 
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [string]$WebAppName,
 
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [string]$AppServicePlanName,
 
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [string]$SqlServerName,
 
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [string]$SqlDatabaseName,
 
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [string]$SqlAdminUser,
 
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)]
     [string]$SqlAdminPassword,
 
     [Parameter(Mandatory = $false)]
@@ -31,6 +31,9 @@ param(
 
     [Parameter(Mandatory = $false)]
     [string]$SurveySupportEmail = "",
+
+    [Parameter(Mandatory = $false)]
+    [string]$ConfigPath = (Join-Path $PSScriptRoot "deploy-azure.settings.json"),
 
     [switch]$AllowMyIp
 )
@@ -50,6 +53,67 @@ $scriptRoot = $PSScriptRoot
 $projectRoot = Split-Path -Parent $scriptRoot
 $publishDir = Join-Path $scriptRoot "publish"
 $publishZip = Join-Path $scriptRoot "publish.zip"
+
+$config = $null
+if (-not [string]::IsNullOrWhiteSpace($ConfigPath) -and (Test-Path $ConfigPath)) {
+    Write-Host "Loading deployment settings from $ConfigPath"
+    $config = Get-Content -Path $ConfigPath -Raw | ConvertFrom-Json
+}
+
+function Resolve-Setting {
+    param(
+        [string]$CliValue,
+        $ConfigValue,
+        [string]$DefaultValue = ""
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($CliValue)) {
+        return $CliValue
+    }
+
+    if ($null -ne $ConfigValue -and -not [string]::IsNullOrWhiteSpace([string]$ConfigValue)) {
+        return [string]$ConfigValue
+    }
+
+    return $DefaultValue
+}
+
+$ResourceGroup = Resolve-Setting -CliValue $ResourceGroup -ConfigValue $config.ResourceGroup
+$Location = Resolve-Setting -CliValue $Location -ConfigValue $config.Location
+$WebAppName = Resolve-Setting -CliValue $WebAppName -ConfigValue $config.WebAppName
+$AppServicePlanName = Resolve-Setting -CliValue $AppServicePlanName -ConfigValue $config.AppServicePlanName
+$SqlServerName = Resolve-Setting -CliValue $SqlServerName -ConfigValue $config.SqlServerName
+$SqlDatabaseName = Resolve-Setting -CliValue $SqlDatabaseName -ConfigValue $config.SqlDatabaseName
+$SqlAdminUser = Resolve-Setting -CliValue $SqlAdminUser -ConfigValue $config.SqlAdminUser
+$SqlAdminPassword = Resolve-Setting -CliValue $SqlAdminPassword -ConfigValue $config.SqlAdminPassword -DefaultValue $env:AZURE_SQL_ADMIN_PASSWORD
+$SurveyLinkSecretKey = Resolve-Setting -CliValue $SurveyLinkSecretKey -ConfigValue $config.SurveyLinkSecretKey
+$SurveySupportEmail = Resolve-Setting -CliValue $SurveySupportEmail -ConfigValue $config.SurveySupportEmail
+
+if ($SurveyLinkExpiryHours -eq 72 -and $null -ne $config.SurveyLinkExpiryHours) {
+    $SurveyLinkExpiryHours = [int]$config.SurveyLinkExpiryHours
+}
+
+$requiredValues = @{
+    ResourceGroup = $ResourceGroup
+    Location = $Location
+    WebAppName = $WebAppName
+    AppServicePlanName = $AppServicePlanName
+    SqlServerName = $SqlServerName
+    SqlDatabaseName = $SqlDatabaseName
+    SqlAdminUser = $SqlAdminUser
+    SqlAdminPassword = $SqlAdminPassword
+}
+
+$missing = @()
+foreach ($key in $requiredValues.Keys) {
+    if ([string]::IsNullOrWhiteSpace($requiredValues[$key])) {
+        $missing += $key
+    }
+}
+
+if ($missing.Count -gt 0) {
+    throw "Missing required deployment settings: $($missing -join ', '). Provide them via script parameters, $ConfigPath, or AZURE_SQL_ADMIN_PASSWORD for SqlAdminPassword."
+}
 
 Write-Host "Checking Azure CLI login..."
 az account show | Out-Null
