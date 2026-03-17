@@ -16,4 +16,5 @@ node_modules/
 wwwroot/lib/
 deploy/publish/
 deploy/publish.zip
+deploy/deploy-azure.settings.json
 deploy/*.zip

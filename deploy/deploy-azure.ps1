@@ -33,7 +33,7 @@ param(
     [string]$SurveySupportEmail = "",
 
     [Parameter(Mandatory = $false)]
-    [string]$ConfigPath = (Join-Path $PSScriptRoot "deploy-azure.settings.json"),
+    [string]$ConfigPath = "",
 
     [switch]$AllowMyIp
 )
@@ -53,6 +53,10 @@ $scriptRoot = $PSScriptRoot
 $projectRoot = Split-Path -Parent $scriptRoot
 $publishDir = Join-Path $scriptRoot "publish"
 $publishZip = Join-Path $scriptRoot "publish.zip"
+
+if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
+    $ConfigPath = Join-Path $scriptRoot "deploy-azure.settings.json"
+}
 
 $config = $null
 if (-not [string]::IsNullOrWhiteSpace($ConfigPath) -and (Test-Path $ConfigPath)) {
