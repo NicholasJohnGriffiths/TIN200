@@ -61,6 +61,7 @@
                         <td>@record.AnswerCount</td>
                         <td class="actions-col">
                             <a asp-page="/CompanySurvey/Edit" asp-route-id="@record.Id" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-sm btn-secondary">Edit</a>
+                            <a asp-page="/CompanySurvey/Notes" asp-route-companySurveyId="@record.Id" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-sm btn-outline-dark">Notes</a>
                             <a asp-page="/Answers/Index" asp-route-companySurveyId="@record.Id" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-sm btn-primary">Open Answers</a>
                             <a asp-page="/Company/SendSurvey"
                                asp-route-id="@record.CompanyId"

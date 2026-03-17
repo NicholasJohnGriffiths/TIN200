@@ -17,6 +17,7 @@ namespace TINWeb.Data
         public DbSet<QuestionGroup> QuestionGroup { get; set; } = null!;
         public DbSet<Image> Image { get; set; } = null!;
         public DbSet<Answer> Answer { get; set; } = null!;
+        public DbSet<CompanySurveyNote> CompanySurveyNotes { get; set; } = null!;
         public DbSet<CompanyFinancialAnalytics> CompanyFinancialAnalytics { get; set; } = null!;
         public DbSet<FinancialYearComparison> FinancialYearComparison { get; set; } = null!;
         public DbSet<RevenueSummaryBySize> RevenueSummaryBySize { get; set; } = null!;
@@ -379,6 +380,42 @@ namespace TINWeb.Data
                     .WithMany()
                     .HasForeignKey(e => e.QuestionId)
                     .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<CompanySurveyNote>(entity =>
+            {
+                entity.ToTable("CompanySurveyNotes");
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("Id")
+                    .ValueGeneratedOnAdd();
+
+                entity.Property(e => e.CompanySurveyId)
+                    .HasColumnName("CompanySurveyId")
+                    .HasColumnType("int")
+                    .IsRequired();
+
+                entity.Property(e => e.NoteDateTime)
+                    .HasColumnName("NoteDateTime")
+                    .HasColumnType("datetime")
+                    .IsRequired();
+
+                entity.Property(e => e.User)
+                    .HasColumnName("User")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255)
+                    .IsRequired();
+
+                entity.Property(e => e.Notes)
+                    .HasColumnName("Notes")
+                    .HasColumnType("varchar(max)");
+
+                entity.HasOne<CompanySurvey>()
+                    .WithMany()
+                    .HasForeignKey(e => e.CompanySurveyId)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .HasConstraintName("FK_CompanySurveyNotes_CompanySurvey");
             });
 
             // Configure view models - no key required for views
