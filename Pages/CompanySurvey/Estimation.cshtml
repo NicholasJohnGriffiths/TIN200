@@ -147,6 +147,166 @@
         </div>
     </div>
 
+    @if (!Model.AvailableRegionalEmploymentQuestionTitles.Any())
+    {
+        <div class="card mb-4">
+            <div class="card-header">Regional Employment Estimation</div>
+            <div class="card-body">
+                <div class="text-muted">No Regional Employment questions were found in the question set.</div>
+            </div>
+        </div>
+    }
+    else
+    {
+        var domesticRegionLabels = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Northland", "Auckland", "Waikato", "BOP", "Gisborne", "HB", "Taranaki", "Wanganui", "Wgtn", "Manawatu", "Nelson", "Marlborough", "Canterbury", "WestCoast", "Otago", "Southland"
+        };
+        string RegionLabel(string questionTitle) => questionTitle.Replace("Regional Employment ", string.Empty).Replace(" Last Financial Year", string.Empty).Trim();
+        var globalRegionalQuestions = Model.AvailableRegionalEmploymentQuestionTitles.Where(q => !domesticRegionLabels.Contains(RegionLabel(q))).ToList();
+        var domesticRegionalQuestions = Model.AvailableRegionalEmploymentQuestionTitles.Where(q => domesticRegionLabels.Contains(RegionLabel(q))).ToList();
+
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">Regional Employment - Global Regions</span>
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#regionalEmploymentGlobal" aria-expanded="true" aria-controls="regionalEmploymentGlobal">Toggle</button>
+            </div>
+            <div id="regionalEmploymentGlobal" class="collapse show">
+                <div class="card-body">
+                    @if (!globalRegionalQuestions.Any())
+                    {
+                        <div class="text-muted">No global regional employment questions found.</div>
+                    }
+                    else
+                    {
+                        @foreach (var regionalQuestionTitle in globalRegionalQuestions)
+                        {
+                            var regionLabel = RegionLabel(regionalQuestionTitle);
+                            var regionalRows = Model.LastFiveYearsRegionalEmploymentByQuestionTitle.TryGetValue(regionalQuestionTitle, out var rows)
+                                ? rows
+                                : new List<TINWeb.Pages.CompanySurvey.EstimationModel.MetricHistoryRow>();
+
+                            <div class="card mb-3">
+                                <div class="card-header d-flex justify-content-between align-items-center estimation-header">
+                                    <span>Last 5 Years - @regionalQuestionTitle</span>
+                                    @if (Model.EstimateEnabled && !Model.IsLocked)
+                                    {
+                                        <form method="post" asp-page-handler="CalculateRegionalEmployment" class="mb-0">
+                                            <input type="hidden" name="companySurveyId" value="@Model.CompanySurveyId" />
+                                            <input type="hidden" name="financialYear" value="@Model.FinancialYearFilter" />
+                                            <input type="hidden" name="regionQuestionTitle" value="@regionalQuestionTitle" />
+                                            <button type="submit" class="btn btn-sm btn-outline-success estimation-generate-btn"><span class="btn-label-full">Generate</span><span class="btn-label-short">Gen</span></button>
+                                        </form>
+                                    }
+                                </div>
+                                <div class="card-body p-0">
+                                    @if (regionalRows.Any())
+                                    {
+                                        <div class="table-responsive">
+                                            <table class="table table-striped mb-0">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th style="width: 200px;">Financial Year</th>
+                                                        <th style="width: 220px;">Company Survey ID</th>
+                                                        <th>Regional Employment (@regionLabel)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var row in regionalRows)
+                                                    {
+                                                        <tr>
+                                                            <td>@row.FinancialYear</td>
+                                                            <td>@row.CompanySurveyId</td>
+                                                            <td>@(row.Value?.ToString("N2") ?? string.Empty)</td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="p-3 text-muted">No historical regional employment values were found for @regionLabel.</div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span class="fw-semibold">Regional Employment - NZ Domestic Regions</span>
+                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#regionalEmploymentDomestic" aria-expanded="false" aria-controls="regionalEmploymentDomestic">Toggle</button>
+            </div>
+            <div id="regionalEmploymentDomestic" class="collapse">
+                <div class="card-body">
+                    @if (!domesticRegionalQuestions.Any())
+                    {
+                        <div class="text-muted">No NZ domestic regional employment questions found.</div>
+                    }
+                    else
+                    {
+                        @foreach (var regionalQuestionTitle in domesticRegionalQuestions)
+                        {
+                            var regionLabel = RegionLabel(regionalQuestionTitle);
+                            var regionalRows = Model.LastFiveYearsRegionalEmploymentByQuestionTitle.TryGetValue(regionalQuestionTitle, out var rows)
+                                ? rows
+                                : new List<TINWeb.Pages.CompanySurvey.EstimationModel.MetricHistoryRow>();
+
+                            <div class="card mb-3">
+                                <div class="card-header d-flex justify-content-between align-items-center estimation-header">
+                                    <span>Last 5 Years - @regionalQuestionTitle</span>
+                                    @if (Model.EstimateEnabled && !Model.IsLocked)
+                                    {
+                                        <form method="post" asp-page-handler="CalculateRegionalEmployment" class="mb-0">
+                                            <input type="hidden" name="companySurveyId" value="@Model.CompanySurveyId" />
+                                            <input type="hidden" name="financialYear" value="@Model.FinancialYearFilter" />
+                                            <input type="hidden" name="regionQuestionTitle" value="@regionalQuestionTitle" />
+                                            <button type="submit" class="btn btn-sm btn-outline-success estimation-generate-btn"><span class="btn-label-full">Generate</span><span class="btn-label-short">Gen</span></button>
+                                        </form>
+                                    }
+                                </div>
+                                <div class="card-body p-0">
+                                    @if (regionalRows.Any())
+                                    {
+                                        <div class="table-responsive">
+                                            <table class="table table-striped mb-0">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th style="width: 200px;">Financial Year</th>
+                                                        <th style="width: 220px;">Company Survey ID</th>
+                                                        <th>Regional Employment (@regionLabel)</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach (var row in regionalRows)
+                                                    {
+                                                        <tr>
+                                                            <td>@row.FinancialYear</td>
+                                                            <td>@row.CompanySurveyId</td>
+                                                            <td>@(row.Value?.ToString("N2") ?? string.Empty)</td>
+                                                        </tr>
+                                                    }
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <div class="p-3 text-muted">No historical regional employment values were found for @regionLabel.</div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
     <div class="card mb-4">
         <div class="card-header d-flex justify-content-between align-items-center estimation-header">
             <span>Last 5 Years - Cost Structures Last Financial Year - Wages and Salaries</span>
@@ -676,6 +836,21 @@
         <div class="alert alert-warning mt-3">
             <div><strong>Forecasted Employment Total:</strong> not available</div>
             <div class="small text-muted">@Model.EmploymentForecastReason</div>
+        </div>
+    }
+
+    @if (Model.ForecastedRegionalEmployment.HasValue)
+    {
+        <div class="alert alert-success mt-3">
+            <div><strong>Forecasted Regional Employment (@Model.SelectedRegionalEmploymentRegionLabel):</strong> @Model.ForecastedRegionalEmployment.Value.ToString("N2")</div>
+            <div class="small text-muted">@Model.RegionalEmploymentForecastReason</div>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Model.RegionalEmploymentForecastReason))
+    {
+        <div class="alert alert-warning mt-3">
+            <div><strong>Forecasted Regional Employment (@Model.SelectedRegionalEmploymentRegionLabel):</strong> not available</div>
+            <div class="small text-muted">@Model.RegionalEmploymentForecastReason</div>
         </div>
     }
 

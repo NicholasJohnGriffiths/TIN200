@@ -16,6 +16,7 @@
         <ul class="list-unstyled d-flex flex-wrap gap-2">
             <li><a href="#revenue" class="btn btn-outline-secondary btn-sm">Total Revenue</a></li>
             <li><a href="#employment" class="btn btn-outline-secondary btn-sm">Employment</a></li>
+            <li><a href="#regionalemployment" class="btn btn-outline-secondary btn-sm">Regional Employment</a></li>
             <li><a href="#wages" class="btn btn-outline-secondary btn-sm">Wages &amp; Salaries</a></li>
             <li><a href="#rd" class="btn btn-outline-secondary btn-sm">Research &amp; Development</a></li>
             <li><a href="#salesmarketing" class="btn btn-outline-secondary btn-sm">Sales &amp; Marketing</a></li>
@@ -86,6 +87,28 @@
                 <li>
                     <strong>No result</strong> — if fewer than 3 positive points exist, sector CAGR cannot be calculated, or sector data is unavailable, returns <em>not available</em>.
                 </li>
+            </ol>
+        </div>
+    </div>
+
+    <div class="card mb-4" id="regionalemployment">
+        <div class="card-header fw-semibold">Regional Employment (dynamic regional questions)</div>
+        <div class="card-body">
+            <p class="mb-2">Regional Employment estimates are loaded dynamically from question titles in the pattern <code>Regional Employment ... Last Financial Year</code> (for example, <code>Regional Employment Northland Last Financial Year</code>).</p>
+            <ol>
+                <li><strong>Actual value</strong> for the target year → returned directly.</li>
+                <li>
+                    <strong>Log-linear growth fit (minimum 2 positive points)</strong> — takes up to 5 recent prior-year positive values and applies OLS on <code>ln(value)</code> vs financial year.
+                </li>
+                <li>
+                    <strong>Sector-percentage fallback (active)</strong> — when fewer than 2 positive historical points are available, the system computes the sector share for that specific region and applies it to forecasted total employment:
+                    <div class="bg-light border rounded p-3 my-2 font-monospace small">
+                        sectorShare = (sum of sector regional employment) / (sum of sector total employment) over last 5 years<br />
+                        estimate = forecastedTotalEmployment × sectorShare
+                    </div>
+                    This implements: <strong>Regional Employment = Sector % × Total Employment</strong>.
+                </li>
+                <li><strong>No result</strong> if neither trend fit nor sector percentage can be computed.</li>
             </ol>
         </div>
     </div>
@@ -167,9 +190,10 @@
             <ol>
                 <li><strong>Actual value</strong> for target year → returned directly.</li>
                 <li>
-                    <strong>Sector-ratio fallback</strong> (if ≤ 3 historical points and fallback is enabled — currently inactive):
+                    <strong>Sector-ratio fallback (active)</strong> — if ≤ 3 historical points are available, EBITDA is estimated as forecasted revenue multiplied by the primary-sector EBITDA/revenue ratio derived from the last 5 years across sector companies:
                     <div class="bg-light border rounded p-3 my-2 font-monospace small">
-                        estimate = revenue × EbitdaPrimaryRatio + revenue × EbitdaSecondaryRatio
+                        sectorRatio = (sum of sector EBITDA) / (sum of sector revenue) over last 5 years<br />
+                        estimate = forecastedRevenue × sectorRatio
                     </div>
                 </li>
                 <li>
@@ -182,7 +206,7 @@
                     </div>
                     The result is floored at <code>0</code> (negative EBITDA estimates are zeroed).
                 </li>
-                <li><strong>No result</strong> if fewer than 4 points and fallback is inactive.</li>
+                <li><strong>No result</strong> if fewer than 4 points and sector fallback cannot be computed.</li>
             </ol>
         </div>
     </div>
@@ -191,7 +215,7 @@
     <div class="card mb-4" id="regions">
         <div class="card-header fw-semibold">Regional Revenue (NZ, Australia, China, Rest of Asia, North America, Europe, Middle East, Latin America, Africa, Other)</div>
         <div class="card-body">
-            <p class="mb-2">All 10 regional revenue metrics share the <strong>same log-linear growth fit algorithm</strong> with a <em>lower</em> minimum threshold than the total revenue metric, plus an optional sector export-ratio fallback.</p>
+            <p class="mb-2">All 10 regional revenue metrics share the <strong>same log-linear growth fit algorithm</strong> with a <em>lower</em> minimum threshold than the total revenue metric, plus an active sector-specific export-ratio fallback.</p>
             <ol>
                 <li><strong>Actual value</strong> for the target year → returned directly.</li>
                 <li>
@@ -204,13 +228,14 @@
                     Requires <strong>≥ 2</strong> positive historical points. Result is floored at <code>0</code>.
                 </li>
                 <li>
-                    <strong>Sector export-ratio fallback (currently inactive for all regions)</strong> — if enabled, applies a per-region export ratio constant to the current year's total company revenue:
+                    <strong>Sector export-ratio fallback (active)</strong> — when fewer than 2 positive regional points are available, the system chooses the export ratio using the company's <strong>primary sector</strong> and the matching <strong>region</strong>, then applies that ratio to forecasted total revenue:
                     <div class="bg-light border rounded p-3 my-2 font-monospace small">
-                        estimate = totalRevenue × RegionExportRatio
+                        sectorExportRatio = (sum of sector region revenue) / (sum of sector total revenue) over last 5 years<br />
+                        estimate = forecastedTotalRevenue × sectorExportRatio
                     </div>
-                    This is configured in code (<code>EnableRevenueXxxSectorFallback = false</code>) but not active for any region at this time — data is not yet available to calibrate the ratios.
+                    Example: for NZ, if the company primary sector is ICT and the historical ICT NZ export ratio is 20%, the estimate uses <code>0.20 × forecastedTotalRevenue</code>.
                 </li>
-                <li><strong>No result</strong> if fewer than 2 positive prior-year points and the fallback is inactive.</li>
+                <li><strong>No result</strong> if fewer than 2 positive prior-year points and sector export ratio cannot be computed.</li>
             </ol>
             <h6 class="mt-3">Difference vs Total Revenue log-linear</h6>
             <table class="table table-sm table-bordered">
@@ -220,7 +245,7 @@
                 <tbody>
                     <tr><td>Minimum positive points</td><td>3</td><td>2</td></tr>
                     <tr><td>Floor at 0</td><td>No</td><td>Yes</td></tr>
-                    <tr><td>Sector fallback</td><td>No</td><td>Yes (inactive)</td></tr>
+                    <tr><td>Sector fallback</td><td>No</td><td>Yes (active: primary-sector + region export ratio)</td></tr>
                 </tbody>
             </table>
         </div>
