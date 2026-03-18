@@ -1,0 +1,192 @@
+@page
+@model TINWeb.Pages.Help.EstimationLogicModel
+@{
+    ViewData["Title"] = "Estimation Logic";
+}
+
+<div class="container mt-4">
+    <h1>Estimation Logic</h1>
+    <p class="text-muted lead">How the Company Survey Estimation page calculates forecasted values for each metric.</p>
+
+    <div class="alert alert-info">
+        <strong>General principle:</strong> All calculations first check whether an actual recorded value exists for the target financial year. If one is found it is used directly. If not, the system falls back through a defined algorithm chain specific to each metric.
+    </div>
+
+    <nav class="mb-4">
+        <ul class="list-unstyled d-flex flex-wrap gap-2">
+            <li><a href="#revenue" class="btn btn-outline-secondary btn-sm">Total Revenue</a></li>
+            <li><a href="#employment" class="btn btn-outline-secondary btn-sm">Employment</a></li>
+            <li><a href="#wages" class="btn btn-outline-secondary btn-sm">Wages &amp; Salaries</a></li>
+            <li><a href="#rd" class="btn btn-outline-secondary btn-sm">Research &amp; Development</a></li>
+            <li><a href="#salesmarketing" class="btn btn-outline-secondary btn-sm">Sales &amp; Marketing</a></li>
+            <li><a href="#ebitda" class="btn btn-outline-secondary btn-sm">EBITDA</a></li>
+            <li><a href="#regions" class="btn btn-outline-secondary btn-sm">Regional Revenue (10 regions)</a></li>
+        </ul>
+    </nav>
+
+    
+    <div class="card mb-4" id="revenue">
+        <div class="card-header fw-semibold">Total Revenue</div>
+        <div class="card-body">
+            <p class="mb-2">Uses the <strong>log-linear trend fit</strong> algorithm. Steps in priority order:</p>
+            <ol>
+                <li>
+                    <strong>Actual value</strong> — if the company has a recorded Total Revenue answer for the target financial year, that value is returned immediately.
+                </li>
+                <li>
+                    <strong>Log-linear trend (minimum 3 positive points)</strong> — takes up to the 5 most recent prior-year positive values and fits an OLS regression on <code>ln(value)</code> vs financial year:
+                    <div class="bg-light border rounded p-3 my-2 font-monospace small">
+                        slope = Σ[(year − meanYear) × (ln(value) − meanLnValue)] / Σ[(year − meanYear)²]<br />
+                        forecast = exp(meanLnValue + slope × (targetYear − meanYear))
+                    </div>
+                    Requires <strong>≥ 3</strong> positive historical points. Result is unclamped (can be negative in theory, though practical values will not be).
+                </li>
+                <li>
+                    <strong>Sector CAGR fallback (active)</strong> — when fewer than 3 positive historical points are available for the company, the system computes a CAGR (Compound Annual Growth Rate) from the last 5 years of total revenue across <em>all companies in the same secondary sector</em> and applies that sector-level growth rate to forecast revenue. The forecast is calculated as:
+                    <div class="bg-light border rounded p-3 my-2 font-monospace small">
+                        latestRevenue = most recent positive revenue value<br />
+                        sectorCAGR = (endYearSectorRevenue / beginYearSectorRevenue) ^ (1 / yearsSpan) − 1<br />
+                        forecast = latestRevenue × (1 + sectorCAGR) ^ yearsToForecast
+                    </div>
+                    If no secondary sector is assigned to the company or insufficient sector-level history exists, returns <em>not available</em>.
+                </li>
+                <li>
+                    <strong>No result</strong> — if fewer than 3 positive points exist, sector CAGR cannot be calculated, or sector data is unavailable, returns <em>not available</em>.
+                </li>
+            </ol>
+        </div>
+    </div>
+
+    
+    <div class="card mb-4" id="employment">
+        <div class="card-header fw-semibold">Total Employment</div>
+        <div class="card-body">
+            <p class="mb-2">Uses the same <strong>log-linear trend fit (minimum 3 positive points)</strong> algorithm as Total Revenue. Historical data from both the current and legacy employment question titles are combined. <span class="badge bg-warning text-dark">No sector fallback</span></p>
+            <ol>
+                <li><strong>Actual value</strong> for target year → returned directly.</li>
+                <li><strong>Log-linear trend (≥ 3 positive points)</strong> across up to 5 prior years.</li>
+                <li><strong>No result</strong> if fewer than 3 positive prior-year points exist.</li>
+            </ol>
+        </div>
+    </div>
+
+    
+    <div class="card mb-4" id="wages">
+        <div class="card-header fw-semibold">Wages &amp; Salaries</div>
+        <div class="card-body">
+            <p class="mb-2">Uses <strong>log-linear trend fit</strong> with a higher minimum and an optional sector-ratio fallback.</p>
+            <ol>
+                <li><strong>Actual value</strong> for target year → returned directly.</li>
+                <li>
+                    <strong>Log-linear trend (&gt; 3 positive points)</strong> — same OLS on <code>ln(value)</code> as above, but requires <strong>more than 3</strong> data points (i.e. ≥ 4).
+                </li>
+                <li>
+                    <strong>Sector-ratio fallback (currently inactive)</strong> — applies primary and secondary revenue ratio constants to the target year's total revenue:
+                    <div class="bg-light border rounded p-3 my-2 font-monospace small">
+                        estimate = revenue × WagesPrimaryRatio + revenue × WagesSecondaryRatio
+                    </div>
+                    This fallback is configured in code but disabled (<code>EnableWagesSectorFallback = false</code>).
+                </li>
+                <li><strong>No result</strong> if neither condition is met.</li>
+            </ol>
+        </div>
+    </div>
+
+    
+    <div class="card mb-4" id="rd">
+        <div class="card-header fw-semibold">Research &amp; Development</div>
+        <div class="card-body">
+            <p class="mb-2">Uses the <strong>log-linear trend fit (minimum 3 positive points)</strong> algorithm, identical to Total Revenue. <span class="badge bg-warning text-dark">No sector fallback</span></p>
+            <ol>
+                <li><strong>Actual value</strong> for target year → returned directly.</li>
+                <li><strong>Log-linear trend (≥ 3 positive points)</strong> across up to 5 prior years.</li>
+                <li><strong>No result</strong> if fewer than 3 positive points exist.</li>
+            </ol>
+        </div>
+    </div>
+
+    
+    <div class="card mb-4" id="salesmarketing">
+        <div class="card-header fw-semibold">Sales &amp; Marketing</div>
+        <div class="card-body">
+            <p class="mb-2">Uses the <strong>log-linear trend fit (minimum 3 positive points)</strong> algorithm, identical to Total Revenue. <span class="badge bg-warning text-dark">No sector fallback</span></p>
+            <ol>
+                <li><strong>Actual value</strong> for target year → returned directly.</li>
+                <li><strong>Log-linear trend (≥ 3 positive points)</strong> across up to 5 prior years.</li>
+                <li><strong>No result</strong> if fewer than 3 positive points exist.</li>
+            </ol>
+        </div>
+    </div>
+
+    
+    <div class="card mb-4" id="ebitda">
+        <div class="card-header fw-semibold">EBITDA</div>
+        <div class="card-body">
+            <p class="mb-2">Uses <strong>linear regression</strong> (equivalent to Excel's <code>FORECAST.LINEAR</code>), not log-linear, because EBITDA can be negative.</p>
+            <ol>
+                <li><strong>Actual value</strong> for target year → returned directly.</li>
+                <li>
+                    <strong>Sector-ratio fallback</strong> (if ≤ 3 historical points and fallback is enabled — currently inactive):
+                    <div class="bg-light border rounded p-3 my-2 font-monospace small">
+                        estimate = revenue × EbitdaPrimaryRatio + revenue × EbitdaSecondaryRatio
+                    </div>
+                </li>
+                <li>
+                    <strong>Linear regression (≥ 4 historical points)</strong> — OLS on raw values vs financial year across all prior-year non-null points:
+                    <div class="bg-light border rounded p-3 my-2 font-monospace small">
+                        slope = Σ[(year − avgYear) × (value − avgValue)] / Σ[(year − avgYear)²]<br />
+                        intercept = avgValue − slope × avgYear<br />
+                        forecast = slope × targetYear + intercept<br />
+                        <span class="text-muted">// floored at 0</span>
+                    </div>
+                    The result is floored at <code>0</code> (negative EBITDA estimates are zeroed).
+                </li>
+                <li><strong>No result</strong> if fewer than 4 points and fallback is inactive.</li>
+            </ol>
+        </div>
+    </div>
+
+    
+    <div class="card mb-4" id="regions">
+        <div class="card-header fw-semibold">Regional Revenue (NZ, Australia, China, Rest of Asia, North America, Europe, Middle East, Latin America, Africa, Other)</div>
+        <div class="card-body">
+            <p class="mb-2">All 10 regional revenue metrics share the <strong>same log-linear growth fit algorithm</strong> with a <em>lower</em> minimum threshold than the total revenue metric, plus an optional sector export-ratio fallback.</p>
+            <ol>
+                <li><strong>Actual value</strong> for the target year → returned directly.</li>
+                <li>
+                    <strong>Log-linear growth fit (minimum 2 positive points)</strong> — takes up to the 5 most recent prior-year positive values:
+                    <div class="bg-light border rounded p-3 my-2 font-monospace small">
+                        slope = Σ[(year − meanYear) × (ln(value) − meanLnValue)] / Σ[(year − meanYear)²]<br />
+                        forecast = exp(meanLnValue + slope × (targetYear − meanYear))<br />
+                        <span class="text-muted">// floored at 0</span>
+                    </div>
+                    Requires <strong>≥ 2</strong> positive historical points. Result is floored at <code>0</code>.
+                </li>
+                <li>
+                    <strong>Sector export-ratio fallback (currently inactive for all regions)</strong> — if enabled, applies a per-region export ratio constant to the current year's total company revenue:
+                    <div class="bg-light border rounded p-3 my-2 font-monospace small">
+                        estimate = totalRevenue × RegionExportRatio
+                    </div>
+                    This is configured in code (<code>EnableRevenueXxxSectorFallback = false</code>) but not active for any region at this time — data is not yet available to calibrate the ratios.
+                </li>
+                <li><strong>No result</strong> if fewer than 2 positive prior-year points and the fallback is inactive.</li>
+            </ol>
+            <h6 class="mt-3">Difference vs Total Revenue log-linear</h6>
+            <table class="table table-sm table-bordered">
+                <thead class="table-light">
+                    <tr><th>Property</th><th>Total Revenue / R&amp;D / Sales &amp; Marketing / Employment</th><th>Regional Revenue (all 10)</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Minimum positive points</td><td>3</td><td>2</td></tr>
+                    <tr><td>Floor at 0</td><td>No</td><td>Yes</td></tr>
+                    <tr><td>Sector fallback</td><td>No</td><td>Yes (inactive)</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="mb-4">
+        <a asp-page="/Index" class="btn btn-secondary">Back to Home</a>
+    </div>
+</div>
+
