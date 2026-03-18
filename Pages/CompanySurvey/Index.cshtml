@@ -48,7 +48,7 @@
             <tbody>
                 @foreach (var record in Model.Records)
                 {
-                    <tr>
+                    <tr id="record-@record.Id">
                         <td>@record.CompanyName</td>
                         <td>@(record.Saved ? "Yes" : "No")</td>
                         <td>@(record.SavedDate?.ToString("dd/MM/yyyy") ?? string.Empty)</td>
@@ -59,8 +59,9 @@
                         <td>@(record.Locked ? "Yes" : "No")</td>
                         <td>@(record.Estimate ? "Yes" : "No")</td>
                         <td>@record.AnswerCount</td>
-                        <td class="actions-col">
+                        <td class="actions-col text-nowrap">
                             <a asp-page="/CompanySurvey/Edit" asp-route-id="@record.Id" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-sm btn-secondary">Edit</a>
+                            <a asp-page="/CompanySurvey/Estimation" asp-route-companySurveyId="@record.Id" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-sm btn-outline-success">Estimatation</a>
                             <a asp-page="/CompanySurvey/Notes" asp-route-companySurveyId="@record.Id" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-sm btn-outline-dark">Notes</a>
                             <a asp-page="/Answers/Index" asp-route-companySurveyId="@record.Id" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-sm btn-primary">Open Answers</a>
                             <a asp-page="/Company/SendSurvey"

@@ -65,7 +65,7 @@ namespace TINWeb.Pages.CompanySurvey
             Record.Locked ??= false;
             Record.Estimate ??= false;
             await _service.UpdateAsync(Record);
-            return RedirectToPage("./Index", new { financialYear = FinancialYear });
+            return RedirectToPage("./Index", null, new { financialYear = FinancialYear }, $"record-{Record.Id}");
         }
     }
 }

@@ -1,0 +1,851 @@
+@page
+@model TINWeb.Pages.CompanySurvey.EstimationModel
+@{
+    ViewData["Title"] = "Company Survey Estimation";
+}
+
+<style>
+    .estimation-header {
+        gap: 0.5rem;
+    }
+
+    .estimation-generate-btn {
+        white-space: nowrap;
+    }
+
+    .btn-label-short {
+        display: none;
+    }
+
+    @@media (max-width: 768px) {
+        .estimation-header {
+            flex-wrap: wrap;
+            align-items: flex-start !important;
+        }
+
+        .estimation-header span {
+            flex: 1 1 100%;
+            line-height: 1.25;
+        }
+
+        .estimation-header form {
+            margin-left: 0;
+        }
+
+        .estimation-generate-btn {
+            font-size: 0.75rem;
+            padding: 0.2rem 0.5rem;
+        }
+
+        .estimation-generate-btn .btn-label-full {
+            display: none;
+        }
+
+        .estimation-generate-btn .btn-label-short {
+            display: inline;
+        }
+    }
+</style>
+
+<div class="container mt-4">
+    <div class="row mb-3">
+        <div class="col-md-8">
+            <h1>Company Survey Estimation</h1>
+            <p class="text-muted mb-0">
+                Company: <strong>@Model.CompanyName</strong> |
+                Company Survey ID: <strong>@Model.CompanySurveyId</strong> |
+                Target Financial Year: <strong>@Model.TargetFinancialYear</strong>
+            </p>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center estimation-header">
+            <span>Last 5 Years - Total Revenue Last Financial Year</span>
+            @if (Model.EstimateEnabled && !Model.IsLocked)
+            {
+                <form method="post" asp-page-handler="CalculateRevenue" class="mb-0">
+                    <input type="hidden" name="companySurveyId" value="@Model.CompanySurveyId" />
+                    <input type="hidden" name="financialYear" value="@Model.FinancialYearFilter" />
+                    <button type="submit" class="btn btn-sm btn-outline-success estimation-generate-btn"><span class="btn-label-full">Generate</span><span class="btn-label-short">Gen</span></button>
+                </form>
+            }
+        </div>
+        <div class="card-body p-0">
+            @if (Model.LastFiveYearsRevenue.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width: 200px;">Financial Year</th>
+                                <th style="width: 220px;">Company Survey ID</th>
+                                <th>Revenue</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.LastFiveYearsRevenue)
+                            {
+                                <tr>
+                                    <td>@row.FinancialYear</td>
+                                    <td>@row.CompanySurveyId</td>
+                                    <td>@(row.Value?.ToString("N2") ?? string.Empty)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="p-3 text-muted">No historical revenue values were found for this company.</div>
+            }
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center estimation-header">
+            <span>Last 5 Years - Total Employment Last Financial Year</span>
+            @if (Model.EstimateEnabled && !Model.IsLocked)
+            {
+                <form method="post" asp-page-handler="CalculateEmployment" class="mb-0">
+                    <input type="hidden" name="companySurveyId" value="@Model.CompanySurveyId" />
+                    <input type="hidden" name="financialYear" value="@Model.FinancialYearFilter" />
+                    <button type="submit" class="btn btn-sm btn-outline-success estimation-generate-btn"><span class="btn-label-full">Generate</span><span class="btn-label-short">Gen</span></button>
+                </form>
+            }
+        </div>
+        <div class="card-body p-0">
+            @if (Model.LastFiveYearsEmployment.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width: 200px;">Financial Year</th>
+                                <th style="width: 220px;">Company Survey ID</th>
+                                <th>Employment Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.LastFiveYearsEmployment)
+                            {
+                                <tr>
+                                    <td>@row.FinancialYear</td>
+                                    <td>@row.CompanySurveyId</td>
+                                    <td>@(row.Value?.ToString("N2") ?? string.Empty)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="p-3 text-muted">No historical employment values were found for this company.</div>
+            }
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center estimation-header">
+            <span>Last 5 Years - Cost Structures Last Financial Year - Wages and Salaries</span>
+            @if (Model.EstimateEnabled && !Model.IsLocked)
+            {
+                <form method="post" asp-page-handler="CalculateWages" class="mb-0">
+                    <input type="hidden" name="companySurveyId" value="@Model.CompanySurveyId" />
+                    <input type="hidden" name="financialYear" value="@Model.FinancialYearFilter" />
+                    <button type="submit" class="btn btn-sm btn-outline-success estimation-generate-btn"><span class="btn-label-full">Generate</span><span class="btn-label-short">Gen</span></button>
+                </form>
+            }
+        </div>
+        <div class="card-body p-0">
+            @if (Model.LastFiveYearsWages.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width: 200px;">Financial Year</th>
+                                <th style="width: 220px;">Company Survey ID</th>
+                                <th>Wages & Salaries</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.LastFiveYearsWages)
+                            {
+                                <tr>
+                                    <td>@row.FinancialYear</td>
+                                    <td>@row.CompanySurveyId</td>
+                                    <td>@(row.Value?.ToString("N2") ?? string.Empty)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="p-3 text-muted">No historical wages and salaries values were found for this company.</div>
+            }
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center estimation-header">
+            <span>Last 5 Years - Cost Structures Last Financial Year - Research and Development</span>
+            @if (Model.EstimateEnabled && !Model.IsLocked)
+            {
+                <form method="post" asp-page-handler="CalculateResearchDevelopment" class="mb-0">
+                    <input type="hidden" name="companySurveyId" value="@Model.CompanySurveyId" />
+                    <input type="hidden" name="financialYear" value="@Model.FinancialYearFilter" />
+                    <button type="submit" class="btn btn-sm btn-outline-success estimation-generate-btn"><span class="btn-label-full">Generate</span><span class="btn-label-short">Gen</span></button>
+                </form>
+            }
+        </div>
+        <div class="card-body p-0">
+            @if (Model.LastFiveYearsResearchDevelopment.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width: 200px;">Financial Year</th>
+                                <th style="width: 220px;">Company Survey ID</th>
+                                <th>Research & Development</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.LastFiveYearsResearchDevelopment)
+                            {
+                                <tr>
+                                    <td>@row.FinancialYear</td>
+                                    <td>@row.CompanySurveyId</td>
+                                    <td>@(row.Value?.ToString("N2") ?? string.Empty)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="p-3 text-muted">No historical research and development values were found for this company.</div>
+            }
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center estimation-header">
+            <span>Last 5 Years - Cost Structures Last Financial Year - Sales and Marketing</span>
+            @if (Model.EstimateEnabled && !Model.IsLocked)
+            {
+                <form method="post" asp-page-handler="CalculateSalesMarketing" class="mb-0">
+                    <input type="hidden" name="companySurveyId" value="@Model.CompanySurveyId" />
+                    <input type="hidden" name="financialYear" value="@Model.FinancialYearFilter" />
+                    <button type="submit" class="btn btn-sm btn-outline-success estimation-generate-btn"><span class="btn-label-full">Generate</span><span class="btn-label-short">Gen</span></button>
+                </form>
+            }
+        </div>
+        <div class="card-body p-0">
+            @if (Model.LastFiveYearsSalesMarketing.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width: 200px;">Financial Year</th>
+                                <th style="width: 220px;">Company Survey ID</th>
+                                <th>Sales & Marketing</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.LastFiveYearsSalesMarketing)
+                            {
+                                <tr>
+                                    <td>@row.FinancialYear</td>
+                                    <td>@row.CompanySurveyId</td>
+                                    <td>@(row.Value?.ToString("N2") ?? string.Empty)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="p-3 text-muted">No historical sales and marketing values were found for this company.</div>
+            }
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center estimation-header">
+            <span>Last 5 Years - EBITDA Last Financial Year</span>
+            @if (Model.EstimateEnabled && !Model.IsLocked)
+            {
+                <form method="post" asp-page-handler="CalculateEbitda" class="mb-0">
+                    <input type="hidden" name="companySurveyId" value="@Model.CompanySurveyId" />
+                    <input type="hidden" name="financialYear" value="@Model.FinancialYearFilter" />
+                    <button type="submit" class="btn btn-sm btn-outline-success estimation-generate-btn"><span class="btn-label-full">Generate</span><span class="btn-label-short">Gen</span></button>
+                </form>
+            }
+        </div>
+        <div class="card-body p-0">
+            @if (Model.LastFiveYearsEbitda.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width: 200px;">Financial Year</th>
+                                <th style="width: 220px;">Company Survey ID</th>
+                                <th>EBITDA</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.LastFiveYearsEbitda)
+                            {
+                                <tr>
+                                    <td>@row.FinancialYear</td>
+                                    <td>@row.CompanySurveyId</td>
+                                    <td>@(row.Value?.ToString("N2") ?? string.Empty)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="p-3 text-muted">No historical EBITDA values were found for this company.</div>
+            }
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center estimation-header">
+            <span>Last 5 Years - Global Revenue NZ Last Financial Year</span>
+            @if (Model.EstimateEnabled && !Model.IsLocked)
+            {
+                <form method="post" asp-page-handler="CalculateRevenueNz" class="mb-0">
+                    <input type="hidden" name="companySurveyId" value="@Model.CompanySurveyId" />
+                    <input type="hidden" name="financialYear" value="@Model.FinancialYearFilter" />
+                    <button type="submit" class="btn btn-sm btn-outline-success estimation-generate-btn"><span class="btn-label-full">Generate</span><span class="btn-label-short">Gen</span></button>
+                </form>
+            }
+        </div>
+        <div class="card-body p-0">
+            @if (Model.LastFiveYearsRevenueNz.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width: 200px;">Financial Year</th>
+                                <th style="width: 220px;">Company Survey ID</th>
+                                <th>Revenue NZ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.LastFiveYearsRevenueNz)
+                            {
+                                <tr>
+                                    <td>@row.FinancialYear</td>
+                                    <td>@row.CompanySurveyId</td>
+                                    <td>@(row.Value?.ToString("N2") ?? string.Empty)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="p-3 text-muted">No historical Revenue NZ values were found for this company.</div>
+            }
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center estimation-header">
+            <span>Last 5 Years - Global Revenue Australia Last Financial Year</span>
+            @if (Model.EstimateEnabled && !Model.IsLocked)
+            {
+                <form method="post" asp-page-handler="CalculateRevenueAustralia" class="mb-0">
+                    <input type="hidden" name="companySurveyId" value="@Model.CompanySurveyId" />
+                    <input type="hidden" name="financialYear" value="@Model.FinancialYearFilter" />
+                    <button type="submit" class="btn btn-sm btn-outline-success estimation-generate-btn"><span class="btn-label-full">Generate</span><span class="btn-label-short">Gen</span></button>
+                </form>
+            }
+        </div>
+        <div class="card-body p-0">
+            @if (Model.LastFiveYearsRevenueAustralia.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th style="width: 200px;">Financial Year</th>
+                                <th style="width: 220px;">Company Survey ID</th>
+                                <th>Revenue Australia</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.LastFiveYearsRevenueAustralia)
+                            {
+                                <tr>
+                                    <td>@row.FinancialYear</td>
+                                    <td>@row.CompanySurveyId</td>
+                                    <td>@(row.Value?.ToString("N2") ?? string.Empty)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            else
+            {
+                <div class="p-3 text-muted">No historical Revenue Australia values were found for this company.</div>
+            }
+        </div>
+    </div>
+
+    <div class="mb-3">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center estimation-header">
+                    <span>Last 5 Years - Global Revenue China Last Financial Year</span>
+                    @if (Model.EstimateEnabled && !Model.IsLocked)
+                    {
+                        <form method="post" asp-page-handler="CalculateRevenueChina" class="mb-0">
+                            <input type="hidden" name="companySurveyId" value="@Model.CompanySurveyId" />
+                            <input type="hidden" name="financialYear" value="@Model.FinancialYearFilter" />
+                            <button type="submit" class="btn btn-sm btn-outline-success estimation-generate-btn"><span class="btn-label-full">Generate</span><span class="btn-label-short">Gen</span></button>
+                        </form>
+                    }
+                </div>
+                <div class="card-body p-0">
+                    @if (Model.LastFiveYearsRevenueChina.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped mb-0">
+                                <thead class="table-dark"><tr><th style="width: 200px;">Financial Year</th><th style="width: 220px;">Company Survey ID</th><th>Revenue China</th></tr></thead>
+                                <tbody>@foreach (var row in Model.LastFiveYearsRevenueChina){<tr><td>@row.FinancialYear</td><td>@row.CompanySurveyId</td><td>@(row.Value?.ToString("N2") ?? string.Empty)</td></tr>}</tbody>
+                            </table>
+                        </div>
+                    }
+                    else { <div class="p-3 text-muted">No historical Revenue China values were found for this company.</div> }
+                </div>
+            </div>
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center estimation-header">
+                    <span>Last 5 Years - Global Revenue Rest of Asia Last Financial Year</span>
+                    @if (Model.EstimateEnabled && !Model.IsLocked)
+                    {
+                        <form method="post" asp-page-handler="CalculateRevenueRestOfAsia" class="mb-0">
+                            <input type="hidden" name="companySurveyId" value="@Model.CompanySurveyId" />
+                            <input type="hidden" name="financialYear" value="@Model.FinancialYearFilter" />
+                            <button type="submit" class="btn btn-sm btn-outline-success estimation-generate-btn"><span class="btn-label-full">Generate</span><span class="btn-label-short">Gen</span></button>
+                        </form>
+                    }
+                </div>
+                <div class="card-body p-0">
+                    @if (Model.LastFiveYearsRevenueRestOfAsia.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped mb-0">
+                                <thead class="table-dark"><tr><th style="width: 200px;">Financial Year</th><th style="width: 220px;">Company Survey ID</th><th>Revenue Rest of Asia</th></tr></thead>
+                                <tbody>@foreach (var row in Model.LastFiveYearsRevenueRestOfAsia){<tr><td>@row.FinancialYear</td><td>@row.CompanySurveyId</td><td>@(row.Value?.ToString("N2") ?? string.Empty)</td></tr>}</tbody>
+                            </table>
+                        </div>
+                    }
+                    else { <div class="p-3 text-muted">No historical Revenue Rest of Asia values were found for this company.</div> }
+                </div>
+            </div>
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center estimation-header">
+                    <span>Last 5 Years - Global Revenue North America Last Financial Year</span>
+                    @if (Model.EstimateEnabled && !Model.IsLocked)
+                    {
+                        <form method="post" asp-page-handler="CalculateRevenueNorthAmerica" class="mb-0">
+                            <input type="hidden" name="companySurveyId" value="@Model.CompanySurveyId" />
+                            <input type="hidden" name="financialYear" value="@Model.FinancialYearFilter" />
+                            <button type="submit" class="btn btn-sm btn-outline-success estimation-generate-btn"><span class="btn-label-full">Generate</span><span class="btn-label-short">Gen</span></button>
+                        </form>
+                    }
+                </div>
+                <div class="card-body p-0">
+                    @if (Model.LastFiveYearsRevenueNorthAmerica.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped mb-0">
+                                <thead class="table-dark"><tr><th style="width: 200px;">Financial Year</th><th style="width: 220px;">Company Survey ID</th><th>Revenue North America</th></tr></thead>
+                                <tbody>@foreach (var row in Model.LastFiveYearsRevenueNorthAmerica){<tr><td>@row.FinancialYear</td><td>@row.CompanySurveyId</td><td>@(row.Value?.ToString("N2") ?? string.Empty)</td></tr>}</tbody>
+                            </table>
+                        </div>
+                    }
+                    else { <div class="p-3 text-muted">No historical Revenue North America values were found for this company.</div> }
+                </div>
+            </div>
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center estimation-header">
+                    <span>Last 5 Years - Global Revenue Europe Last Financial Year</span>
+                    @if (Model.EstimateEnabled && !Model.IsLocked)
+                    {
+                        <form method="post" asp-page-handler="CalculateRevenueEurope" class="mb-0">
+                            <input type="hidden" name="companySurveyId" value="@Model.CompanySurveyId" />
+                            <input type="hidden" name="financialYear" value="@Model.FinancialYearFilter" />
+                            <button type="submit" class="btn btn-sm btn-outline-success estimation-generate-btn"><span class="btn-label-full">Generate</span><span class="btn-label-short">Gen</span></button>
+                        </form>
+                    }
+                </div>
+                <div class="card-body p-0">
+                    @if (Model.LastFiveYearsRevenueEurope.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped mb-0">
+                                <thead class="table-dark"><tr><th style="width: 200px;">Financial Year</th><th style="width: 220px;">Company Survey ID</th><th>Revenue Europe</th></tr></thead>
+                                <tbody>@foreach (var row in Model.LastFiveYearsRevenueEurope){<tr><td>@row.FinancialYear</td><td>@row.CompanySurveyId</td><td>@(row.Value?.ToString("N2") ?? string.Empty)</td></tr>}</tbody>
+                            </table>
+                        </div>
+                    }
+                    else { <div class="p-3 text-muted">No historical Revenue Europe values were found for this company.</div> }
+                </div>
+            </div>
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center estimation-header">
+                    <span>Last 5 Years - Global Revenue Middle East Last Financial Year</span>
+                    @if (Model.EstimateEnabled && !Model.IsLocked)
+                    {
+                        <form method="post" asp-page-handler="CalculateRevenueMiddleEast" class="mb-0">
+                            <input type="hidden" name="companySurveyId" value="@Model.CompanySurveyId" />
+                            <input type="hidden" name="financialYear" value="@Model.FinancialYearFilter" />
+                            <button type="submit" class="btn btn-sm btn-outline-success estimation-generate-btn"><span class="btn-label-full">Generate</span><span class="btn-label-short">Gen</span></button>
+                        </form>
+                    }
+                </div>
+                <div class="card-body p-0">
+                    @if (Model.LastFiveYearsRevenueMiddleEast.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped mb-0">
+                                <thead class="table-dark"><tr><th style="width: 200px;">Financial Year</th><th style="width: 220px;">Company Survey ID</th><th>Revenue Middle East</th></tr></thead>
+                                <tbody>@foreach (var row in Model.LastFiveYearsRevenueMiddleEast){<tr><td>@row.FinancialYear</td><td>@row.CompanySurveyId</td><td>@(row.Value?.ToString("N2") ?? string.Empty)</td></tr>}</tbody>
+                            </table>
+                        </div>
+                    }
+                    else { <div class="p-3 text-muted">No historical Revenue Middle East values were found for this company.</div> }
+                </div>
+            </div>
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center estimation-header">
+                    <span>Last 5 Years - Global Revenue Latin America Last Financial Year</span>
+                    @if (Model.EstimateEnabled && !Model.IsLocked)
+                    {
+                        <form method="post" asp-page-handler="CalculateRevenueLatinAmerica" class="mb-0">
+                            <input type="hidden" name="companySurveyId" value="@Model.CompanySurveyId" />
+                            <input type="hidden" name="financialYear" value="@Model.FinancialYearFilter" />
+                            <button type="submit" class="btn btn-sm btn-outline-success estimation-generate-btn"><span class="btn-label-full">Generate</span><span class="btn-label-short">Gen</span></button>
+                        </form>
+                    }
+                </div>
+                <div class="card-body p-0">
+                    @if (Model.LastFiveYearsRevenueLatinAmerica.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped mb-0">
+                                <thead class="table-dark"><tr><th style="width: 200px;">Financial Year</th><th style="width: 220px;">Company Survey ID</th><th>Revenue Latin America</th></tr></thead>
+                                <tbody>@foreach (var row in Model.LastFiveYearsRevenueLatinAmerica){<tr><td>@row.FinancialYear</td><td>@row.CompanySurveyId</td><td>@(row.Value?.ToString("N2") ?? string.Empty)</td></tr>}</tbody>
+                            </table>
+                        </div>
+                    }
+                    else { <div class="p-3 text-muted">No historical Revenue Latin America values were found for this company.</div> }
+                </div>
+            </div>
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center estimation-header">
+                    <span>Last 5 Years - Global Revenue Africa Last Financial Year</span>
+                    @if (Model.EstimateEnabled && !Model.IsLocked)
+                    {
+                        <form method="post" asp-page-handler="CalculateRevenueAfrica" class="mb-0">
+                            <input type="hidden" name="companySurveyId" value="@Model.CompanySurveyId" />
+                            <input type="hidden" name="financialYear" value="@Model.FinancialYearFilter" />
+                            <button type="submit" class="btn btn-sm btn-outline-success estimation-generate-btn"><span class="btn-label-full">Generate</span><span class="btn-label-short">Gen</span></button>
+                        </form>
+                    }
+                </div>
+                <div class="card-body p-0">
+                    @if (Model.LastFiveYearsRevenueAfrica.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped mb-0">
+                                <thead class="table-dark"><tr><th style="width: 200px;">Financial Year</th><th style="width: 220px;">Company Survey ID</th><th>Revenue Africa</th></tr></thead>
+                                <tbody>@foreach (var row in Model.LastFiveYearsRevenueAfrica){<tr><td>@row.FinancialYear</td><td>@row.CompanySurveyId</td><td>@(row.Value?.ToString("N2") ?? string.Empty)</td></tr>}</tbody>
+                            </table>
+                        </div>
+                    }
+                    else { <div class="p-3 text-muted">No historical Revenue Africa values were found for this company.</div> }
+                </div>
+            </div>
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center estimation-header">
+                    <span>Last 5 Years - Global Revenue Other Last Financial Year</span>
+                    @if (Model.EstimateEnabled && !Model.IsLocked)
+                    {
+                        <form method="post" asp-page-handler="CalculateRevenueOther" class="mb-0">
+                            <input type="hidden" name="companySurveyId" value="@Model.CompanySurveyId" />
+                            <input type="hidden" name="financialYear" value="@Model.FinancialYearFilter" />
+                            <button type="submit" class="btn btn-sm btn-outline-success estimation-generate-btn"><span class="btn-label-full">Generate</span><span class="btn-label-short">Gen</span></button>
+                        </form>
+                    }
+                </div>
+                <div class="card-body p-0">
+                    @if (Model.LastFiveYearsRevenueOther.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-striped mb-0">
+                                <thead class="table-dark"><tr><th style="width: 200px;">Financial Year</th><th style="width: 220px;">Company Survey ID</th><th>Revenue Other</th></tr></thead>
+                                <tbody>@foreach (var row in Model.LastFiveYearsRevenueOther){<tr><td>@row.FinancialYear</td><td>@row.CompanySurveyId</td><td>@(row.Value?.ToString("N2") ?? string.Empty)</td></tr>}</tbody>
+                            </table>
+                        </div>
+                    }
+                    else { <div class="p-3 text-muted">No historical Revenue Other values were found for this company.</div> }
+                </div>
+            </div>
+
+            <div class="mb-3">
+        <span class="badge @(Model.EstimateEnabled ? "bg-success" : "bg-secondary")">
+            Estimate Flag: @(Model.EstimateEnabled ? "Enabled" : "Disabled")
+        </span>
+        <span class="badge @(Model.IsLocked ? "bg-danger" : "bg-success") ms-2">
+            Locked: @(Model.IsLocked ? "Yes" : "No")
+        </span>
+    </div>
+
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.SaveMessage))
+    {
+        <div class="alert alert-success">@Model.SaveMessage</div>
+    }
+
+    @if (!Model.EstimateEnabled || Model.IsLocked)
+    {
+        <div class="alert alert-warning">
+            <div><strong>Generate button unavailable</strong></div>
+            @if (!Model.EstimateEnabled)
+            {
+                <div>- The Estimate flag is set to <strong>No</strong> on this Company Survey record.</div>
+            }
+            @if (Model.IsLocked)
+            {
+                <div>- This Company Survey record is currently <strong>Locked</strong>.</div>
+            }
+            <div class="mt-1">Enable Estimate and unlock the record on the edit page to generate estimates.</div>
+        </div>
+    }
+
+    <div class="mb-3">
+        <a asp-page="./Index" asp-route-financialYear="@Model.FinancialYearFilter" class="btn btn-secondary">Back to Company Survey Records</a>
+    </div>
+
+    @if (Model.ForecastedRevenue.HasValue)
+    {
+        <div class="alert alert-success mt-3">
+            <div><strong>Forecasted Revenue:</strong> @Model.ForecastedRevenue.Value.ToString("N2")</div>
+            <div class="small text-muted">@Model.ForecastReason</div>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Model.ForecastReason))
+    {
+        <div class="alert alert-warning mt-3">
+            <div><strong>Forecasted Revenue:</strong> not available</div>
+            <div class="small text-muted">@Model.ForecastReason</div>
+        </div>
+    }
+
+    @if (Model.ForecastedEmployment.HasValue)
+    {
+        <div class="alert alert-success mt-3">
+            <div><strong>Forecasted Employment Total:</strong> @Model.ForecastedEmployment.Value.ToString("N2")</div>
+            <div class="small text-muted">@Model.EmploymentForecastReason</div>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Model.EmploymentForecastReason))
+    {
+        <div class="alert alert-warning mt-3">
+            <div><strong>Forecasted Employment Total:</strong> not available</div>
+            <div class="small text-muted">@Model.EmploymentForecastReason</div>
+        </div>
+    }
+
+    @if (Model.ForecastedWages.HasValue)
+    {
+        <div class="alert alert-success mt-3">
+            <div><strong>Forecasted Wages & Salaries:</strong> @Model.ForecastedWages.Value.ToString("N2")</div>
+            <div class="small text-muted">@Model.WagesForecastReason</div>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Model.WagesForecastReason))
+    {
+        <div class="alert alert-warning mt-3">
+            <div><strong>Forecasted Wages & Salaries:</strong> not available</div>
+            <div class="small text-muted">@Model.WagesForecastReason</div>
+        </div>
+    }
+
+    @if (Model.ForecastedResearchDevelopment.HasValue)
+    {
+        <div class="alert alert-success mt-3">
+            <div><strong>Forecasted Research & Development:</strong> @Model.ForecastedResearchDevelopment.Value.ToString("N2")</div>
+            <div class="small text-muted">@Model.ResearchDevelopmentForecastReason</div>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Model.ResearchDevelopmentForecastReason))
+    {
+        <div class="alert alert-warning mt-3">
+            <div><strong>Forecasted Research & Development:</strong> not available</div>
+            <div class="small text-muted">@Model.ResearchDevelopmentForecastReason</div>
+        </div>
+    }
+
+    @if (Model.ForecastedSalesMarketing.HasValue)
+    {
+        <div class="alert alert-success mt-3">
+            <div><strong>Forecasted Sales & Marketing:</strong> @Model.ForecastedSalesMarketing.Value.ToString("N2")</div>
+            <div class="small text-muted">@Model.SalesMarketingForecastReason</div>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Model.SalesMarketingForecastReason))
+    {
+        <div class="alert alert-warning mt-3">
+            <div><strong>Forecasted Sales & Marketing:</strong> not available</div>
+            <div class="small text-muted">@Model.SalesMarketingForecastReason</div>
+        </div>
+    }
+
+    @if (Model.ForecastedEbitda.HasValue)
+    {
+        <div class="alert alert-success mt-3">
+            <div><strong>Forecasted EBITDA:</strong> @Model.ForecastedEbitda.Value.ToString("N2")</div>
+            <div class="small text-muted">@Model.EbitdaForecastReason</div>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Model.EbitdaForecastReason))
+    {
+        <div class="alert alert-warning mt-3">
+            <div><strong>Forecasted EBITDA:</strong> not available</div>
+            <div class="small text-muted">@Model.EbitdaForecastReason</div>
+        </div>
+    }
+
+    @if (Model.ForecastedRevenueNz.HasValue)
+    {
+        <div class="alert alert-success mt-3">
+            <div><strong>Forecasted Revenue NZ:</strong> @Model.ForecastedRevenueNz.Value.ToString("N2")</div>
+            <div class="small text-muted">@Model.RevenueNzForecastReason</div>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Model.RevenueNzForecastReason))
+    {
+        <div class="alert alert-warning mt-3">
+            <div><strong>Forecasted Revenue NZ:</strong> not available</div>
+            <div class="small text-muted">@Model.RevenueNzForecastReason</div>
+        </div>
+    }
+
+    @if (Model.ForecastedRevenueAustralia.HasValue)
+    {
+        <div class="alert alert-success mt-3">
+            <div><strong>Forecasted Revenue Australia:</strong> @Model.ForecastedRevenueAustralia.Value.ToString("N2")</div>
+            <div class="small text-muted">@Model.RevenueAustraliaForecastReason</div>
+        </div>
+    }
+    else if (!string.IsNullOrWhiteSpace(Model.RevenueAustraliaForecastReason))
+    {
+        <div class="alert alert-warning mt-3">
+            <div><strong>Forecasted Revenue Australia:</strong> not available</div>
+            <div class="small text-muted">@Model.RevenueAustraliaForecastReason</div>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.GeneratedSummary))
+        @if (Model.ForecastedRevenueChina.HasValue) { <div class="alert alert-success mt-3"><div><strong>Forecasted Revenue China:</strong> @Model.ForecastedRevenueChina.Value.ToString("N2")</div><div class="small text-muted">@Model.RevenueChinaForecastReason</div></div> }
+        else if (!string.IsNullOrWhiteSpace(Model.RevenueChinaForecastReason)) { <div class="alert alert-warning mt-3"><div><strong>Forecasted Revenue China:</strong> not available</div><div class="small text-muted">@Model.RevenueChinaForecastReason</div></div> }
+        @if (Model.ForecastedRevenueRestOfAsia.HasValue) { <div class="alert alert-success mt-3"><div><strong>Forecasted Revenue Rest of Asia:</strong> @Model.ForecastedRevenueRestOfAsia.Value.ToString("N2")</div><div class="small text-muted">@Model.RevenueRestOfAsiaForecastReason</div></div> }
+        else if (!string.IsNullOrWhiteSpace(Model.RevenueRestOfAsiaForecastReason)) { <div class="alert alert-warning mt-3"><div><strong>Forecasted Revenue Rest of Asia:</strong> not available</div><div class="small text-muted">@Model.RevenueRestOfAsiaForecastReason</div></div> }
+        @if (Model.ForecastedRevenueNorthAmerica.HasValue) { <div class="alert alert-success mt-3"><div><strong>Forecasted Revenue North America:</strong> @Model.ForecastedRevenueNorthAmerica.Value.ToString("N2")</div><div class="small text-muted">@Model.RevenueNorthAmericaForecastReason</div></div> }
+        else if (!string.IsNullOrWhiteSpace(Model.RevenueNorthAmericaForecastReason)) { <div class="alert alert-warning mt-3"><div><strong>Forecasted Revenue North America:</strong> not available</div><div class="small text-muted">@Model.RevenueNorthAmericaForecastReason</div></div> }
+        @if (Model.ForecastedRevenueEurope.HasValue) { <div class="alert alert-success mt-3"><div><strong>Forecasted Revenue Europe:</strong> @Model.ForecastedRevenueEurope.Value.ToString("N2")</div><div class="small text-muted">@Model.RevenueEuropeForecastReason</div></div> }
+        else if (!string.IsNullOrWhiteSpace(Model.RevenueEuropeForecastReason)) { <div class="alert alert-warning mt-3"><div><strong>Forecasted Revenue Europe:</strong> not available</div><div class="small text-muted">@Model.RevenueEuropeForecastReason</div></div> }
+        @if (Model.ForecastedRevenueMiddleEast.HasValue) { <div class="alert alert-success mt-3"><div><strong>Forecasted Revenue Middle East:</strong> @Model.ForecastedRevenueMiddleEast.Value.ToString("N2")</div><div class="small text-muted">@Model.RevenueMiddleEastForecastReason</div></div> }
+        else if (!string.IsNullOrWhiteSpace(Model.RevenueMiddleEastForecastReason)) { <div class="alert alert-warning mt-3"><div><strong>Forecasted Revenue Middle East:</strong> not available</div><div class="small text-muted">@Model.RevenueMiddleEastForecastReason</div></div> }
+        @if (Model.ForecastedRevenueLatinAmerica.HasValue) { <div class="alert alert-success mt-3"><div><strong>Forecasted Revenue Latin America:</strong> @Model.ForecastedRevenueLatinAmerica.Value.ToString("N2")</div><div class="small text-muted">@Model.RevenueLatinAmericaForecastReason</div></div> }
+        else if (!string.IsNullOrWhiteSpace(Model.RevenueLatinAmericaForecastReason)) { <div class="alert alert-warning mt-3"><div><strong>Forecasted Revenue Latin America:</strong> not available</div><div class="small text-muted">@Model.RevenueLatinAmericaForecastReason</div></div> }
+        @if (Model.ForecastedRevenueAfrica.HasValue) { <div class="alert alert-success mt-3"><div><strong>Forecasted Revenue Africa:</strong> @Model.ForecastedRevenueAfrica.Value.ToString("N2")</div><div class="small text-muted">@Model.RevenueAfricaForecastReason</div></div> }
+        else if (!string.IsNullOrWhiteSpace(Model.RevenueAfricaForecastReason)) { <div class="alert alert-warning mt-3"><div><strong>Forecasted Revenue Africa:</strong> not available</div><div class="small text-muted">@Model.RevenueAfricaForecastReason</div></div> }
+        @if (Model.ForecastedRevenueOther.HasValue) { <div class="alert alert-success mt-3"><div><strong>Forecasted Revenue Other:</strong> @Model.ForecastedRevenueOther.Value.ToString("N2")</div><div class="small text-muted">@Model.RevenueOtherForecastReason</div></div> }
+        else if (!string.IsNullOrWhiteSpace(Model.RevenueOtherForecastReason)) { <div class="alert alert-warning mt-3"><div><strong>Forecasted Revenue Other:</strong> not available</div><div class="small text-muted">@Model.RevenueOtherForecastReason</div></div> }
+
+        @if (!string.IsNullOrWhiteSpace(Model.GeneratedSummary))
+    {
+        <div class="card mt-3">
+            <div class="card-header">Estimation Summary</div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <textarea class="form-control" rows="12" readonly>@Model.GeneratedSummary</textarea>
+                </div>
+
+                <form method="post" asp-page-handler="SaveEstimation" class="d-inline">
+                    <input type="hidden" name="companySurveyId" value="@Model.CompanySurveyId" />
+                    <input type="hidden" name="financialYear" value="@Model.FinancialYearFilter" />
+                    <textarea name="generatedSummary" class="d-none">@Model.GeneratedSummary</textarea>
+                    <input type="hidden" name="forecastReason" value="@Model.ForecastReason" />
+                    <input type="hidden" name="forecastedRevenue" value="@Model.ForecastedRevenue" />
+                    <input type="hidden" name="employmentForecastReason" value="@Model.EmploymentForecastReason" />
+                    <input type="hidden" name="forecastedEmployment" value="@Model.ForecastedEmployment" />
+                    <input type="hidden" name="wagesForecastReason" value="@Model.WagesForecastReason" />
+                    <input type="hidden" name="forecastedWages" value="@Model.ForecastedWages" />
+                    <input type="hidden" name="researchDevelopmentForecastReason" value="@Model.ResearchDevelopmentForecastReason" />
+                    <input type="hidden" name="forecastedResearchDevelopment" value="@Model.ForecastedResearchDevelopment" />
+                    <input type="hidden" name="salesMarketingForecastReason" value="@Model.SalesMarketingForecastReason" />
+                    <input type="hidden" name="forecastedSalesMarketing" value="@Model.ForecastedSalesMarketing" />
+                    <input type="hidden" name="ebitdaForecastReason" value="@Model.EbitdaForecastReason" />
+                    <input type="hidden" name="forecastedEbitda" value="@Model.ForecastedEbitda" />
+                    <input type="hidden" name="revenueNzForecastReason" value="@Model.RevenueNzForecastReason" />
+                    <input type="hidden" name="forecastedRevenueNz" value="@Model.ForecastedRevenueNz" />
+                    <input type="hidden" name="revenueAustraliaForecastReason" value="@Model.RevenueAustraliaForecastReason" />
+                    <input type="hidden" name="forecastedRevenueAustralia" value="@Model.ForecastedRevenueAustralia" />
+                    <input type="hidden" name="revenueChinaForecastReason" value="@Model.RevenueChinaForecastReason" />
+                    <input type="hidden" name="forecastedRevenueChina" value="@Model.ForecastedRevenueChina" />
+                    <input type="hidden" name="revenueRestOfAsiaForecastReason" value="@Model.RevenueRestOfAsiaForecastReason" />
+                    <input type="hidden" name="forecastedRevenueRestOfAsia" value="@Model.ForecastedRevenueRestOfAsia" />
+                    <input type="hidden" name="revenueNorthAmericaForecastReason" value="@Model.RevenueNorthAmericaForecastReason" />
+                    <input type="hidden" name="forecastedRevenueNorthAmerica" value="@Model.ForecastedRevenueNorthAmerica" />
+                    <input type="hidden" name="revenueEuropeForecastReason" value="@Model.RevenueEuropeForecastReason" />
+                    <input type="hidden" name="forecastedRevenueEurope" value="@Model.ForecastedRevenueEurope" />
+                    <input type="hidden" name="revenueMiddleEastForecastReason" value="@Model.RevenueMiddleEastForecastReason" />
+                    <input type="hidden" name="forecastedRevenueMiddleEast" value="@Model.ForecastedRevenueMiddleEast" />
+                    <input type="hidden" name="revenueLatinAmericaForecastReason" value="@Model.RevenueLatinAmericaForecastReason" />
+                    <input type="hidden" name="forecastedRevenueLatinAmerica" value="@Model.ForecastedRevenueLatinAmerica" />
+                    <input type="hidden" name="revenueAfricaForecastReason" value="@Model.RevenueAfricaForecastReason" />
+                    <input type="hidden" name="forecastedRevenueAfrica" value="@Model.ForecastedRevenueAfrica" />
+                    <input type="hidden" name="revenueOtherForecastReason" value="@Model.RevenueOtherForecastReason" />
+                    <input type="hidden" name="forecastedRevenueOther" value="@Model.ForecastedRevenueOther" />
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </form>
+
+                <form method="post" asp-page-handler="CancelEstimation" class="d-inline ms-2">
+                    <input type="hidden" name="companySurveyId" value="@Model.CompanySurveyId" />
+                    <input type="hidden" name="financialYear" value="@Model.FinancialYearFilter" />
+                    <button type="submit" class="btn btn-outline-secondary">Cancel</button>
+                </form>
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+}
+

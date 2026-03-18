@@ -45,29 +45,29 @@
         </div>
 
         <div class="form-check mb-3">
-            <input type="hidden" name="Record.Locked" value="false" />
             <input type="checkbox"
                    class="form-check-input"
                    id="Record_Locked"
                    name="Record.Locked"
                    value="true"
-                   checked="@(Model.Record.Locked == true)" />
+                     checked="@(Model.Record.Locked == true ? "checked" : null)" />
+            <input type="hidden" name="Record.Locked" value="false" />
             <label class="form-check-label" for="Record_Locked">Locked</label>
         </div>
 
         <div class="form-check mb-3">
-            <input type="hidden" name="Record.Estimate" value="false" />
             <input type="checkbox"
                    class="form-check-input"
                    id="Record_Estimate"
                    name="Record.Estimate"
                    value="true"
-                   checked="@(Model.Record.Estimate == true)" />
+                     checked="@(Model.Record.Estimate == true ? "checked" : null)" />
+            <input type="hidden" name="Record.Estimate" value="false" />
             <label class="form-check-label" for="Record_Estimate">Estimate</label>
         </div>
 
         <button type="submit" class="btn btn-primary">Save</button>
-        <a asp-page="./Index" asp-route-financialYear="@Model.FinancialYear" class="btn btn-secondary">Back to List</a>
+        <a asp-page="./Index" asp-route-financialYear="@Model.FinancialYear" asp-fragment="record-@Model.Record.Id" class="btn btn-secondary">Back to List</a>
     </form>
 </div>
 
