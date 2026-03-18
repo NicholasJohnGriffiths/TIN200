@@ -94,18 +94,19 @@
     <div class="card mb-4" id="wages">
         <div class="card-header fw-semibold">Wages &amp; Salaries</div>
         <div class="card-body">
-            <p class="mb-2">Uses <strong>log-linear trend fit</strong> with a higher minimum and an optional sector-ratio fallback.</p>
+                <p class="mb-2">Uses <strong>log-linear trend fit</strong> with a higher minimum and an active sector-ratio fallback. Ratios are calculated from the primary sector using the last 5 years of wages-to-revenue data.</p>
             <ol>
                 <li><strong>Actual value</strong> for target year → returned directly.</li>
                 <li>
-                    <strong>Log-linear trend (&gt; 3 positive points)</strong> — same OLS on <code>ln(value)</code> as above, but requires <strong>more than 3</strong> data points (i.e. ≥ 4).
+                        <strong>Log-linear trend (&gt; 3 positive points)</strong> — same OLS on <code>ln(value)</code> as Total Revenue, but requires <strong>more than 3</strong> data points (i.e. ≥ 4).
                 </li>
                 <li>
-                    <strong>Sector-ratio fallback (currently inactive)</strong> — applies primary and secondary revenue ratio constants to the target year's total revenue:
+                        <strong>Sector-ratio fallback (active)</strong> — when fewer than 4 positive historical points are available for the company, calculates the average ratio of <em>wages-to-revenue</em> from all companies in the same primary sector over the last 5 years and applies that ratio to the company's forecasted revenue:
                     <div class="bg-light border rounded p-3 my-2 font-monospace small">
-                        estimate = revenue × WagesPrimaryRatio + revenue × WagesSecondaryRatio
+                            sectorRatio = (sum of sector wages) / (sum of sector revenue) over last 5 years<br />
+                            forecast = forecastedRevenue × sectorRatio
                     </div>
-                    This fallback is configured in code but disabled (<code>EnableWagesSectorFallback = false</code>).
+                        If no primary sector is assigned or insufficient sector-level history exists, returns <em>not available</em>.
                 </li>
                 <li><strong>No result</strong> if neither condition is met.</li>
             </ol>
@@ -116,11 +117,21 @@
     <div class="card mb-4" id="rd">
         <div class="card-header fw-semibold">Research &amp; Development</div>
         <div class="card-body">
-            <p class="mb-2">Uses the <strong>log-linear trend fit (minimum 3 positive points)</strong> algorithm, identical to Total Revenue. <span class="badge bg-warning text-dark">No sector fallback</span></p>
+                <p class="mb-2">Uses the <strong>log-linear trend fit</strong> algorithm with an active sector-ratio fallback. Ratios are calculated from the primary sector using the last 5 years of R&D-to-revenue data.</p>
             <ol>
                 <li><strong>Actual value</strong> for target year → returned directly.</li>
-                <li><strong>Log-linear trend (≥ 3 positive points)</strong> across up to 5 prior years.</li>
-                <li><strong>No result</strong> if fewer than 3 positive points exist.</li>
+                    <li>
+                        <strong>Log-linear trend (≥ 3 positive points)</strong> — same OLS on <code>ln(value)</code> as Total Revenue across up to 5 prior years.
+                    </li>
+                    <li>
+                        <strong>Sector-ratio fallback (active)</strong> — when fewer than 3 positive historical points are available for the company, calculates the average ratio of <em>R&D-to-revenue</em> from all companies in the same primary sector over the last 5 years and applies that ratio to the company's forecasted revenue:
+                        <div class="bg-light border rounded p-3 my-2 font-monospace small">
+                            sectorRatio = (sum of sector R&D) / (sum of sector revenue) over last 5 years<br />
+                            forecast = forecastedRevenue × sectorRatio
+                        </div>
+                        If no primary sector is assigned or insufficient sector-level history exists, returns <em>not available</em>.
+                    </li>
+                    <li><strong>No result</strong> if neither condition is met.</li>
             </ol>
         </div>
     </div>
@@ -129,11 +140,21 @@
     <div class="card mb-4" id="salesmarketing">
         <div class="card-header fw-semibold">Sales &amp; Marketing</div>
         <div class="card-body">
-            <p class="mb-2">Uses the <strong>log-linear trend fit (minimum 3 positive points)</strong> algorithm, identical to Total Revenue. <span class="badge bg-warning text-dark">No sector fallback</span></p>
+                <p class="mb-2">Uses the <strong>log-linear trend fit</strong> algorithm with an active sector-ratio fallback. Ratios are calculated from the primary sector using the last 5 years of S&M-to-revenue data.</p>
             <ol>
                 <li><strong>Actual value</strong> for target year → returned directly.</li>
-                <li><strong>Log-linear trend (≥ 3 positive points)</strong> across up to 5 prior years.</li>
-                <li><strong>No result</strong> if fewer than 3 positive points exist.</li>
+                    <li>
+                        <strong>Log-linear trend (≥ 3 positive points)</strong> — same OLS on <code>ln(value)</code> as Total Revenue across up to 5 prior years.
+                    </li>
+                    <li>
+                        <strong>Sector-ratio fallback (active)</strong> — when fewer than 3 positive historical points are available for the company, calculates the average ratio of <em>S&M-to-revenue</em> from all companies in the same primary sector over the last 5 years and applies that ratio to the company's forecasted revenue:
+                        <div class="bg-light border rounded p-3 my-2 font-monospace small">
+                            sectorRatio = (sum of sector S&M) / (sum of sector revenue) over last 5 years<br />
+                            forecast = forecastedRevenue × sectorRatio
+                        </div>
+                        If no primary sector is assigned or insufficient sector-level history exists, returns <em>not available</em>.
+                    </li>
+                    <li><strong>No result</strong> if neither condition is met.</li>
             </ol>
         </div>
     </div>

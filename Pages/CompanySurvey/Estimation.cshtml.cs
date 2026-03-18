@@ -25,7 +25,7 @@ namespace TINWeb.Pages.CompanySurvey
         private const string RevenueLatinAmericaQuestionTitle = "Global Revenue Latin America Last Financial Year";
         private const string RevenueAfricaQuestionTitle = "Global Revenue Africa Last Financial Year";
         private const string RevenueOtherQuestionTitle = "Global Revenue Other Last Financial Year";
-        private static readonly bool EnableWagesSectorFallback = false;
+        private static readonly bool EnableWagesSectorFallback = true;
         private const decimal WagesPrimaryRatio = 0.6m;
         private const decimal WagesSecondaryRatio = 0.3m;
         private static readonly bool EnableEbitdaSectorFallback = false;
@@ -300,7 +300,7 @@ namespace TINWeb.Pages.CompanySurvey
             var wagesHistory = await GetCompanyMetricHistoryAsync(CompanyId, WagesQuestionTitle);
             var revenueHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueQuestionTitle);
 
-            ForecastedWages = CalculateForecastedWages(wagesHistory, revenueHistory, TargetFinancialYear, out var wagesReason);
+            ForecastedWages = await CalculateForecastedWagesWithSectorFallbackAsync(wagesHistory, revenueHistory, TargetFinancialYear, out var wagesReason);
             WagesForecastReason = wagesReason;
 
             ForecastedRevenue = null;
@@ -368,8 +368,9 @@ namespace TINWeb.Pages.CompanySurvey
             }
 
             var researchDevelopmentHistory = await GetCompanyMetricHistoryAsync(CompanyId, ResearchDevelopmentQuestionTitle);
+            var revenueHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueQuestionTitle);
 
-            ForecastedResearchDevelopment = CalculateForecastedValue(researchDevelopmentHistory, TargetFinancialYear, "research and development", out var researchDevelopmentReason);
+            ForecastedResearchDevelopment = await CalculateForecastedResearchDevelopmentWithSectorFallbackAsync(researchDevelopmentHistory, revenueHistory, TargetFinancialYear, out var researchDevelopmentReason);
             ResearchDevelopmentForecastReason = researchDevelopmentReason;
 
             ForecastedRevenue = null;
@@ -437,8 +438,9 @@ namespace TINWeb.Pages.CompanySurvey
             }
 
             var salesMarketingHistory = await GetCompanyMetricHistoryAsync(CompanyId, SalesMarketingQuestionTitle);
+            var revenueHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueQuestionTitle);
 
-            ForecastedSalesMarketing = CalculateForecastedValue(salesMarketingHistory, TargetFinancialYear, "sales and marketing", out var salesMarketingReason);
+            ForecastedSalesMarketing = await CalculateForecastedSalesMarketingWithSectorFallbackAsync(salesMarketingHistory, revenueHistory, TargetFinancialYear, out var salesMarketingReason);
             SalesMarketingForecastReason = salesMarketingReason;
 
             ForecastedRevenue = null;
@@ -1277,6 +1279,20 @@ namespace TINWeb.Pages.CompanySurvey
         private async Task<string?> GetCompanySecondarySectorAsync(int companyId)
         {
             var secondarySector = await (
+                        private async Task<string?> GetCompanyPrimarySectorAsync(int companyId)
+                        {
+                            var primarySector = await (
+                                from companySurvey in _context.CompanySurvey
+                                join answer in _context.Answer on companySurvey.Id equals answer.CompanySurveyId
+                                join question in _context.Question on answer.QuestionId equals question.Id
+                                where companySurvey.CompanyId == companyId && question.Title == "Primary Sector"
+                                orderby companySurvey.Id descending
+                                select answer.AnswerText
+                            ).FirstOrDefaultAsync();
+
+                            return primarySector;
+                        }
+
                 from companySurvey in _context.CompanySurvey
                 join answer in _context.Answer on companySurvey.Id equals answer.CompanySurveyId
                 join question in _context.Question on answer.QuestionId equals question.Id
@@ -1804,6 +1820,430 @@ namespace TINWeb.Pages.CompanySurvey
             decimal result = forecastValue < 0 ? 0m : Convert.ToDecimal(forecastValue);
             reason = $"Linear trend fitted on {numPoints} historical data points (FY{(int)trendPoints.Min(d => d.Year)}\u2013FY{(int)trendPoints.Max(d => d.Year)}). Slope: {slope:N4}, Intercept: {intercept:N2}. Forecast floored at 0.";
             return result;
+        }
+
+
+        private async Task<decimal?> CalculateSectorWagesRatioAsync(string? primarySector, int targetYear)
+        {
+            if (string.IsNullOrWhiteSpace(primarySector))
+            {
+                return null;
+            }
+
+            // Get all companies with the same primary sector and their wages/revenue history for past 5 years
+            var sectorData = await (
+                from companySurvey in _context.CompanySurvey
+                join answer in _context.Answer on companySurvey.Id equals answer.CompanySurveyId
+                join question in _context.Question on answer.QuestionId equals question.Id
+                join wagesAnswer in _context.Answer on companySurvey.Id equals wagesAnswer.CompanySurveyId
+                join wagesQuestion in _context.Question on wagesAnswer.QuestionId equals wagesQuestion.Id
+                join revenueAnswer in _context.Answer on companySurvey.Id equals revenueAnswer.CompanySurveyId
+                join revenueQuestion in _context.Question on revenueAnswer.QuestionId equals revenueQuestion.Id
+                join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
+                where question.Title == "Primary Sector" 
+                    && (answer.AnswerText ?? string.Empty) == primarySector
+                    && wagesQuestion.Title == WagesQuestionTitle
+                    && revenueQuestion.Title == RevenueQuestionTitle
+                    && survey.FinancialYear < targetYear
+                select new
+                {
+                    companySurvey.Id,
+                    survey.FinancialYear,
+                    WagesAnswerCurrency = wagesAnswer.AnswerCurrency,
+                    WagesAnswerNumber = wagesAnswer.AnswerNumber,
+                    WagesAnswerText = wagesAnswer.AnswerText,
+                    RevenueAnswerCurrency = revenueAnswer.AnswerCurrency,
+                    RevenueAnswerNumber = revenueAnswer.AnswerNumber,
+                    RevenueAnswerText = revenueAnswer.AnswerText
+                }
+            ).ToListAsync();
+
+            if (sectorData.Count == 0)
+            {
+                return null;
+            }
+
+            // Group by year and calculate average wages/revenue for last 5 years
+            var yearlyRatios = sectorData
+                .Select(x => new
+                {
+                    x.FinancialYear,
+                    WagesValue = ResolveMetricValue(x.WagesAnswerCurrency, x.WagesAnswerNumber, x.WagesAnswerText) ?? 0m,
+                    RevenueValue = ResolveMetricValue(x.RevenueAnswerCurrency, x.RevenueAnswerNumber, x.RevenueAnswerText) ?? 0m
+                })
+                .Where(x => x.WagesValue > 0 && x.RevenueValue > 0)
+                .GroupBy(x => x.FinancialYear)
+                .Select(g => new
+                {
+                    Year = g.Key,
+                    AvgWages = g.Average(x => (double)x.WagesValue),
+                    AvgRevenue = g.Average(x => (double)x.RevenueValue)
+                })
+                .OrderByDescending(x => x.Year)
+                .Take(5)
+                .ToList();
+
+            if (yearlyRatios.Count == 0)
+            {
+                return null;
+            }
+
+            // Calculate average ratio across years
+            var averageRatio = yearlyRatios.Average(x => x.AvgWages / x.AvgRevenue);
+            return Convert.ToDecimal(averageRatio);
+        }
+
+        private async Task<decimal?> CalculateSectorResearchDevelopmentRatioAsync(string? primarySector, int targetYear)
+        {
+            if (string.IsNullOrWhiteSpace(primarySector))
+            {
+                return null;
+            }
+
+            // Get all companies with the same primary sector and their R&D/revenue history for past 5 years
+            var sectorData = await (
+                from companySurvey in _context.CompanySurvey
+                join answer in _context.Answer on companySurvey.Id equals answer.CompanySurveyId
+                join question in _context.Question on answer.QuestionId equals question.Id
+                join rdAnswer in _context.Answer on companySurvey.Id equals rdAnswer.CompanySurveyId
+                join rdQuestion in _context.Question on rdAnswer.QuestionId equals rdQuestion.Id
+                join revenueAnswer in _context.Answer on companySurvey.Id equals revenueAnswer.CompanySurveyId
+                join revenueQuestion in _context.Question on revenueAnswer.QuestionId equals revenueQuestion.Id
+                join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
+                where question.Title == "Primary Sector" 
+                    && (answer.AnswerText ?? string.Empty) == primarySector
+                    && rdQuestion.Title == ResearchDevelopmentQuestionTitle
+                    && revenueQuestion.Title == RevenueQuestionTitle
+                    && survey.FinancialYear < targetYear
+                select new
+                {
+                    companySurvey.Id,
+                    survey.FinancialYear,
+                    RdAnswerCurrency = rdAnswer.AnswerCurrency,
+                    RdAnswerNumber = rdAnswer.AnswerNumber,
+                    RdAnswerText = rdAnswer.AnswerText,
+                    RevenueAnswerCurrency = revenueAnswer.AnswerCurrency,
+                    RevenueAnswerNumber = revenueAnswer.AnswerNumber,
+                    RevenueAnswerText = revenueAnswer.AnswerText
+                }
+            ).ToListAsync();
+
+            if (sectorData.Count == 0)
+            {
+                return null;
+            }
+
+            // Group by year and calculate average R&D/revenue for last 5 years
+            var yearlyRatios = sectorData
+                .Select(x => new
+                {
+                    x.FinancialYear,
+                    RdValue = ResolveMetricValue(x.RdAnswerCurrency, x.RdAnswerNumber, x.RdAnswerText) ?? 0m,
+                    RevenueValue = ResolveMetricValue(x.RevenueAnswerCurrency, x.RevenueAnswerNumber, x.RevenueAnswerText) ?? 0m
+                })
+                .Where(x => x.RdValue > 0 && x.RevenueValue > 0)
+                .GroupBy(x => x.FinancialYear)
+                .Select(g => new
+                {
+                    Year = g.Key,
+                    AvgRd = g.Average(x => (double)x.RdValue),
+                    AvgRevenue = g.Average(x => (double)x.RevenueValue)
+                })
+                .OrderByDescending(x => x.Year)
+                .Take(5)
+                .ToList();
+
+            if (yearlyRatios.Count == 0)
+            {
+                return null;
+            }
+
+            // Calculate average ratio across years
+            var averageRatio = yearlyRatios.Average(x => x.AvgRd / x.AvgRevenue);
+            return Convert.ToDecimal(averageRatio);
+        }
+
+        private async Task<decimal?> CalculateSectorSalesMarketingRatioAsync(string? primarySector, int targetYear)
+        {
+            if (string.IsNullOrWhiteSpace(primarySector))
+            {
+                return null;
+            }
+
+            // Get all companies with the same primary sector and their S&M/revenue history for past 5 years
+            var sectorData = await (
+                from companySurvey in _context.CompanySurvey
+                join answer in _context.Answer on companySurvey.Id equals answer.CompanySurveyId
+                join question in _context.Question on answer.QuestionId equals question.Id
+                join smAnswer in _context.Answer on companySurvey.Id equals smAnswer.CompanySurveyId
+                join smQuestion in _context.Question on smAnswer.QuestionId equals smQuestion.Id
+                join revenueAnswer in _context.Answer on companySurvey.Id equals revenueAnswer.CompanySurveyId
+                join revenueQuestion in _context.Question on revenueAnswer.QuestionId equals revenueQuestion.Id
+                join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
+                where question.Title == "Primary Sector" 
+                    && (answer.AnswerText ?? string.Empty) == primarySector
+                    && smQuestion.Title == SalesMarketingQuestionTitle
+                    && revenueQuestion.Title == RevenueQuestionTitle
+                    && survey.FinancialYear < targetYear
+                select new
+                {
+                    companySurvey.Id,
+                    survey.FinancialYear,
+                    SmAnswerCurrency = smAnswer.AnswerCurrency,
+                    SmAnswerNumber = smAnswer.AnswerNumber,
+                    SmAnswerText = smAnswer.AnswerText,
+                    RevenueAnswerCurrency = revenueAnswer.AnswerCurrency,
+                    RevenueAnswerNumber = revenueAnswer.AnswerNumber,
+                    RevenueAnswerText = revenueAnswer.AnswerText
+                }
+            ).ToListAsync();
+
+            if (sectorData.Count == 0)
+            {
+                return null;
+            }
+
+            // Group by year and calculate average S&M/revenue for last 5 years
+            var yearlyRatios = sectorData
+                .Select(x => new
+                {
+                    x.FinancialYear,
+                    SmValue = ResolveMetricValue(x.SmAnswerCurrency, x.SmAnswerNumber, x.SmAnswerText) ?? 0m,
+                    RevenueValue = ResolveMetricValue(x.RevenueAnswerCurrency, x.RevenueAnswerNumber, x.RevenueAnswerText) ?? 0m
+                })
+                .Where(x => x.SmValue > 0 && x.RevenueValue > 0)
+                .GroupBy(x => x.FinancialYear)
+                .Select(g => new
+                {
+                    Year = g.Key,
+                    AvgSm = g.Average(x => (double)x.SmValue),
+                    AvgRevenue = g.Average(x => (double)x.RevenueValue)
+                })
+                .OrderByDescending(x => x.Year)
+                .Take(5)
+                .ToList();
+
+            if (yearlyRatios.Count == 0)
+            {
+                return null;
+            }
+
+            // Calculate average ratio across years
+            var averageRatio = yearlyRatios.Average(x => x.AvgSm / x.AvgRevenue);
+            return Convert.ToDecimal(averageRatio);
+        }
+
+        private async Task<decimal?> CalculateForecastedWagesWithSectorFallbackAsync(
+            List<MetricHistoryRow> wagesHistory,
+            List<MetricHistoryRow> revenueHistory,
+            int targetYear,
+            out string reason)
+        {
+            // Step 1: Use actual if exists for target year
+            var actual = wagesHistory
+                .Where(x => x.FinancialYear == targetYear)
+                .OrderByDescending(x => x.CompanySurveyId)
+                .Select(x => x.Value)
+                .FirstOrDefault();
+
+            if (actual.HasValue)
+            {
+                reason = "Using actual wages and salaries for target financial year.";
+                return actual.Value;
+            }
+
+            // Step 2: Log-linear trend fit (> 3 positive points)
+            var trendPoints = wagesHistory
+                .Where(x => x.FinancialYear < targetYear && x.Value.HasValue && x.Value.Value > 0)
+                .OrderByDescending(x => x.FinancialYear)
+                .Take(5)
+                .Select(x => new
+                {
+                    x.FinancialYear,
+                    Value = (double)x.Value!.Value
+                })
+                .ToList();
+
+            if (trendPoints.Count > 3)
+            {
+                var meanYear = trendPoints.Average(x => (double)x.FinancialYear);
+                var meanLnValue = trendPoints.Average(x => Math.Log(x.Value));
+
+                var numerator = trendPoints.Sum(x => ((double)x.FinancialYear - meanYear) * (Math.Log(x.Value) - meanLnValue));
+                var denominator = trendPoints.Sum(x => Math.Pow((double)x.FinancialYear - meanYear, 2));
+
+                if (denominator > 0)
+                {
+                    var slope = numerator / denominator;
+                    var lnForecast = meanLnValue + slope * (targetYear - meanYear);
+                    var trendFit = Math.Exp(lnForecast);
+
+                    reason = "Using log-linear trend fit from previous years for wages and salaries (more than 3 points).";
+                    return Convert.ToDecimal(trendFit);
+                }
+            }
+
+            // Step 3: Sector-ratio fallback (active)
+            var primarySector = await GetCompanyPrimarySectorAsync(CompanyId);
+            var sectorRatio = await CalculateSectorWagesRatioAsync(primarySector, targetYear);
+
+            if (sectorRatio.HasValue && sectorRatio.Value > 0)
+            {
+                var forecastedRevenue = await CalculateForecastedRevenueWithSectorFallbackAsync(revenueHistory, targetYear, out _);
+                
+                if (forecastedRevenue.HasValue && forecastedRevenue.Value > 0)
+                {
+                    var forecastValue = forecastedRevenue.Value * sectorRatio.Value;
+                    reason = $"Insufficient company-level historical data ({trendPoints.Count} points, maximum 3 required). Using sector wages-to-revenue ratio ({sectorRatio:P2}) from primary sector '{primarySector}' applied to forecasted revenue.";
+                    return forecastValue > 0 ? forecastValue : 0m;
+                }
+            }
+
+            // Step 4: No result
+            reason = $"No actual value and insufficient positive historical points ({trendPoints.Count}, more than 3 required) for trend fit. Sector-based fallback not available (no sector data or unable to forecast base revenue).";
+            return null;
+        }
+
+        private async Task<decimal?> CalculateForecastedResearchDevelopmentWithSectorFallbackAsync(
+            List<MetricHistoryRow> researchDevelopmentHistory,
+            List<MetricHistoryRow> revenueHistory,
+            int targetYear,
+            out string reason)
+        {
+            // Step 1: Use actual if exists for target year
+            var actual = researchDevelopmentHistory
+                .Where(x => x.FinancialYear == targetYear)
+                .OrderByDescending(x => x.CompanySurveyId)
+                .Select(x => x.Value)
+                .FirstOrDefault();
+
+            if (actual.HasValue)
+            {
+                reason = "Using actual research and development for target financial year.";
+                return actual.Value;
+            }
+
+            // Step 2: Log-linear trend fit (>= 3 positive points)
+            var trendPoints = researchDevelopmentHistory
+                .Where(x => x.FinancialYear < targetYear && x.Value.HasValue && x.Value.Value > 0)
+                .OrderByDescending(x => x.FinancialYear)
+                .Take(5)
+                .Select(x => new
+                {
+                    x.FinancialYear,
+                    Value = (double)x.Value!.Value
+                })
+                .ToList();
+
+            if (trendPoints.Count >= 3)
+            {
+                var meanYear = trendPoints.Average(x => (double)x.FinancialYear);
+                var meanLnValue = trendPoints.Average(x => Math.Log(x.Value));
+
+                var numerator = trendPoints.Sum(x => ((double)x.FinancialYear - meanYear) * (Math.Log(x.Value) - meanLnValue));
+                var denominator = trendPoints.Sum(x => Math.Pow((double)x.FinancialYear - meanYear, 2));
+
+                if (denominator > 0)
+                {
+                    var slope = numerator / denominator;
+                    var lnForecast = meanLnValue + slope * (targetYear - meanYear);
+                    var trendFit = Math.Exp(lnForecast);
+
+                    reason = "Using log-linear trend fit from previous years for research and development (minimum 3 points).";
+                    return Convert.ToDecimal(trendFit);
+                }
+            }
+
+            // Step 3: Sector-ratio fallback (active)
+            var primarySector = await GetCompanyPrimarySectorAsync(CompanyId);
+            var sectorRatio = await CalculateSectorResearchDevelopmentRatioAsync(primarySector, targetYear);
+
+            if (sectorRatio.HasValue && sectorRatio.Value > 0)
+            {
+                var forecastedRevenue = await CalculateForecastedRevenueWithSectorFallbackAsync(revenueHistory, targetYear, out _);
+                
+                if (forecastedRevenue.HasValue && forecastedRevenue.Value > 0)
+                {
+                    var forecastValue = forecastedRevenue.Value * sectorRatio.Value;
+                    reason = $"Insufficient company-level historical data ({trendPoints.Count} points, minimum 3 required). Using sector R&D-to-revenue ratio ({sectorRatio:P2}) from primary sector '{primarySector}' applied to forecasted revenue.";
+                    return forecastValue > 0 ? forecastValue : 0m;
+                }
+            }
+
+            // Step 4: No result
+            reason = $"No actual value and insufficient positive historical points ({trendPoints.Count}, minimum 3 required) for trend fit. Sector-based fallback not available (no sector data or unable to forecast base revenue).";
+            return null;
+        }
+
+        private async Task<decimal?> CalculateForecastedSalesMarketingWithSectorFallbackAsync(
+            List<MetricHistoryRow> salesMarketingHistory,
+            List<MetricHistoryRow> revenueHistory,
+            int targetYear,
+            out string reason)
+        {
+            // Step 1: Use actual if exists for target year
+            var actual = salesMarketingHistory
+                .Where(x => x.FinancialYear == targetYear)
+                .OrderByDescending(x => x.CompanySurveyId)
+                .Select(x => x.Value)
+                .FirstOrDefault();
+
+            if (actual.HasValue)
+            {
+                reason = "Using actual sales and marketing for target financial year.";
+                return actual.Value;
+            }
+
+            // Step 2: Log-linear trend fit (>= 3 positive points)
+            var trendPoints = salesMarketingHistory
+                .Where(x => x.FinancialYear < targetYear && x.Value.HasValue && x.Value.Value > 0)
+                .OrderByDescending(x => x.FinancialYear)
+                .Take(5)
+                .Select(x => new
+                {
+                    x.FinancialYear,
+                    Value = (double)x.Value!.Value
+                })
+                .ToList();
+
+            if (trendPoints.Count >= 3)
+            {
+                var meanYear = trendPoints.Average(x => (double)x.FinancialYear);
+                var meanLnValue = trendPoints.Average(x => Math.Log(x.Value));
+
+                var numerator = trendPoints.Sum(x => ((double)x.FinancialYear - meanYear) * (Math.Log(x.Value) - meanLnValue));
+                var denominator = trendPoints.Sum(x => Math.Pow((double)x.FinancialYear - meanYear, 2));
+
+                if (denominator > 0)
+                {
+                    var slope = numerator / denominator;
+                    var lnForecast = meanLnValue + slope * (targetYear - meanYear);
+                    var trendFit = Math.Exp(lnForecast);
+
+                    reason = "Using log-linear trend fit from previous years for sales and marketing (minimum 3 points).";
+                    return Convert.ToDecimal(trendFit);
+                }
+            }
+
+            // Step 3: Sector-ratio fallback (active)
+            var primarySector = await GetCompanyPrimarySectorAsync(CompanyId);
+            var sectorRatio = await CalculateSectorSalesMarketingRatioAsync(primarySector, targetYear);
+
+            if (sectorRatio.HasValue && sectorRatio.Value > 0)
+            {
+                var forecastedRevenue = await CalculateForecastedRevenueWithSectorFallbackAsync(revenueHistory, targetYear, out _);
+                
+                if (forecastedRevenue.HasValue && forecastedRevenue.Value > 0)
+                {
+                    var forecastValue = forecastedRevenue.Value * sectorRatio.Value;
+                    reason = $"Insufficient company-level historical data ({trendPoints.Count} points, minimum 3 required). Using sector S&M-to-revenue ratio ({sectorRatio:P2}) from primary sector '{primarySector}' applied to forecasted revenue.";
+                    return forecastValue > 0 ? forecastValue : 0m;
+                }
+            }
+
+            // Step 4: No result
+            reason = $"No actual value and insufficient positive historical points ({trendPoints.Count}, minimum 3 required) for trend fit. Sector-based fallback not available (no sector data or unable to forecast base revenue).";
+            return null;
         }
 
         private static decimal? CalculateForecastedWages(
