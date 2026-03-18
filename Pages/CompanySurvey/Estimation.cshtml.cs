@@ -230,7 +230,7 @@ namespace TINWeb.Pages.CompanySurvey
 
             var allEmploymentHistory = await GetCompanyMetricHistoryAsync(CompanyId, EmploymentQuestionTitle, EmploymentQuestionTitleLegacy);
 
-            ForecastedEmployment = CalculateForecastedValue(allEmploymentHistory, TargetFinancialYear, "employment", out var employmentReason);
+            ForecastedEmployment = await CalculateForecastedEmploymentWithSectorFallbackAsync(allEmploymentHistory, TargetFinancialYear, out var employmentReason);
             EmploymentForecastReason = employmentReason;
 
             ForecastedRevenue = null;
@@ -1352,6 +1352,147 @@ namespace TINWeb.Pages.CompanySurvey
 
             var cagrDecimal = Math.Pow(newestYear.AverageValue / oldestYear.AverageValue, 1.0 / yearsSpan) - 1.0;
             return Convert.ToDecimal(cagrDecimal);
+        }
+
+        private async Task<decimal?> CalculateSectorCAGREmploymentAsync(string? secondarySector, int targetYear)
+        {
+            if (string.IsNullOrWhiteSpace(secondarySector))
+            {
+                return null;
+            }
+
+            // Get all companies with the same secondary sector and their employment history for past 5 years
+            var sectorEmploymentData = await (
+                from companySurvey in _context.CompanySurvey
+                join answer in _context.Answer on companySurvey.Id equals answer.CompanySurveyId
+                join question in _context.Question on answer.QuestionId equals question.Id
+                join employmentAnswer in _context.Answer on companySurvey.Id equals employmentAnswer.CompanySurveyId
+                join employmentQuestion in _context.Question on employmentAnswer.QuestionId equals employmentQuestion.Id
+                join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
+                where question.Title == "Secondary Sector" 
+                    && (answer.AnswerText ?? string.Empty) == secondarySector
+                    && (employmentQuestion.Title == EmploymentQuestionTitle || employmentQuestion.Title == EmploymentQuestionTitleLegacy)
+                    && survey.FinancialYear < targetYear
+                select new
+                {
+                    companySurvey.Id,
+                    survey.FinancialYear,
+                    employmentAnswer.AnswerCurrency,
+                    employmentAnswer.AnswerNumber,
+                    employmentAnswer.AnswerText
+                }
+            ).ToListAsync();
+
+            // Resolve metric values and group by year
+            var yearlyValues = sectorEmploymentData
+                .Select(x => new
+                {
+                    x.FinancialYear,
+                    Value = ResolveMetricValue(x.AnswerCurrency, x.AnswerNumber, x.AnswerText) ?? 0m
+                })
+                .GroupBy(x => x.FinancialYear)
+                .Select(g => new
+                {
+                    Year = g.Key,
+                    AverageValue = g.Where(x => x.Value > 0).Average(x => (double)x.Value)
+                })
+                .Where(x => x.AverageValue > 0 && !double.IsNaN(x.AverageValue))
+                .OrderByDescending(x => x.Year)
+                .Take(5)
+                .ToList();
+
+            if (yearlyValues.Count < 2)
+            {
+                return null;
+            }
+
+            // Calculate CAGR: (EndValue / BeginValue) ^ (1 / NumYears) - 1
+            var newestYear = yearlyValues.First();
+            var oldestYear = yearlyValues.Last();
+            var yearsSpan = newestYear.Year - oldestYear.Year;
+
+            if (yearsSpan <= 0 || oldestYear.AverageValue == 0)
+            {
+                return null;
+            }
+
+            var cagrDecimal = Math.Pow(newestYear.AverageValue / oldestYear.AverageValue, 1.0 / yearsSpan) - 1.0;
+            return Convert.ToDecimal(cagrDecimal);
+        }
+
+        private async Task<decimal?> CalculateForecastedEmploymentWithSectorFallbackAsync(
+            List<MetricHistoryRow> employmentHistory,
+            int targetYear,
+            out string reason)
+        {
+            // Step 1: Use actual if exists for target year
+            var actual = employmentHistory
+                .Where(x => x.FinancialYear == targetYear)
+                .OrderByDescending(x => x.CompanySurveyId)
+                .Select(x => x.Value)
+                .FirstOrDefault();
+
+            if (actual.HasValue)
+            {
+                reason = "Using actual employment for target financial year.";
+                return actual.Value;
+            }
+
+            // Step 2: Log-linear trend fit (>= 3 positive points)
+            var trendPoints = employmentHistory
+                .Where(x => x.FinancialYear < targetYear && x.Value.HasValue && x.Value.Value > 0)
+                .OrderByDescending(x => x.FinancialYear)
+                .Take(5)
+                .Select(x => (Year: (double)x.FinancialYear, Value: (double)x.Value!.Value))
+                .ToList();
+
+            if (trendPoints.Count >= 3)
+            {
+                double meanYear = trendPoints.Average(d => d.Year);
+                double meanLnValue = trendPoints.Average(d => Math.Log(d.Value));
+                double numerator = trendPoints.Sum(d => (d.Year - meanYear) * (Math.Log(d.Value) - meanLnValue));
+                double denominator = trendPoints.Sum(d => Math.Pow(d.Year - meanYear, 2));
+
+                if (denominator > 0)
+                {
+                    double slope = numerator / denominator;
+                    double lnForecast = meanLnValue + slope * (targetYear - meanYear);
+                    double growthFit = Math.Exp(lnForecast);
+                    decimal result = growthFit < 0 ? 0m : Convert.ToDecimal(growthFit);
+                    reason = $"Log-linear trend fit from {trendPoints.Count} historical data point(s) (minimum 3 positive points).";
+                    return result;
+                }
+            }
+
+            // Step 3: Sector CAGR fallback (now active)
+            var secondarySector = await GetCompanySecondarySectorAsync(CompanyId);
+            var sectorCAGR = await CalculateSectorCAGREmploymentAsync(secondarySector, targetYear);
+
+            if (sectorCAGR.HasValue && sectorCAGR.Value > -1) // CAGR must be > -100%
+            {
+                var latestEmployment = employmentHistory
+                    .Where(x => x.FinancialYear < targetYear && x.Value.HasValue && x.Value.Value > 0)
+                    .OrderByDescending(x => x.FinancialYear)
+                    .Select(x => x.Value)
+                    .FirstOrDefault() ?? 0m;
+
+                if (latestEmployment > 0)
+                {
+                    var yearsToForecast = targetYear - employmentHistory
+                        .Where(x => x.FinancialYear < targetYear && x.Value.HasValue && x.Value.Value > 0)
+                        .OrderByDescending(x => x.FinancialYear)
+                        .Select(x => x.FinancialYear)
+                        .FirstOrDefault();
+
+                    var forecastValue = latestEmployment * Convert.ToDecimal(Math.Pow(1 + (double)sectorCAGR, yearsToForecast));
+                    reason = $"Insufficient company-level historical data ({trendPoints.Count} points, minimum 3 required). Using sector CAGR ({sectorCAGR:P2}) from secondary sector '{secondarySector}' applied to latest employment over {yearsToForecast} year(s).";
+                    return forecastValue > 0 ? forecastValue : 0m;
+                }
+            }
+
+            // Step 4: No result
+            reason = $"No actual value and insufficient positive historical points ({trendPoints.Count}, minimum 3 required) for trend fit. Sector CAGR fallback not available (no sector data or insufficient sector history).";
+            return null;
         }
 
         private async Task<decimal?> CalculateForecastedRevenueWithSectorFallbackAsync(

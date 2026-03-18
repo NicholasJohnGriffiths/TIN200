@@ -61,11 +61,31 @@
     <div class="card mb-4" id="employment">
         <div class="card-header fw-semibold">Total Employment</div>
         <div class="card-body">
-            <p class="mb-2">Uses the same <strong>log-linear trend fit (minimum 3 positive points)</strong> algorithm as Total Revenue. Historical data from both the current and legacy employment question titles are combined. <span class="badge bg-warning text-dark">No sector fallback</span></p>
+            <p class=\"mb-2\">Uses the same <strong>log-linear trend fit</strong> algorithm as Total Revenue. Steps in priority order:</p>
             <ol>
-                <li><strong>Actual value</strong> for target year → returned directly.</li>
-                <li><strong>Log-linear trend (≥ 3 positive points)</strong> across up to 5 prior years.</li>
-                <li><strong>No result</strong> if fewer than 3 positive prior-year points exist.</li>
+                <li>
+                    <strong>Actual value</strong> — if the company has a recorded Total Employment answer for the target financial year, that value is returned immediately. Historical data from both the current and legacy employment question titles are combined.
+                </li>
+                <li>
+                    <strong>Log-linear trend (minimum 3 positive points)</strong> — takes up to the 5 most recent prior-year positive values and fits an OLS regression on <code>ln(value)</code> vs financial year:
+                    <div class=\"bg-light border rounded p-3 my-2 font-monospace small\">
+                        slope = Σ[(year − meanYear) × (ln(value) − meanLnValue)] / Σ[(year − meanYear)²]<br />
+                        forecast = exp(meanLnValue + slope × (targetYear − meanYear))
+                    </div>
+                    Requires <strong>≥ 3</strong> positive historical points.
+                </li>
+                <li>
+                    <strong>Sector CAGR fallback (active)</strong> — when fewer than 3 positive historical points are available for the company, the system computes a CAGR from the last 5 years of total employment across <em>all companies in the same secondary sector</em> and applies that sector-level growth rate to forecast employment. The forecast is calculated as:
+                    <div class=\"bg-light border rounded p-3 my-2 font-monospace small\">
+                        latestEmployment = most recent positive employment value<br />
+                        sectorCAGR = (endYearSectorEmployment / beginYearSectorEmployment) ^ (1 / yearsSpan) − 1<br />
+                        forecast = latestEmployment × (1 + sectorCAGR) ^ yearsToForecast
+                    </div>
+                    If no secondary sector is assigned to the company or insufficient sector-level history exists, returns <em>not available</em>.
+                </li>
+                <li>
+                    <strong>No result</strong> — if fewer than 3 positive points exist, sector CAGR cannot be calculated, or sector data is unavailable, returns <em>not available</em>.
+                </li>
             </ol>
         </div>
     </div>
