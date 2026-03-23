@@ -21,6 +21,7 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AddPageRoute("/Company/Edit", "/Tin200/Edit/{id?}");
     options.Conventions.AddPageRoute("/Company/Details", "/Tin200/Details/{id?}");
     options.Conventions.AddPageRoute("/Company/Delete", "/Tin200/Delete/{id?}");
+    options.Conventions.AddPageRoute("/Company/SurveyHistory", "/Tin200/SurveyHistory/{id:int}");
     options.Conventions.AddPageRoute("/Company/Import", "/Tin200/Import");
     options.Conventions.AddPageRoute("/Company/SendSurvey", "/Tin200/SendSurvey");
     options.Conventions.AddPageRoute("/Company/SurveyUpdate", "/Tin200/SurveyUpdate/{id:int}");

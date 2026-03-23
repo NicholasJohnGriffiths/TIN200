@@ -1,0 +1,156 @@
+@page "{id:int}"
+@model TINWeb.Pages.Company.SurveyHistoryModel
+@{
+    ViewData["Title"] = "Survey History";
+}
+
+<div class="container-fluid px-0 mt-3">
+    @if (Model.History == null)
+    {
+        <div class="alert alert-danger" role="alert">Company not found.</div>
+    }
+    else
+    {
+        <div class="row mb-3">
+            <div class="col-md-8">
+                <h1 class="h4 mb-1">Survey History</h1>
+                <p class="mb-0 small"><strong>Company:</strong> @(Model.History.CompanyName ?? "N/A")</p>
+                <p class="mb-0 small"><strong>External ID:</strong> @(Model.History.ExternalId ?? "N/A")</p>
+                <p class="mb-0 small"><strong>Years found:</strong> @Model.History.Years.Count</p>
+            </div>
+            <div class="col-md-4 text-end d-flex gap-2 justify-content-md-end align-items-start mt-2 mt-md-0">
+                <a asp-page="./Details" asp-route-id="@Model.History.CompanyId" class="btn btn-outline-secondary btn-sm">Company Details</a>
+                <a asp-page="./Index" class="btn btn-secondary btn-sm">Back to List</a>
+            </div>
+        </div>
+
+        @if (!Model.History.Years.Any())
+        {
+            <div class="alert alert-info" role="alert">
+                No CompanySurvey history exists for this company yet.
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle survey-history-table">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="min-width: 120px;">Group</th>
+                            <th style="min-width: 90px;">Order</th>
+                            <th style="min-width: 420px;">Question</th>
+                            @foreach (var year in Model.History.Years)
+                            {
+                                <th style="min-width: 180px;">@year</th>
+                            }
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @{
+                            string? currentGroup = null;
+                            var totalColumnCount = 3 + Model.History.Years.Count;
+                        }
+                        @foreach (var row in Model.History.Rows)
+                        {
+                            var groupName = string.IsNullOrWhiteSpace(row.GroupTitle)
+                                ? "Ungrouped"
+                                : row.GroupTitle.Trim();
+
+                            if (!string.Equals(currentGroup, groupName, StringComparison.Ordinal))
+                            {
+                                currentGroup = groupName;
+                                <tr class="group-header-row">
+                                    <td colspan="@totalColumnCount">@currentGroup</td>
+                                </tr>
+                            }
+
+                            <tr>
+                                <td>@groupName</td>
+                                <td>@(row.QuestionOrderNumber?.ToString() ?? string.Empty)</td>
+                                <td>@(row.QuestionText ?? string.Empty)</td>
+                                @foreach (var year in Model.History.Years)
+                                {
+                                    <td>@(row.AnswersByYear.TryGetValue(year, out var value) ? value : string.Empty)</td>
+                                }
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+</div>
+
+<style>
+    .survey-history-table {
+        font-size: 0.7rem;
+    }
+
+    .survey-history-table th,
+    .survey-history-table td {
+        padding: 0.25rem 0.35rem;
+        line-height: 1.1;
+        white-space: normal;
+        vertical-align: top;
+    }
+
+    .survey-history-table thead th {
+        font-size: 0.68rem;
+        white-space: nowrap;
+    }
+    
+    .survey-history-table td:nth-child(n + 4) {
+        min-width: 120px;
+    }
+
+    .survey-history-table th:nth-child(1),
+    .survey-history-table td:nth-child(1) {
+        position: sticky;
+        left: 0;
+        z-index: 3;
+        background-color: #fff;
+        min-width: 105px;
+    }
+
+    .survey-history-table th:nth-child(2),
+    .survey-history-table td:nth-child(2) {
+        position: sticky;
+        left: 105px;
+        z-index: 3;
+        background-color: #fff;
+        min-width: 72px;
+    }
+
+    .survey-history-table th:nth-child(3),
+    .survey-history-table td:nth-child(3) {
+        position: sticky;
+        left: 177px;
+        z-index: 3;
+        background-color: #fff;
+        min-width: 300px;
+    }
+
+    .survey-history-table thead th:nth-child(1),
+    .survey-history-table thead th:nth-child(2),
+    .survey-history-table thead th:nth-child(3) {
+        z-index: 4;
+        background-color: #212529;
+    }
+
+    .survey-history-table tbody tr:nth-child(even) td:nth-child(-n + 3) {
+        background-color: #f8f9fa;
+    }
+
+    .survey-history-table .group-header-row td {
+        position: static !important;
+        left: auto !important;
+        z-index: 1 !important;
+        background-color: #e9ecef !important;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        padding-top: 0.35rem;
+        padding-bottom: 0.35rem;
+        border-top: 2px solid #adb5bd;
+    }
+</style>

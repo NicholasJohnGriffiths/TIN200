@@ -140,6 +140,114 @@ namespace TINWeb.Services
             return await query.ToListAsync();
         }
 
+        public async Task<CompanySurveyHistoryResult?> GetCompanySurveyHistoryAsync(int companyId)
+        {
+            var company = await _context.Tin200
+                .AsNoTracking()
+                .Where(x => x.Id == companyId)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.CompanyName,
+                    x.ExternalId
+                })
+                .FirstOrDefaultAsync();
+
+            if (company == null)
+            {
+                return null;
+            }
+
+            var years = await (
+                from companySurvey in _context.CompanySurvey.AsNoTracking()
+                join survey in _context.Survey.AsNoTracking() on companySurvey.SurveyId equals survey.Id
+                where companySurvey.CompanyId == companyId
+                select survey.FinancialYear
+            )
+            .Distinct()
+            .OrderByDescending(year => year)
+            .ToListAsync();
+
+            var latestAnswerIds = await (
+                from answer in _context.Answer.AsNoTracking()
+                join companySurvey in _context.CompanySurvey.AsNoTracking() on answer.CompanySurveyId equals companySurvey.Id
+                join survey in _context.Survey.AsNoTracking() on companySurvey.SurveyId equals survey.Id
+                where companySurvey.CompanyId == companyId
+                group answer.Id by new { answer.QuestionId, survey.FinancialYear } into grouped
+                select grouped.Max()
+            ).ToListAsync();
+
+            var latestAnswers = latestAnswerIds.Count == 0
+                ? new List<CompanySurveyHistoryAnswerValue>()
+                : await (
+                from answer in _context.Answer.AsNoTracking()
+                join companySurvey in _context.CompanySurvey.AsNoTracking() on answer.CompanySurveyId equals companySurvey.Id
+                join survey in _context.Survey.AsNoTracking() on companySurvey.SurveyId equals survey.Id
+                where companySurvey.CompanyId == companyId
+                    && latestAnswerIds.Contains(answer.Id)
+                select new CompanySurveyHistoryAnswerValue
+                {
+                    QuestionId = answer.QuestionId,
+                    FinancialYear = survey.FinancialYear,
+                    AnswerText = answer.AnswerText,
+                    AnswerNumber = answer.AnswerNumber,
+                    AnswerCurrency = answer.AnswerCurrency
+                }
+            ).ToListAsync();
+
+            var questions = await (
+                from question in _context.Question.AsNoTracking()
+                join questionGroup in _context.QuestionGroup.AsNoTracking()
+                    on question.GroupId equals questionGroup.Id into questionGroupJoin
+                from questionGroup in questionGroupJoin.DefaultIfEmpty()
+                orderby questionGroup == null ? 1 : 0,
+                        questionGroup!.OrderNumber,
+                        questionGroup.Id,
+                        question.OrderNumber,
+                        question.Id
+                select new
+                {
+                    question.Id,
+                    question.OrderNumber,
+                    GroupTitle = questionGroup != null ? questionGroup.Title : question.GroupTitle,
+                    question.QuestionText
+                }
+            ).ToListAsync();
+
+            var answerLookup = latestAnswers
+                .GroupBy(x => x.QuestionId)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.ToDictionary(
+                        item => item.FinancialYear,
+                        item => FormatAnswerValue(item.AnswerText, item.AnswerNumber, item.AnswerCurrency)));
+
+            var rows = questions
+                .Select(question => new CompanySurveyHistoryRow
+                {
+                    QuestionId = question.Id,
+                    QuestionOrderNumber = question.OrderNumber,
+                    GroupTitle = question.GroupTitle,
+                    QuestionText = question.QuestionText,
+                    AnswersByYear = years.ToDictionary(
+                        year => year,
+                        year => answerLookup.TryGetValue(question.Id, out var answersByYear)
+                            && answersByYear.TryGetValue(year, out var value)
+                            ? value
+                            : string.Empty)
+                })
+                .ToList();
+
+            return new CompanySurveyHistoryResult
+            {
+                CompanyId = company.Id,
+                CompanyName = company.CompanyName,
+                ExternalId = company.ExternalId,
+                Years = years,
+                Rows = rows
+            };
+        }
+
         public async Task<List<AnswerExportRow>> GetAnswerExportRowsAsync(int? financialYear)
         {
             var query =
@@ -1549,8 +1657,37 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             }
         }
 
+        private static string FormatAnswerValue(string? answerText, double? answerNumber, decimal? answerCurrency)
+        {
+            if (!string.IsNullOrWhiteSpace(answerText))
+            {
+                return answerText.Trim();
+            }
+
+            if (answerCurrency.HasValue)
+            {
+                return answerCurrency.Value.ToString("N0", CultureInfo.InvariantCulture);
+            }
+
+            if (answerNumber.HasValue)
+            {
+                return answerNumber.Value.ToString("G", CultureInfo.InvariantCulture);
+            }
+
+            return string.Empty;
+        }
+
         private sealed class ParsedAnswerValue
         {
+            public string? AnswerText { get; set; }
+            public double? AnswerNumber { get; set; }
+            public decimal? AnswerCurrency { get; set; }
+        }
+
+        private sealed class CompanySurveyHistoryAnswerValue
+        {
+            public int QuestionId { get; set; }
+            public int FinancialYear { get; set; }
             public string? AnswerText { get; set; }
             public double? AnswerNumber { get; set; }
             public decimal? AnswerCurrency { get; set; }
@@ -1689,6 +1826,24 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             public DateTime? SavedDate { get; set; }
             public DateTime? SubmittedDate { get; set; }
             public DateTime? RequestedDate { get; set; }
+        }
+
+        public class CompanySurveyHistoryResult
+        {
+            public int CompanyId { get; set; }
+            public string? CompanyName { get; set; }
+            public string? ExternalId { get; set; }
+            public List<int> Years { get; set; } = new();
+            public List<CompanySurveyHistoryRow> Rows { get; set; } = new();
+        }
+
+        public class CompanySurveyHistoryRow
+        {
+            public int QuestionId { get; set; }
+            public int? QuestionOrderNumber { get; set; }
+            public string? GroupTitle { get; set; }
+            public string? QuestionText { get; set; }
+            public Dictionary<int, string> AnswersByYear { get; set; } = new();
         }
     }
 }
