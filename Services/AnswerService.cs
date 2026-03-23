@@ -69,6 +69,7 @@ namespace TINWeb.Services
                     Saved = companySurvey.Saved,
                     Submitted = companySurvey.Submitted,
                     Requested = companySurvey.Requested,
+                    Estimate = companySurvey.Estimate == true,
                     SavedDate = companySurvey.SavedDate,
                     SubmittedDate = companySurvey.SubmittedDate,
                     RequestedDate = companySurvey.RequestedDate
@@ -168,6 +169,24 @@ namespace TINWeb.Services
             .OrderByDescending(year => year)
             .ToListAsync();
 
+            var estimateRows = await (
+                from companySurvey in _context.CompanySurvey.AsNoTracking()
+                join survey in _context.Survey.AsNoTracking() on companySurvey.SurveyId equals survey.Id
+                where companySurvey.CompanyId == companyId
+                select new
+                {
+                    survey.FinancialYear,
+                    companySurvey.Id,
+                    Estimate = EF.Property<bool?>(companySurvey, nameof(CompanySurvey.Estimate))
+                }
+            ).ToListAsync();
+
+            var estimateByYear = estimateRows
+                .GroupBy(x => x.FinancialYear)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.OrderByDescending(x => x.Id).First().Estimate == true);
+
             var latestAnswerIds = await (
                 from answer in _context.Answer.AsNoTracking()
                 join companySurvey in _context.CompanySurvey.AsNoTracking() on answer.CompanySurveyId equals companySurvey.Id
@@ -243,6 +262,12 @@ namespace TINWeb.Services
                 CompanyId = company.Id,
                 CompanyName = company.CompanyName,
                 ExternalId = company.ExternalId,
+                LatestEstimate = years.Any()
+                    && estimateByYear.TryGetValue(years[0], out var latestEstimate)
+                    && latestEstimate,
+                EstimateByYear = years.ToDictionary(
+                    year => year,
+                    year => estimateByYear.TryGetValue(year, out var estimate) && estimate),
                 Years = years,
                 Rows = rows
             };
@@ -565,7 +590,7 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
 
         public async Task<AnswerImportPreviewResult> PreviewAnswersImportFromExcelAsync(Stream excelStream, int financialYear)
         {
-            var plan = await BuildImportPlanAsync(excelStream, financialYear, ImportPlanMode.Standard, autoCreateMissingGlobalRecords: false);
+            var plan = await BuildImportPlanAsync(excelStream, financialYear, ImportPlanMode.Qualtrics, autoCreateMissingGlobalRecords: false);
             return new AnswerImportPreviewResult
             {
                 FinancialYear = financialYear,
@@ -608,14 +633,7 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             await excelStream.CopyToAsync(bufferedStream);
             bufferedStream.Position = 0;
 
-            var plan = await BuildImportPlanAsync(bufferedStream, financialYear, ImportPlanMode.Standard, autoCreateMissingGlobalRecords: false);
-
-            if (plan.UnmatchedExternalIds.Any())
-            {
-                await EnsureCompanyAndCompanySurveyRecordsAsync(plan.UnmatchedExternalIds, financialYear);
-                bufferedStream.Position = 0;
-                plan = await BuildImportPlanAsync(bufferedStream, financialYear, ImportPlanMode.Standard, autoCreateMissingGlobalRecords: false);
-            }
+            var plan = await BuildImportPlanAsync(bufferedStream, financialYear, ImportPlanMode.Qualtrics, autoCreateMissingGlobalRecords: false);
 
             foreach (var error in plan.Errors)
             {
@@ -639,6 +657,15 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
                     if (!existingById.TryGetValue(operation.ExistingAnswerId.Value, out var existingAnswer))
                     {
                         result.Errors.Add($"Unable to find existing answer Id {operation.ExistingAnswerId.Value} during apply.");
+                        continue;
+                    }
+
+                    // Skip if the existing answer already has a value — only fill blanks
+                    var alreadyHasValue = !string.IsNullOrWhiteSpace(existingAnswer.AnswerText)
+                        || existingAnswer.AnswerNumber.HasValue
+                        || existingAnswer.AnswerCurrency.HasValue;
+                    if (alreadyHasValue)
+                    {
                         continue;
                     }
 
@@ -895,6 +922,12 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             }
         }
 
+        private static readonly HashSet<string> QualtricsAllowedTitles = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "Recipient Email", "CEO First Name", "CEO Last Name", "CEO Email", "CEO Phone",
+            "Survey Contact First Name", "Survey Contact Last Name", "Survey Contact Email", "Survey Contact Phone"
+        };
+
         private async Task<ImportPlanResult> BuildImportPlanAsync(Stream excelStream, int financialYear, ImportPlanMode mode, bool autoCreateMissingGlobalRecords = false)
         {
             var plan = new ImportPlanResult();
@@ -907,7 +940,7 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
                 return plan;
             }
 
-            var headerRowNumber = mode == ImportPlanMode.GlobalByIdThenName ? 1 : 2;
+            var headerRowNumber = mode == ImportPlanMode.GlobalByIdThenName || mode == ImportPlanMode.Qualtrics ? 1 : 2;
             var firstRow = worksheet.Row(headerRowNumber);
             if (firstRow == null || firstRow.IsEmpty())
             {
@@ -976,16 +1009,27 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             var hasNameColumn = false;
             var nameColumn = 0;
 
-            if (mode == ImportPlanMode.Standard)
+            if (mode == ImportPlanMode.Standard || mode == ImportPlanMode.Qualtrics)
             {
-                if (!TryGetColumn(out externalIdColumn, out var matchedExternalIdHeader, "External ID", "ExternalID", "ID"))
+                if (!TryGetColumn(out externalIdColumn, out var matchedExternalIdHeader,
+                    "ExternalRefence", "ExternalReference", "External ID", "ExternalID", "ID"))
                 {
                     var available = plan.AvailableHeaders.Any() ? string.Join(", ", plan.AvailableHeaders) : "(none)";
-                    plan.Errors.Add($"Missing required column header: External ID (or ID). Available headers on row {headerRowNumber}: {available}");
+                    plan.Errors.Add($"Missing required column header: ExternalRefence/External ID (or ID). Available headers on row {headerRowNumber}: {available}");
                     return plan;
                 }
 
-                plan.IdentifierFieldMatch = $"External ID match column: {matchedExternalIdHeader}";
+                if (mode == ImportPlanMode.Qualtrics)
+                {
+                    hasNameColumn = TryGetColumn(out nameColumn, out var matchedNameHeader, "Name", "Company Name", "CompanyName");
+                    plan.IdentifierFieldMatch = hasNameColumn
+                        ? $"External ID match column: {matchedExternalIdHeader}; Name fallback column: {matchedNameHeader}"
+                        : $"External ID match column: {matchedExternalIdHeader}; Name fallback column: (not found)";
+                }
+                else
+                {
+                    plan.IdentifierFieldMatch = $"External ID match column: {matchedExternalIdHeader}";
+                }
             }
             else
             {
@@ -1002,23 +1046,29 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
                     : $"ID match column: {matchedIdHeader}; Name fallback column: (not found)";
             }
 
-            var questions = mode == ImportPlanMode.Standard
+            var questions = mode == ImportPlanMode.Qualtrics
                 ? await _context.Question
-                    .Where(q => !string.IsNullOrWhiteSpace(q.ImportColumnName))
+                    .Where(q => !string.IsNullOrWhiteSpace(q.ImportColumnName) && QualtricsAllowedTitles.Contains(q.Title ?? ""))
                     .OrderBy(q => q.OrderNumber)
                     .ThenBy(q => q.Id)
                     .ToListAsync()
-                : await _context.Question
-                    .Where(q => !string.IsNullOrWhiteSpace(q.ImportColumnNameAlt))
-                    .OrderBy(q => q.OrderNumber)
-                    .ThenBy(q => q.Id)
-                    .ToListAsync();
+                : mode == ImportPlanMode.Standard
+                    ? await _context.Question
+                        .Where(q => !string.IsNullOrWhiteSpace(q.ImportColumnName))
+                        .OrderBy(q => q.OrderNumber)
+                        .ThenBy(q => q.Id)
+                        .ToListAsync()
+                    : await _context.Question
+                        .Where(q => !string.IsNullOrWhiteSpace(q.ImportColumnNameAlt))
+                        .OrderBy(q => q.OrderNumber)
+                        .ThenBy(q => q.Id)
+                        .ToListAsync();
 
             if (!questions.Any())
             {
-                plan.Errors.Add(mode == ImportPlanMode.Standard
-                    ? "No questions have ImportColumnName configured."
-                    : "No questions have ImportColumnNameAlt configured.");
+                plan.Errors.Add(mode == ImportPlanMode.GlobalByIdThenName
+                    ? "No questions have ImportColumnNameAlt configured."
+                    : "No questions have ImportColumnName configured.");
                 return plan;
             }
 
@@ -1042,9 +1092,9 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             var mappedQuestions = new List<(Question Question, int ColumnNumber, string ImportColumnName, int TargetFinancialYear)>();
             foreach (var question in questions)
             {
-                var configuredColumnName = mode == ImportPlanMode.Standard
-                    ? question.ImportColumnName
-                    : question.ImportColumnNameAlt;
+                var configuredColumnName = mode == ImportPlanMode.GlobalByIdThenName
+                    ? question.ImportColumnNameAlt
+                    : question.ImportColumnName;
 
                 if (string.IsNullOrWhiteSpace(configuredColumnName))
                 {
@@ -1100,9 +1150,9 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
 
             if (!mappedQuestions.Any())
             {
-                plan.Errors.Add(mode == ImportPlanMode.Standard
-                    ? "No question ImportColumnName values match any Excel column headers."
-                    : "No question ImportColumnNameAlt values match any Excel column headers.");
+                plan.Errors.Add(mode == ImportPlanMode.GlobalByIdThenName
+                    ? "No question ImportColumnNameAlt values match any Excel column headers."
+                    : "No question ImportColumnName values match any Excel column headers.");
                 return plan;
             }
 
@@ -1220,7 +1270,7 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
                     },
                     StringComparer.OrdinalIgnoreCase);
 
-            if (mode == ImportPlanMode.Standard && !companySurveyByExternalId.Any())
+            if ((mode == ImportPlanMode.Standard || mode == ImportPlanMode.Qualtrics) && !companySurveyByExternalId.Any())
             {
                 plan.Errors.Add($"No CompanySurvey records found for financial year {financialYear} with matching External ID values.");
                 return plan;
@@ -1273,30 +1323,74 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
                 var row = worksheet.Row(rowNumber);
                 var companySurveyId = 0;
 
-                if (mode == ImportPlanMode.Standard)
+                if (mode == ImportPlanMode.Standard || mode == ImportPlanMode.Qualtrics)
                 {
                     var externalId = row.Cell(externalIdColumn).GetString().Trim();
-                    if (string.IsNullOrWhiteSpace(externalId))
+                    if (mode == ImportPlanMode.Qualtrics)
                     {
-                        continue;
-                    }
+                        var nameValue = hasNameColumn ? row.Cell(nameColumn).GetString().Trim() : string.Empty;
 
-                    if (!companySurveyByExternalId.TryGetValue(externalId, out var externalIdMatch))
+                        if (string.IsNullOrWhiteSpace(externalId) && string.IsNullOrWhiteSpace(nameValue))
+                        {
+                            continue;
+                        }
+
+                        var externalIdMatch = (Id: 0, Submitted: (bool?)null);
+                        var nameMatch = (Id: 0, Submitted: (bool?)null);
+
+                        var hasExternalIdMatch = !string.IsNullOrWhiteSpace(externalId)
+                            && companySurveyByExternalId.TryGetValue(externalId, out externalIdMatch);
+                        var hasNameMatch = !hasExternalIdMatch
+                            && !string.IsNullOrWhiteSpace(nameValue)
+                            && companySurveyByCompanyName.TryGetValue(nameValue, out nameMatch);
+
+                        if (!hasExternalIdMatch && !hasNameMatch)
+                        {
+                            plan.UnmatchedExternalIds.Add(string.IsNullOrWhiteSpace(externalId)
+                                ? nameValue
+                                : $"{externalId} (name: {nameValue})");
+                            continue;
+                        }
+
+                        var selectedMatch = hasExternalIdMatch ? externalIdMatch : nameMatch;
+                        if (selectedMatch.Submitted == true)
+                        {
+                            plan.SkippedSubmittedRowKeys.Add(hasExternalIdMatch ? externalId : nameValue);
+                            continue;
+                        }
+
+                        companySurveyId = selectedMatch.Id;
+                        plan.MatchedCompanySurveyIds.Add(companySurveyId);
+                        plan.MatchedExternalIds.Add(hasExternalIdMatch
+                            ? externalId
+                            : (string.IsNullOrWhiteSpace(externalId)
+                                ? nameValue
+                                : $"{externalId} (fallback to name: {nameValue})"));
+                    }
+                    else
                     {
-                        plan.UnmatchedExternalIds.Add(externalId);
-                        continue;
+                        if (string.IsNullOrWhiteSpace(externalId))
+                        {
+                            continue;
+                        }
+
+                        if (!companySurveyByExternalId.TryGetValue(externalId, out var externalIdMatch))
+                        {
+                            plan.UnmatchedExternalIds.Add(externalId);
+                            continue;
+                        }
+
+                        if (externalIdMatch.Submitted == true)
+                        {
+                            plan.SkippedSubmittedRowKeys.Add(externalId);
+                            continue;
+                        }
+
+                        companySurveyId = externalIdMatch.Id;
+                        plan.MatchedCompanySurveyIds.Add(companySurveyId);
+
+                        plan.MatchedExternalIds.Add(externalId);
                     }
-
-                    if (externalIdMatch.Submitted == true)
-                    {
-                        plan.SkippedSubmittedRowKeys.Add(externalId);
-                        continue;
-                    }
-
-                    companySurveyId = externalIdMatch.Id;
-                    plan.MatchedCompanySurveyIds.Add(companySurveyId);
-
-                    plan.MatchedExternalIds.Add(externalId);
                 }
                 else
                 {
@@ -1696,6 +1790,7 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
         private enum ImportPlanMode
         {
             Standard,
+            Qualtrics,
             GlobalByIdThenName
         }
 
@@ -1823,6 +1918,7 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             public bool Saved { get; set; }
             public bool Submitted { get; set; }
             public bool Requested { get; set; }
+            public bool Estimate { get; set; }
             public DateTime? SavedDate { get; set; }
             public DateTime? SubmittedDate { get; set; }
             public DateTime? RequestedDate { get; set; }
@@ -1833,6 +1929,8 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             public int CompanyId { get; set; }
             public string? CompanyName { get; set; }
             public string? ExternalId { get; set; }
+            public bool LatestEstimate { get; set; }
+            public Dictionary<int, bool> EstimateByYear { get; set; } = new();
             public List<int> Years { get; set; } = new();
             public List<CompanySurveyHistoryRow> Rows { get; set; } = new();
         }

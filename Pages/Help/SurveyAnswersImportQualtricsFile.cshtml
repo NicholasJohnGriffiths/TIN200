@@ -1,0 +1,45 @@
+@page
+@{
+    ViewData["Title"] = "Survey Answers Help - Import Qualtrics File";
+}
+
+<div class="container mt-4">
+    <h1>Survey Answers: Import Qualtrics File</h1>
+    <p class="text-muted">Explains the Qualtrics Import action on the Survey Answers page.</p>
+
+    <div class="alert alert-info">
+        This feature imports a restricted set of answer fields from a Qualtrics Excel file into existing survey answers.
+    </div>
+
+    <h2 class="h5 mt-4">What it imports</h2>
+    <p>Only specific contact-related question titles are imported. The Excel column names still match questions by <strong>ImportColumnName</strong>.</p>
+
+    <h2 class="h5 mt-4">File requirements</h2>
+    <ul>
+        <li>The file must be an Excel <strong>.xlsx</strong> file.</li>
+        <li>Column headers must be on <strong>row 1</strong>.</li>
+        <li>Data starts on <strong>row 2</strong>.</li>
+    </ul>
+
+    <h2 class="h5 mt-4">How company matching works</h2>
+    <ul>
+        <li>Excel column <strong>ExternalRefence</strong> is matched to <strong>Company.ExternalId</strong>.</li>
+        <li>Excel column <strong>Name</strong> is used as a fallback match to <strong>Company.CompanyName</strong>.</li>
+        <li>The import only works against existing CompanySurvey records for the selected financial year.</li>
+    </ul>
+
+    <h2 class="h5 mt-4">What happens to existing answers</h2>
+    <ul>
+        <li>The import only fills answers that do <strong>not already have a value</strong>.</li>
+        <li>Existing non-blank answers are left unchanged.</li>
+        <li>Submitted CompanySurvey records are skipped.</li>
+    </ul>
+
+    <h2 class="h5 mt-4">Preview step</h2>
+    <ul>
+        <li>Shows matched and unmatched companies.</li>
+        <li>Shows matched and unmatched question fields.</li>
+        <li>Shows how many answer rows would be inserted or updated.</li>
+        <li>Shows any parse or matching errors before you apply the import.</li>
+    </ul>
+</div>

@@ -1,0 +1,96 @@
+@page
+@{
+    ViewData["Title"] = "Companies Help - Import Global File";
+}
+
+<div class="container mt-4">
+    <h1>Companies: Import Global File</h1>
+    <p class="text-muted">Explains the Import Global File action on the Companies page.</p>
+
+    <div class="alert alert-info">
+        This feature imports company master data from an Excel <strong>.xlsx</strong> file into the Companies table.
+        The first row of the file is treated as the header row.
+    </div>
+
+    <h2 class="h5 mt-4">What it does</h2>
+    <p>It reads the uploaded file, previews which rows will be added or left unchanged, then creates the missing company records and associated CompanySurvey rows only after you confirm.</p>
+
+    <h2 class="h5 mt-4">Required Excel columns</h2>
+    <p>The importer looks for these fields by trying each accepted column header name in order (case-insensitive, whitespace-insensitive):</p>
+    <table class="table table-sm table-bordered w-auto">
+        <thead class="table-light">
+            <tr>
+                <th>Field</th>
+                <th>Required?</th>
+                <th>Accepted column header names</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>External ID</strong></td>
+                <td>Required</td>
+                <td><code>ID</code>, <code>External ID</code>, <code>ExternalID</code></td>
+            </tr>
+            <tr>
+                <td><strong>Company Name</strong></td>
+                <td>Required</td>
+                <td><code>Name</code>, <code>Company Name</code>, <code>CompanyName</code></td>
+            </tr>
+            <tr>
+                <td><strong>Company Description</strong></td>
+                <td>Optional</td>
+                <td><code>Description</code>, <code>Company Description</code>, <code>CompanyDescription</code></td>
+            </tr>
+        </tbody>
+    </table>
+    <p class="text-muted small">The file may contain additional columns — they are ignored.</p>
+
+    <h2 class="h5 mt-4">How row matching works</h2>
+    <ol>
+        <li>If the row has an <strong>External ID</strong>, the importer looks for an existing company with that External ID.</li>
+        <li>If no match is found by External ID (or the External ID is blank), the importer falls back to matching by <strong>Company Name</strong>.</li>
+        <li>Rows where both External ID and Company Name are blank are skipped.</li>
+        <li>Duplicate import keys (same External ID or Company Name appearing more than once in the file) are skipped with an error.</li>
+    </ol>
+
+    <h2 class="h5 mt-4">Actions per row</h2>
+    <table class="table table-sm table-bordered w-auto">
+        <thead class="table-light">
+            <tr>
+                <th>Action</th>
+                <th>When it applies</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><span class="badge bg-success">Add</span></td>
+                <td>No existing company matches — a new company record will be created.</td>
+            </tr>
+            <tr>
+                <td><span class="badge bg-secondary">Unchanged</span></td>
+                <td>An existing company matches — the company record is not modified.</td>
+            </tr>
+        </tbody>
+    </table>
+    <p class="text-muted small">Existing company records are intentionally never overwritten by this import. Only new companies are added.</p>
+
+    <h2 class="h5 mt-4">CompanySurvey records</h2>
+    <p>After processing company rows, the importer checks every matched or newly created company and creates a <strong>CompanySurvey</strong> row for the selected <strong>Import Year</strong> if one does not already exist.</p>
+
+    <h2 class="h5 mt-4">Preview step</h2>
+    <ul>
+        <li>Shows each row's action (Add / Unchanged), the matched External ID header, Company Name header, and Company Description header.</li>
+        <li>Shows the estimated number of CompanySurvey records that will be created.</li>
+        <li>Lists any row-level errors (blank keys, duplicates, missing required columns).</li>
+        <li>No data is changed until you click <strong>Apply</strong>.</li>
+    </ul>
+
+    <h2 class="h5 mt-4">Inputs</h2>
+    <ul>
+        <li><strong>Import Year</strong> — required; determines which survey year CompanySurvey rows are created for.</li>
+        <li>The upload must be an Excel <strong>.xlsx</strong> file.</li>
+    </ul>
+
+    <h2 class="h5 mt-4">Result summary</h2>
+    <p>After apply, the page reports counts of companies added, unchanged, and CompanySurvey records created.</p>
+</div>

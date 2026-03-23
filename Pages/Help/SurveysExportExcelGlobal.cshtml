@@ -1,0 +1,130 @@
+@page
+@model TINWeb.Pages.Help.SurveysExportExcelGlobalModel
+@{
+    ViewData["Title"] = "Surveys Help - Export Excel Global";
+}
+
+<div class="container mt-4">
+    <h1>Surveys: Export Excel - Global</h1>
+    <p class="text-muted">Explains the Export Excel - Global page under Surveys.</p>
+
+    <div class="alert alert-info">
+        This feature builds a global-format answers export. You paste a list of column headers, the system resolves each header to a built-in field or a question via <strong>ImportColumnNameAlt</strong>, and exports the result as CSV.
+    </div>
+
+    <h2 class="h5 mt-4">How it works</h2>
+    <ol>
+        <li>Choose a <strong>Financial Year</strong>.</li>
+        <li>Paste the column headers you want in the output (comma or newline separated).</li>
+        <li>Click <strong>Preview</strong> to see matched/unmatched headers and sample rows.</li>
+        <li>Click <strong>Export</strong> to download the CSV.</li>
+    </ol>
+
+    <h2 class="h5 mt-4">Built-in headers</h2>
+    <p>These two headers are resolved directly from the company record — no question configuration needed:</p>
+    <table class="table table-sm table-bordered w-auto">
+        <thead class="table-light">
+            <tr><th>Header</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>ID</code></td><td>Company External ID</td></tr>
+            <tr><td><code>Name</code></td><td>Company Name</td></tr>
+        </tbody>
+    </table>
+    <p class="text-muted small">Matching is case-insensitive and exact.</p>
+
+    <h2 class="h5 mt-4">Question.Title and ImportColumnNameAlt</h2>
+    <p>All other headers are resolved by matching against <code>Question.ImportColumnNameAlt</code>:</p>
+    <table class="table table-sm table-bordered w-auto">
+        <thead class="table-light">
+            <tr><th>Field</th><th>Purpose</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>Question.Title</code></td>
+                <td>Human-readable label for the question (e.g. <em>Revenue</em>). Shown in preview matched/unmatched lists.</td>
+            </tr>
+            <tr>
+                <td><code>Question.ImportColumnNameAlt</code></td>
+                <td>The base column name that links this question to the export header. Set on the <strong>Questions</strong> edit page. Only questions with a non-blank <code>ImportColumnNameAlt</code> participate in the export.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2 class="h5 mt-4">How header matching works</h2>
+    <p>Each pasted header is processed as follows:</p>
+    <ol>
+        <li>Strip any trailing <code>-N</code> year offset (e.g. <code>CY-1 Revenue</code> → base <code>CY Revenue</code>, offset 1).</li>
+        <li>Match the base against <code>ImportColumnNameAlt</code> values — case-insensitive, exact string (after trimming).</li>
+        <li>Retrieve the answer for that question from the financial year <strong>minus the offset</strong> (e.g. offset 1 → prior year).</li>
+    </ol>
+    <p class="text-muted small">The year-offset pattern is <code>-N</code> where N is 1–5, appearing as a word-bounded suffix in the header (e.g. <code>CY-1 Revenue</code>, <code>CY-2 Revenue</code>). Headers without an offset use the selected financial year directly.</p>
+
+    <h2 class="h5 mt-4">Year offset examples</h2>
+    <table class="table table-sm table-bordered w-auto">
+        <thead class="table-light">
+            <tr><th>Pasted header</th><th>Matches ImportColumnNameAlt</th><th>Data year (if FY = 2025)</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>CY Revenue</code></td><td><code>CY Revenue</code></td><td>2025</td></tr>
+            <tr><td><code>CY-1 Revenue</code></td><td><code>CY Revenue</code></td><td>2024</td></tr>
+            <tr><td><code>CY-2 Revenue</code></td><td><code>CY Revenue</code></td><td>2023</td></tr>
+        </tbody>
+    </table>
+
+    <h2 class="h5 mt-4">Preview step</h2>
+    <ul>
+        <li><strong>Matched headers</strong> — headers that resolved to a built-in field or a question.</li>
+        <li><strong>Unmatched headers</strong> — headers with no corresponding built-in value or question <code>ImportColumnNameAlt</code>. These columns appear blank in the export.</li>
+        <li>Sample rows show the actual data shape before you export.</li>
+    </ul>
+
+    <h2 class="h5 mt-4">Export result</h2>
+    <p>A CSV file is downloaded with exactly the columns you pasted, in the same order, filled with built-in values and mapped answers for the selected year range.</p>
+
+    <h2 class="h5 mt-4">Configuring questions for this export</h2>
+    <p>Go to <strong>Questions → Edit</strong> for each question and set <strong>Import Column Name Alt</strong> to the base header name used in the global file (e.g. <code>CY Revenue</code>). Leave it blank to exclude the question entirely.</p>
+
+    <h2 class="h5 mt-4">Current question mappings</h2>
+    @if (!Model.QuestionMappings.Any())
+    {
+        <div class="alert alert-warning">No questions currently have <code>ImportColumnNameAlt</code> configured.</div>
+    }
+    else
+    {
+        <p class="text-muted small">The table below shows every column the export can produce. Paste these headers (with optional <code>CY-N</code> year offsets) into the header list on the export page to include them in output.</p>
+        <table class="table table-sm table-bordered table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th>Q#</th>
+                    <th>Question Title</th>
+                    <th>Base Header (<code>ImportColumnNameAlt</code>)</th>
+                    <th>Source</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="table-primary">
+                    <td class="text-muted">—</td>
+                    <td><strong>Company External ID</strong></td>
+                    <td><code>ID</code></td>
+                    <td>Built-in</td>
+                </tr>
+                <tr class="table-primary">
+                    <td class="text-muted">—</td>
+                    <td><strong>Company Name</strong></td>
+                    <td><code>Name</code></td>
+                    <td>Built-in</td>
+                </tr>
+                @foreach (var q in Model.QuestionMappings)
+                {
+                    <tr>
+                        <td class="text-muted">@q.Id</td>
+                        <td>@q.Title</td>
+                        <td><code>@q.ImportColumnNameAlt</code></td>
+                        <td><code>ImportColumnNameAlt</code></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>

@@ -1,0 +1,44 @@
+@page
+@{
+    ViewData["Title"] = "Help";
+}
+
+<div class="container mt-4">
+    <h1>Help</h1>
+    <p class="text-muted">Quick links to the import, export, and estimation guides available in TINWeb.</p>
+
+    <div class="row g-4 mt-1">
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header fw-semibold">Companies</div>
+                <div class="card-body">
+                    <p class="mb-3">Guides for company master data import and export actions.</p>
+                    <div class="list-group list-group-flush">
+                        <a class="list-group-item list-group-item-action" asp-page="/Help/CompaniesImportGlobalFile">Import Global File</a>
+                        <a class="list-group-item list-group-item-action" asp-page="/Help/CompaniesExport">Export</a>
+                        <a class="list-group-item list-group-item-action" asp-page="/Help/CompaniesSmExport">SM Export</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header fw-semibold">Surveys</div>
+                <div class="card-body">
+                    <p class="mb-3">Guides for survey answer imports, exports, and global export formatting.</p>
+                    <div class="list-group list-group-flush mb-3">
+                        <div class="list-group-item fw-semibold">Survey Answers</div>
+                        <a class="list-group-item list-group-item-action" asp-page="/Help/SurveyAnswersImportQualtricsFile">Import Qualtrics File</a>
+                        <a class="list-group-item list-group-item-action" asp-page="/Help/SurveyAnswersImportGlobalFile">Import Global File</a>
+                        <a class="list-group-item list-group-item-action" asp-page="/Help/SurveyAnswersExport">Export</a>
+                    </div>
+                    <div class="list-group list-group-flush">
+                        <a class="list-group-item list-group-item-action" asp-page="/Help/SurveysExportExcelGlobal">Export Excel - Global</a>
+                        <a class="list-group-item list-group-item-action" asp-page="/Help/EstimationLogic">Estimation Logic</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

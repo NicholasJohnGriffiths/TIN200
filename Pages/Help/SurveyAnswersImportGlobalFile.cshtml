@@ -1,0 +1,140 @@
+@page
+@model TINWeb.Pages.Help.SurveyAnswersImportGlobalFileModel
+@{
+    ViewData["Title"] = "Survey Answers Help - Import Global File";
+}
+
+<div class="container mt-4">
+    <h1>Survey Answers: Import Global File</h1>
+    <p class="text-muted">Explains the Import Global File action on the Survey Answers page.</p>
+
+    <div class="alert alert-info">
+        This feature imports answer data from a global-format Excel file. Each question is matched to an Excel column using the question's <strong>ImportColumnNameAlt</strong> field.
+    </div>
+
+    <h2 class="h5 mt-4">File requirements</h2>
+    <ul>
+        <li>The file must be an Excel <strong>.xlsx</strong> file.</li>
+        <li>Column headers must be on <strong>row 1</strong>.</li>
+        <li>The file must include an <strong>ID</strong> column (matched to <code>Company.ExternalId</code>).</li>
+        <li>A <strong>Name</strong> column is optional — used as a fallback when no <code>ExternalId</code> match is found.</li>
+    </ul>
+
+    <h2 class="h5 mt-4">Question.Title and ImportColumnNameAlt</h2>
+    <p>Every question in the system has two relevant fields:</p>
+    <table class="table table-sm table-bordered w-auto">
+        <thead class="table-light">
+            <tr>
+                <th>Field</th>
+                <th>Purpose</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>Question.Title</code></td>
+                <td>The short human-readable label for the question (e.g. <em>Revenue</em>). Shown in preview matched/unmatched lists as <code>Q{Id} ({Title})</code>.</td>
+            </tr>
+            <tr>
+                <td><code>Question.ImportColumnNameAlt</code></td>
+                <td>The Excel column header that this question maps to when using the global import. Set this on the <strong>Questions</strong> edit page. Only questions with a non-blank <code>ImportColumnNameAlt</code> are included in the global import.</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h2 class="h5 mt-4">How question columns are matched</h2>
+    <p>The importer compares <code>ImportColumnNameAlt</code> against Excel column headers using <strong>normalised matching</strong>: all non-alphanumeric characters (spaces, brackets, punctuation) are removed and the result is lowercased before comparing. This means:</p>
+    <ul>
+        <li><code>Revenue (A$m)</code> in the database matches <code>Revenue AM</code>, <code>Revenue (A$M)</code>, or <code>RevenueAm</code> in the Excel file.</li>
+        <li>Case differences are ignored.</li>
+        <li>Punctuation and spacing differences are ignored.</li>
+    </ul>
+
+    <h2 class="h5 mt-4">Year offset syntax (CY-N)</h2>
+    <p>An <code>ImportColumnNameAlt</code> value can include a <strong>CY-N</strong> suffix to target a prior financial year:</p>
+    <table class="table table-sm table-bordered w-auto">
+        <thead class="table-light">
+            <tr>
+                <th>ImportColumnNameAlt value</th>
+                <th>What it matches</th>
+                <th>Target financial year</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>Revenue</code></td>
+                <td>Any Excel column with base name <em>Revenue</em> (with or without a CY-N suffix)</td>
+                <td>For each matched column: import year − offset in that column's suffix</td>
+            </tr>
+            <tr>
+                <td><code>Revenue CY-1</code></td>
+                <td>Only Excel columns whose base name is <em>Revenue</em> and whose suffix is exactly <code>CY-1</code></td>
+                <td>Import year − 1</td>
+            </tr>
+            <tr>
+                <td><code>Revenue CY-2</code></td>
+                <td>Only Excel columns with base <em>Revenue</em> and suffix <code>CY-2</code></td>
+                <td>Import year − 2</td>
+            </tr>
+        </tbody>
+    </table>
+    <p class="text-muted small">When <code>ImportColumnNameAlt</code> has no CY-N suffix, the question matches <em>all</em> columns sharing that base name (one per offset present in the file) and routes each to the correct prior year automatically. When a CY-N suffix is set on the question, it only matches that exact offset.</p>
+    <p class="text-muted small">The <code>CY-</code> token is detected inside the column name (preceded by a word boundary). Unicode dashes (en dash, em dash, minus) are all accepted as the dash character.</p>
+
+    <h2 class="h5 mt-4">Preview step</h2>
+    <ul>
+        <li><strong>Matched fields</strong> — lists each question as <code>Q{Id} ({Title}): {ImportColumnNameAlt} → {Excel header} (target FY {year})</code>.</li>
+        <li><strong>Unmatched fields</strong> — questions whose <code>ImportColumnNameAlt</code> did not correspond to any Excel column header.</li>
+        <li><strong>Matched rows</strong> — companies resolved by External ID or Company Name.</li>
+        <li><strong>Unmatched rows</strong> — Excel rows whose ID/Name did not match any company.</li>
+        <li>No data is written until you click <strong>Apply</strong>.</li>
+    </ul>
+
+    <h2 class="h5 mt-4">Apply step</h2>
+    <p>Writes the mapped answers to the database and marks affected CompanySurvey records as estimated. Existing answers are only overwritten if the incoming value is non-blank.</p>
+
+    <h2 class="h5 mt-4">Configuring questions for global import</h2>
+    <p>Go to <strong>Questions → Edit</strong> for each question and set the <strong>Import Column Name Alt</strong> field to the Excel column header used in the global file. Leave it blank to exclude the question from global imports.</p>
+
+    <h2 class="h5 mt-4">Current question mappings</h2>
+    @if (!Model.QuestionMappings.Any())
+    {
+        <div class="alert alert-warning">No questions currently have <code>ImportColumnNameAlt</code> configured.</div>
+    }
+    else
+    {
+        <p class="text-muted small">The table below shows every column expected in the uploaded Excel file. The <strong>Excel Column Header</strong> must match the column name in your file (after normalisation — non-alphanumeric characters and casing are ignored).</p>
+        <table class="table table-sm table-bordered table-hover">
+            <thead class="table-light">
+                <tr>
+                    <th>Q#</th>
+                    <th>Question Title</th>
+                    <th>Excel Column Header</th>
+                    <th>Source</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="table-primary">
+                    <td class="text-muted">—</td>
+                    <td><strong>Company External ID</strong></td>
+                    <td><code>ID</code></td>
+                    <td>Company identifier (required)</td>
+                </tr>
+                <tr class="table-primary">
+                    <td class="text-muted">—</td>
+                    <td><strong>Company Name</strong></td>
+                    <td><code>Name</code></td>
+                    <td>Fallback identifier (optional)</td>
+                </tr>
+                @foreach (var q in Model.QuestionMappings)
+                {
+                    <tr>
+                        <td class="text-muted">@q.Id</td>
+                        <td>@q.Title</td>
+                        <td><code>@q.ImportColumnNameAlt</code></td>
+                        <td><code>ImportColumnNameAlt</code></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>

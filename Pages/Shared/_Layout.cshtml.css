@@ -39,6 +39,43 @@ button.accept-policy {
   line-height: inherit;
 }
 
+.dropdown-submenu {
+  position: relative;
+}
+
+.dropdown-submenu > .dropdown-menu {
+  top: -0.4rem;
+  left: 100%;
+  margin-left: 0.1rem;
+}
+
+.dropdown-submenu > .dropdown-toggle::after {
+  float: right;
+  margin-top: 0.55rem;
+  transform: rotate(-90deg);
+}
+
+@media (min-width: 576px) {
+  .dropdown-submenu:hover > .dropdown-menu,
+  .dropdown-submenu:focus-within > .dropdown-menu {
+    display: block;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .dropdown-submenu > .dropdown-menu {
+    position: static;
+    margin-left: 0;
+    border: 0;
+    box-shadow: none;
+    padding-left: 1rem;
+  }
+
+  .dropdown-submenu > .dropdown-toggle::after {
+    transform: none;
+  }
+}
+
 .footer {
   position: absolute;
   bottom: 0;

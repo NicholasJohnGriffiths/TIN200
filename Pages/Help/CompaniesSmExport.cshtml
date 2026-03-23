@@ -1,0 +1,36 @@
+@page
+@{
+    ViewData["Title"] = "Companies Help - SM Export";
+}
+
+<div class="container mt-4">
+    <h1>Companies: SM Export</h1>
+    <p class="text-muted">Explains the SM Export action on the Companies page.</p>
+
+    <div class="alert alert-info">
+        This feature exports company contact and profile fields in CSV format for SurveyMonkey-style use.
+    </div>
+
+    <h2 class="h5 mt-4">What it exports</h2>
+    <ul>
+        <li>Email</li>
+        <li>FirstName</li>
+        <li>LastName</li>
+        <li>CompanyName</li>
+        <li>ExternalId</li>
+        <li>CompanyDescription</li>
+        <li>LastTIN200Year</li>
+        <li>FYE2025</li>
+        <li>FYE2024</li>
+        <li>FYE2023</li>
+    </ul>
+
+    <h2 class="h5 mt-4">How it is used</h2>
+    <p>This export is intended for outbound survey/contact workflows where a CSV file with contact and company fields is required.</p>
+
+    <h2 class="h5 mt-4">Filtering</h2>
+    <p>If you apply a Last TIN200 Year filter first, only the filtered company set is exported.</p>
+
+    <h2 class="h5 mt-4">File format</h2>
+    <p>The file is downloaded as a timestamped <strong>.csv</strong> file.</p>
+</div>

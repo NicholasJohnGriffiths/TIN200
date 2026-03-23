@@ -1,0 +1,37 @@
+@page
+@{
+    ViewData["Title"] = "Companies Help - Export";
+}
+
+<div class="container mt-4">
+    <h1>Companies: Export</h1>
+    <p class="text-muted">Explains the Export action on the Companies page.</p>
+
+    <div class="alert alert-info">
+        This feature exports the current company list to a tab-separated file.
+    </div>
+
+    <h2 class="h5 mt-4">What it exports</h2>
+    <p>The export contains the filtered company records from the Companies page.</p>
+
+    <h2 class="h5 mt-4">Columns included</h2>
+    <ul>
+        <li>Id</li>
+        <li>CEO First Name</li>
+        <li>CEO Last Name</li>
+        <li>Email</li>
+        <li>External ID</li>
+        <li>Company Name</li>
+        <li>Company Description</li>
+        <li>FYE 2025</li>
+        <li>FYE 2024</li>
+        <li>FYE 2023</li>
+        <li>LastTIN200Year</li>
+    </ul>
+
+    <h2 class="h5 mt-4">Filtering</h2>
+    <p>If you apply a Last TIN200 Year filter first, the export uses that filtered list. If no filter is selected, it exports the default list for the page.</p>
+
+    <h2 class="h5 mt-4">File format</h2>
+    <p>The file is downloaded as a <strong>.tsv</strong> file, which opens cleanly in Excel and other spreadsheet tools.</p>
+</div>

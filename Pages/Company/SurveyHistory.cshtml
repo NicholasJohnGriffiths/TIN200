@@ -16,6 +16,7 @@
                 <h1 class="h4 mb-1">Survey History</h1>
                 <p class="mb-0 small"><strong>Company:</strong> @(Model.History.CompanyName ?? "N/A")</p>
                 <p class="mb-0 small"><strong>External ID:</strong> @(Model.History.ExternalId ?? "N/A")</p>
+                <p class="mb-0 small"><strong>Estimate:</strong> @(Model.History.LatestEstimate ? "Yes" : "No")</p>
                 <p class="mb-0 small"><strong>Years found:</strong> @Model.History.Years.Count</p>
             </div>
             <div class="col-md-4 text-end d-flex gap-2 justify-content-md-end align-items-start mt-2 mt-md-0">

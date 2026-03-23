@@ -1,0 +1,39 @@
+@page
+@{
+    ViewData["Title"] = "Survey Answers Help - Export";
+}
+
+<div class="container mt-4">
+    <h1>Survey Answers: Export</h1>
+    <p class="text-muted">Explains the Export action on the Survey Answers page.</p>
+
+    <div class="alert alert-info">
+        This feature exports survey answers for the selected financial year to CSV. Column headers are driven by <strong>Question.Title</strong>.
+    </div>
+
+    <h2 class="h5 mt-4">What it exports</h2>
+    <p>Each row represents one company. The fixed columns are always present, followed by one column per question:</p>
+    <table class="table table-sm table-bordered w-auto">
+        <thead class="table-light">
+            <tr><th>Column</th><th>Source</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>ExternalId</code></td><td>Company External ID</td></tr>
+            <tr><td><code>CompanyName</code></td><td>Company Name</td></tr>
+            <tr><td><code>Email</code></td><td>Company Email</td></tr>
+            <tr><td><em>One column per question</em></td><td>Header = <code>Question.Title</code>; value = latest answer for that company and year</td></tr>
+        </tbody>
+    </table>
+
+    <h2 class="h5 mt-4">Question.Title as the column header</h2>
+    <p>This export uses <code>Question.Title</code> (the short human-readable label, e.g. <em>Revenue</em>) as the column header for each question. Unlike the Global export, this export does <strong>not</strong> use <code>ImportColumnNameAlt</code> — all questions with a title are included automatically.</p>
+
+    <h2 class="h5 mt-4">How answer values are chosen</h2>
+    <p>For each company and question, the export selects the <strong>latest</strong> answer row available for the selected financial year and outputs the answer text, number, or currency value.</p>
+
+    <h2 class="h5 mt-4">Filtering</h2>
+    <p>The export is scoped to the selected financial year. If no year is selected, it falls back to the current survey year.</p>
+
+    <h2 class="h5 mt-4">File format</h2>
+    <p>Downloaded as a <strong>CSV</strong> file with one row per company.</p>
+</div>

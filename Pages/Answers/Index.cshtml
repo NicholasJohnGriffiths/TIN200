@@ -32,7 +32,7 @@
                 <form method="post" asp-page-handler="PreviewImport" enctype="multipart/form-data" id="previewImportForm" class="d-inline-flex align-items-center gap-2">
                     <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
                     <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="max-width: 220px;" />
-                    <button type="submit" class="btn btn-outline-primary btn-sm">Preview Import</button>
+                    <button type="submit" class="btn btn-outline-primary btn-sm">Qualtrics Import</button>
                 </form>
 
                 <form method="post" asp-page-handler="PreviewGlobalImport" enctype="multipart/form-data" id="previewGlobalImportForm" class="d-inline-flex align-items-center gap-2">
@@ -83,7 +83,7 @@
 
                 @if (Model.ImportPreview.AvailableHeaders.Any())
                 {
-                    <p class="mb-1"><strong>Detected headers (row 2):</strong></p>
+                    <p class="mb-1"><strong>Detected headers (row 1):</strong></p>
                     <div class="small text-muted mb-3">@string.Join(", ", Model.ImportPreview.AvailableHeaders)</div>
                 }
 
@@ -232,8 +232,9 @@
                         var savedDate = option.SavedDate?.ToString("dd/MM/yyyy") ?? string.Empty;
                         var submittedDate = option.SubmittedDate?.ToString("dd/MM/yyyy") ?? string.Empty;
                         var requestedDate = option.RequestedDate?.ToString("dd/MM/yyyy") ?? string.Empty;
+                        var estimate = option.Estimate ? "Yes" : "No";
                         <option value="@option.CompanySurveyId" selected="@(Model.SelectedCompanySurveyId == option.CompanySurveyId ? "selected" : null)">
-                            CompanySurvey: #@option.CompanySurveyId | @option.CompanyName | FY: @option.FinancialYear | Answers: @option.AnswerCount | SavedDate: @savedDate | SubmittedDate: @submittedDate | RequestedDate: @requestedDate
+                            CompanySurvey: #@option.CompanySurveyId | @option.CompanyName | FY: @option.FinancialYear | Estimate: @estimate | Answers: @option.AnswerCount | SavedDate: @savedDate | SubmittedDate: @submittedDate | RequestedDate: @requestedDate
                         </option>
                     }
                 </select>
