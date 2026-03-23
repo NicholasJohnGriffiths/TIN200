@@ -34,6 +34,18 @@ namespace TINWeb.Models
         [StringLength(255)]
         public string? CompanyDescription { get; set; }
 
+        [Display(Name = "External ID Import Column Name")]
+        [StringLength(255)]
+        public string? ExternalIdImportColumnName { get; set; }
+
+        [Display(Name = "Company Name Import Column Name")]
+        [StringLength(255)]
+        public string? CompanyNameImportColumnName { get; set; }
+
+        [Display(Name = "Company Description Import Column Name")]
+        [StringLength(255)]
+        public string? CompanyDescriptionImportColumnName { get; set; }
+
         [Display(Name = "FYE 2025")]
         [Column(TypeName = "decimal(18, 0)")]
         public decimal? Fye2025 { get; set; }
@@ -48,6 +60,9 @@ namespace TINWeb.Models
 
         [Display(Name = "Financial Year")]
         public int? FinancialYear { get; set; }
+
+        [Display(Name = "Last TIN200 Year")]
+        public int? LastTIN200Year { get; set; }
 
         // TIN200 identity/data column intentionally not exposed in the model
     }

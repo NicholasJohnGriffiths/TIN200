@@ -39,6 +39,7 @@ namespace TINWeb.Pages.Company
                 string? line = await reader.ReadLineAsync();
                 bool hasHeader = false;
                 if (line != null && line.Contains('\t') && line.ToLower().Contains("ceo first")) hasHeader = true;
+                var headers = hasHeader ? line!.Split('\t').Select(h => h.Trim()).ToArray() : Array.Empty<string>();
                 if (!hasHeader)
                 {
                     reader.BaseStream.Position = 0;
@@ -63,6 +64,9 @@ namespace TINWeb.Pages.Company
                     var externalId = cols.Length > 3 ? cols[3]?.Trim() : null;
                     var companyName = cols.Length > 4 ? cols[4]?.Trim() : null;
                     var companyDesc = cols.Length > 5 ? cols[5]?.Trim() : null;
+                    var externalIdImportColumnName = GetHeaderName(headers, 3);
+                    var companyNameImportColumnName = GetHeaderName(headers, 4);
+                    var companyDescriptionImportColumnName = GetHeaderName(headers, 5);
                     var fye2025Raw = cols.Length > 6 ? cols[6]?.Trim() : null;
                     var fye2024Raw = cols.Length > 7 ? cols[7]?.Trim() : null;
                     var fye2023Raw = cols.Length > 8 ? cols[8]?.Trim() : null;
@@ -91,6 +95,9 @@ namespace TINWeb.Pages.Company
                         MissingExternalId = string.IsNullOrWhiteSpace(externalId),
                         CompanyName = companyName,
                         CompanyDescription = companyDesc,
+                        ExternalIdImportColumnName = externalIdImportColumnName,
+                        CompanyNameImportColumnName = companyNameImportColumnName,
+                        CompanyDescriptionImportColumnName = companyDescriptionImportColumnName,
                         Fye2025 = fye2025,
                         Fye2024 = fye2024,
                         Fye2023 = fye2023,
@@ -122,6 +129,7 @@ namespace TINWeb.Pages.Company
                 string? line = await reader.ReadLineAsync();
                 bool hasHeader = false;
                 if (line != null && line.Contains('\t') && line.ToLower().Contains("ceo first")) hasHeader = true;
+                var headers = hasHeader ? line!.Split('\t').Select(h => h.Trim()).ToArray() : Array.Empty<string>();
                 if (!hasHeader)
                 {
                     reader.BaseStream.Position = 0;
@@ -150,6 +158,9 @@ namespace TINWeb.Pages.Company
                         var externalId = cols.Length > 3 ? cols[3]?.Trim() : null;
                         var companyName = cols.Length > 4 ? cols[4]?.Trim() : null;
                         var companyDesc = cols.Length > 5 ? cols[5]?.Trim() : null;
+                        var externalIdImportColumnName = GetHeaderName(headers, 3);
+                        var companyNameImportColumnName = GetHeaderName(headers, 4);
+                        var companyDescriptionImportColumnName = GetHeaderName(headers, 5);
                         var fye2025Raw = cols.Length > 6 ? cols[6]?.Trim() : null;
                         var fye2024Raw = cols.Length > 7 ? cols[7]?.Trim() : null;
                         var fye2023Raw = cols.Length > 8 ? cols[8]?.Trim() : null;
@@ -195,6 +206,9 @@ SET [CEOFirstName] = @ceoFirst,
     [ExternalID] = @externalId,
     [CompanyName] = @companyName,
     [CompanyDescription] = @companyDesc,
+    [ExternalId_ImportColumnName] = @externalIdImportColumnName,
+    [CompanyName_ImportColumnName] = @companyNameImportColumnName,
+    [CompanyDescription_ImportColumnName] = @companyDescriptionImportColumnName,
     [FYE2025] = @fye2025,
     [FYE2024] = @fye2024,
     [FYE2023] = @fye2023
@@ -205,6 +219,9 @@ WHERE [Id] = @id";
                                 cmd.Parameters.AddWithValue("@externalId", (object?)externalId ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@companyName", (object?)companyName ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@companyDesc", (object?)companyDesc ?? DBNull.Value);
+                                cmd.Parameters.AddWithValue("@externalIdImportColumnName", (object?)externalIdImportColumnName ?? DBNull.Value);
+                                cmd.Parameters.AddWithValue("@companyNameImportColumnName", (object?)companyNameImportColumnName ?? DBNull.Value);
+                                cmd.Parameters.AddWithValue("@companyDescriptionImportColumnName", (object?)companyDescriptionImportColumnName ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@fye2025", (object?)fye2025 ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@fye2024", (object?)fye2024 ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@fye2023", (object?)fye2023 ?? DBNull.Value);
@@ -218,14 +235,17 @@ WHERE [Id] = @id";
                                 using var cmd = conn.CreateCommand();
                                 cmd.Transaction = tran;
                                 cmd.CommandText = @"
-INSERT INTO [TIN200] ([CEOFirstName], [CEOLastName], [Email], [ExternalID], [CompanyName], [CompanyDescription], [FYE2025], [FYE2024], [FYE2023], [TIN200])
-VALUES (@ceoFirst, @ceoLast, @email, @externalId, @companyName, @companyDesc, @fye2025, @fye2024, @fye2023, @tin200)";
+INSERT INTO [TIN200] ([CEOFirstName], [CEOLastName], [Email], [ExternalID], [CompanyName], [CompanyDescription], [ExternalId_ImportColumnName], [CompanyName_ImportColumnName], [CompanyDescription_ImportColumnName], [FYE2025], [FYE2024], [FYE2023], [TIN200])
+VALUES (@ceoFirst, @ceoLast, @email, @externalId, @companyName, @companyDesc, @externalIdImportColumnName, @companyNameImportColumnName, @companyDescriptionImportColumnName, @fye2025, @fye2024, @fye2023, @tin200)";
                                 cmd.Parameters.AddWithValue("@ceoFirst", (object?)ceoFirst ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@ceoLast", (object?)ceoLast ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@email", (object?)email ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@externalId", (object?)externalId ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@companyName", (object?)companyName ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@companyDesc", (object?)companyDesc ?? DBNull.Value);
+                                cmd.Parameters.AddWithValue("@externalIdImportColumnName", (object?)externalIdImportColumnName ?? DBNull.Value);
+                                cmd.Parameters.AddWithValue("@companyNameImportColumnName", (object?)companyNameImportColumnName ?? DBNull.Value);
+                                cmd.Parameters.AddWithValue("@companyDescriptionImportColumnName", (object?)companyDescriptionImportColumnName ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@fye2025", (object?)fye2025 ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@fye2024", (object?)fye2024 ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@fye2023", (object?)fye2023 ?? DBNull.Value);
@@ -261,6 +281,17 @@ VALUES (@ceoFirst, @ceoLast, @email, @externalId, @companyName, @companyDesc, @f
             var cleaned = s.Replace(",", "");
             if (decimal.TryParse(cleaned, NumberStyles.Number | NumberStyles.AllowCurrencySymbol, CultureInfo.InvariantCulture, out v)) return v;
             return null;
+        }
+
+        private static string? GetHeaderName(string[] headers, int index)
+        {
+            if (headers.Length <= index)
+            {
+                return null;
+            }
+
+            var header = headers[index];
+            return string.IsNullOrWhiteSpace(header) ? null : header;
         }
     }
 }

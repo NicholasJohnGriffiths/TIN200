@@ -64,6 +64,21 @@ namespace TINWeb.Data
                     .HasColumnName("CompanyDescription")
                     .HasColumnType("varchar(255)")
                     .HasMaxLength(255);
+
+                entity.Property(e => e.ExternalIdImportColumnName)
+                    .HasColumnName("ExternalId_ImportColumnName")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255);
+
+                entity.Property(e => e.CompanyNameImportColumnName)
+                    .HasColumnName("CompanyName_ImportColumnName")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255);
+
+                entity.Property(e => e.CompanyDescriptionImportColumnName)
+                    .HasColumnName("CompanyDescription_ImportColumnName")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255);
                 
                 entity.Property(e => e.Fye2025)
                     .HasColumnName("FYE2025")
@@ -79,6 +94,10 @@ namespace TINWeb.Data
 
                 entity.Property(e => e.FinancialYear)
                     .HasColumnName("FinancialYear")
+                    .HasColumnType("int");
+
+                entity.Property(e => e.LastTIN200Year)
+                    .HasColumnName("LastTIN200Year")
                     .HasColumnType("int");
 
                 // Company column exists in the database but is intentionally not mapped to the model

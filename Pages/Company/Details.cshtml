@@ -65,6 +65,17 @@
                             </div>
                         </div>
 
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <h6 class="text-muted">Financial Year</h6>
+                                <p>@(Model.Record.FinancialYear?.ToString() ?? "N/A")</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-muted">Last TIN200 Year</h6>
+                                <p>@(Model.Record.LastTIN200Year?.ToString() ?? "N/A")</p>
+                            </div>
+                        </div>
+
                         <!-- Company field intentionally not displayed -->
                     </div>
                 </div>

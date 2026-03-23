@@ -14,20 +14,20 @@ namespace TINWeb.Pages.Company
             _service = service;
         }
 
-        public async Task<IActionResult> OnGetAsync(int? year)
+        public async Task<IActionResult> OnGetAsync(int? lastTin200Year)
         {
             // default to latest when not supplied
-            var years = await _service.GetAvailableFinancialYearsAsync();
-            if (!year.HasValue)
+            var lastTin200Years = await _service.GetAvailableLastTin200YearsAsync();
+            if (!lastTin200Year.HasValue)
             {
-                year = years.FirstOrDefault();
+                lastTin200Year = lastTin200Years.FirstOrDefault();
             }
 
-            var records = await _service.GetAllCompaniesAsync(year);
+            var records = await _service.GetAllCompaniesAsync(lastTin200Year);
 
             var sb = new StringBuilder();
             // header
-            sb.AppendLine(string.Join('\t', new[] { "Id", "CEO First Name", "CEO Last Name", "Email", "External ID", "Company Name", "Company Description", "FYE 2025", "FYE 2024", "FYE 2023", "FinancialYear" }));
+            sb.AppendLine(string.Join('\t', new[] { "Id", "CEO First Name", "CEO Last Name", "Email", "External ID", "Company Name", "Company Description", "FYE 2025", "FYE 2024", "FYE 2023", "LastTIN200Year" }));
 
             foreach (var r in records)
             {
@@ -42,13 +42,13 @@ namespace TINWeb.Pages.Company
                     r.Fye2025.HasValue ? r.Fye2025.Value.ToString("F0") : string.Empty,
                     r.Fye2024.HasValue ? r.Fye2024.Value.ToString("F0") : string.Empty,
                     r.Fye2023.HasValue ? r.Fye2023.Value.ToString("F0") : string.Empty,
-                    r.FinancialYear.HasValue ? r.FinancialYear.Value.ToString() : string.Empty
+                    r.LastTIN200Year.HasValue ? r.LastTIN200Year.Value.ToString() : string.Empty
                 };
                 sb.AppendLine(string.Join('\t', cols));
             }
 
             var bytes = Encoding.UTF8.GetBytes(sb.ToString());
-            var fileName = year.HasValue ? $"Company_export_{year.Value}.tsv" : "Company_export_all.tsv";
+            var fileName = lastTin200Year.HasValue ? $"Company_export_{lastTin200Year.Value}.tsv" : "Company_export_all.tsv";
             return File(bytes, "text/tab-separated-values; charset=utf-8", fileName);
         }
     }

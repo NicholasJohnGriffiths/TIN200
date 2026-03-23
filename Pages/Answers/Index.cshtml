@@ -98,6 +98,17 @@
                     </ul>
                 }
 
+                @if (Model.ImportPreview.UnmatchedFields.Any())
+                {
+                    <p class="mb-1 text-warning"><strong>Unmatched question fields:</strong></p>
+                    <ul class="small text-warning mb-3">
+                        @foreach (var unmatchedField in Model.ImportPreview.UnmatchedFields.Take(30))
+                        {
+                            <li>@unmatchedField</li>
+                        }
+                    </ul>
+                }
+
                 @if (Model.ImportPreview.MatchedExternalIds.Any())
                 {
                     <p class="mb-1"><strong>Matched External IDs:</strong></p>
@@ -144,17 +155,28 @@
 
                 @if (Model.GlobalImportPreview.AvailableHeaders.Any())
                 {
-                    <p class="mb-1"><strong>Detected headers (row 2):</strong></p>
+                    <p class="mb-1"><strong>Detected headers (row 1):</strong></p>
                     <div class="small text-muted mb-3">@string.Join(", ", Model.GlobalImportPreview.AvailableHeaders)</div>
                 }
 
                 @if (Model.GlobalImportPreview.MatchedFields.Any())
                 {
-                    <p class="mb-1"><strong>Matched question fields:</strong></p>
+                    <p class="mb-1"><strong>Matched question fields (@Model.GlobalImportPreview.MatchedFields.Count):</strong></p>
                     <ul class="small text-muted mb-3">
-                        @foreach (var matchedField in Model.GlobalImportPreview.MatchedFields.Take(30))
+                        @foreach (var matchedField in Model.GlobalImportPreview.MatchedFields)
                         {
                             <li>@matchedField</li>
+                        }
+                    </ul>
+                }
+
+                @if (Model.GlobalImportPreview.UnmatchedFields.Any())
+                {
+                    <p class="mb-1 text-warning"><strong>Unmatched question fields (@Model.GlobalImportPreview.UnmatchedFields.Count):</strong></p>
+                    <ul class="small text-warning mb-3">
+                        @foreach (var unmatchedField in Model.GlobalImportPreview.UnmatchedFields)
+                        {
+                            <li>@unmatchedField</li>
                         }
                     </ul>
                 }
