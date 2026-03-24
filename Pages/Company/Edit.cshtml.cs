@@ -42,6 +42,13 @@ namespace TINWeb.Pages.Company
                 return NotFound();
             }
 
+            // Auto-generate ExternalId if blank
+            if (string.IsNullOrWhiteSpace(Record.ExternalId))
+            {
+                var highestId = await _service.GetHighestNumericExternalIdAsync();
+                Record.ExternalId = (highestId + 1).ToString();
+            }
+
             await _service.UpdateCompanyAsync(Record);
             return RedirectToPage("./Index");
         }

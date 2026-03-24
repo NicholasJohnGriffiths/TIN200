@@ -114,6 +114,33 @@ namespace TINWeb.Services
             }
         }
 
+        public async Task<int> GetHighestNumericExternalIdAsync()
+        {
+            try
+            {
+                var companies = await _context.Tin200
+                    .Where(x => x.ExternalId != null && x.ExternalId != "")
+                    .Select(x => x.ExternalId)
+                    .ToListAsync();
+
+                int maxId = 0;
+                foreach (var extId in companies)
+                {
+                    if (int.TryParse(extId, out int numId) && numId > maxId)
+                    {
+                        maxId = numId;
+                    }
+                }
+
+                return maxId;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to get highest numeric ExternalId.");
+                return 0;
+            }
+        }
+
         public async Task<Tin200> CreateCompanyAsync(Tin200 company)
         {
             _context.Tin200.Add(company);
