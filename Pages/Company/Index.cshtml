@@ -27,12 +27,19 @@
         {
             <div class="card mb-3 border-warning">
                 <div class="card-header bg-warning-subtle">
-                    Reset Preview Summary (Current survey year: @Model.PreviewSummary.CurrentSurveyYear)
+                    Update Company Info Preview (Current survey year: @Model.PreviewSummary.CurrentSurveyYear)
                 </div>
                 <div class="card-body">
+                    <p class="small text-muted mb-2">FYE values use current survey first, then roll back by year (e.g., Year-1 can fall back to prior survey Last Financial Year; Year-2 can fall back to prior survey Year-1). CEO fields use latest available non-blank survey answers.</p>
                     <p class="mb-2">
-                        Matched companies: <strong>@Model.PreviewSummary.TotalMatchedCompanies</strong>.<br />
+                        Matched companies: <strong>@Model.PreviewSummary.TotalMatchedCompanies</strong>
+                        &mdash; with revenue answer data: <strong>@Model.PreviewSummary.CompaniesWithRevenueData</strong>,
+                        with CEO answer data: <strong>@Model.PreviewSummary.CompaniesWithCeoData</strong>.<br />
                         Companies that would be updated: <strong>@Model.PreviewSummary.WouldUpdateCompanyCount</strong>.
+                        @if (Model.PreviewSummary.WouldUpdateCompanyCount == 0 && Model.PreviewSummary.TotalMatchedCompanies > 0)
+                        {
+                            <br /><span class="text-muted small">No changes detected &mdash; answer data matches existing company values, or no answer data is available for those fields yet.</span>
+                        }
                     </p>
                     @if (Model.PreviewSummary.PreviewRows.Any())
                     {
@@ -41,6 +48,9 @@
                                 <thead class="table-light">
                                     <tr>
                                         <th>Company</th>
+                                        <th>CEO First Name</th>
+                                        <th>CEO Last Name</th>
+                                        <th>Email</th>
                                         <th>FYE Last Financial Year</th>
                                         <th>FYE Year-1</th>
                                         <th>FYE Year-2</th>
@@ -51,6 +61,9 @@
                                     {
                                         <tr>
                                             <td>@row.CompanyName (@row.CompanyId)</td>
+                                            <td>@(row.NewCeoFirstName != null && row.CurrentCeoFirstName != row.NewCeoFirstName ? $"{row.CurrentCeoFirstName} -> {row.NewCeoFirstName}" : row.CurrentCeoFirstName ?? "")</td>
+                                            <td>@(row.NewCeoLastName != null && row.CurrentCeoLastName != row.NewCeoLastName ? $"{row.CurrentCeoLastName} -> {row.NewCeoLastName}" : row.CurrentCeoLastName ?? "")</td>
+                                            <td>@(row.NewEmail != null && row.CurrentEmail != row.NewEmail ? $"{row.CurrentEmail} -> {row.NewEmail}" : row.CurrentEmail ?? "")</td>
                                             <td>@(row.CurrentFye2025?.ToString("C0") ?? "") -> @(row.NewFye2025?.ToString("C0") ?? "")</td>
                                             <td>@(row.CurrentFye2024?.ToString("C0") ?? "") -> @(row.NewFye2024?.ToString("C0") ?? "")</td>
                                             <td>@(row.CurrentFye2023?.ToString("C0") ?? "") -> @(row.NewFye2023?.ToString("C0") ?? "")</td>
@@ -193,9 +206,9 @@
                     <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
                     <button type="submit" class="btn btn-outline-secondary me-2" id="companyResetPreviewButton">Preview Summary</button>
                 </form>
-                <form method="post" asp-page-handler="ResetFyeValues" class="d-inline" onsubmit="return confirm('Reset FYE 2025/2024/2023 from survey answers? This will overwrite existing values.');">
+                <form method="post" asp-page-handler="ResetFyeValues" class="d-inline" onsubmit="return confirm('Update company info (CEO name, email, FYE Last Financial Year / Year-1 / Year-2) from survey answers? This will overwrite existing values.');">
                     <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
-                    <button type="submit" class="btn btn-outline-warning me-2" id="companyResetButton">Reset FYE Values</button>
+                    <button type="submit" class="btn btn-outline-warning me-2" id="companyResetButton">Update Company Info</button>
                 </form>
                 <a asp-page="./Create" class="btn btn-primary">
                     <i class="bi bi-plus-circle"></i> Add New Record

@@ -48,11 +48,11 @@ namespace TINWeb.Pages.Company
 
             if (!result.HasCurrentSurvey)
             {
-                StatusMessage = "Reset FYE Values skipped: no current survey is configured.";
+                StatusMessage = "Update Company Info skipped: no current survey is configured.";
                 return RedirectToPage(new { lastTin200Year });
             }
 
-            StatusMessage = $"Reset FYE Values complete (Current survey year: {result.CurrentSurveyYear}). Updated {result.UpdatedCompanyCount} of {result.TotalMatchedCompanies} matched company record(s).";
+            StatusMessage = $"Update Company Info complete (Current survey year: {result.CurrentSurveyYear}). Updated {result.UpdatedCompanyCount} of {result.TotalMatchedCompanies} matched company record(s).";
             return RedirectToPage(new { lastTin200Year });
         }
 

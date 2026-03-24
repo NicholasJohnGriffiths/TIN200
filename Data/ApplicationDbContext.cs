@@ -81,15 +81,15 @@ namespace TINWeb.Data
                     .HasMaxLength(255);
                 
                 entity.Property(e => e.Fye2025)
-                    .HasColumnName("FYE2025")
+                    .HasColumnName("FYELastFinancialYear")
                     .HasColumnType("decimal(18, 0)");
                 
                 entity.Property(e => e.Fye2024)
-                    .HasColumnName("FYE2024")
+                    .HasColumnName("FYEYear-1")
                     .HasColumnType("decimal(18, 0)");
                 
                 entity.Property(e => e.Fye2023)
-                    .HasColumnName("FYE2023")
+                    .HasColumnName("FYEYear-2")
                     .HasColumnType("decimal(18, 0)");
 
                 entity.Property(e => e.FinancialYear)

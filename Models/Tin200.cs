@@ -46,15 +46,15 @@ namespace TINWeb.Models
         [StringLength(255)]
         public string? CompanyDescriptionImportColumnName { get; set; }
 
-        [Display(Name = "FYE 2025")]
+        [Display(Name = "FYE Last Financial Year")]
         [Column(TypeName = "decimal(18, 0)")]
         public decimal? Fye2025 { get; set; }
 
-        [Display(Name = "FYE 2024")]
+        [Display(Name = "FYE Year-1")]
         [Column(TypeName = "decimal(18, 0)")]
         public decimal? Fye2024 { get; set; }
 
-        [Display(Name = "FYE 2023")]
+        [Display(Name = "FYE Year-2")]
         [Column(TypeName = "decimal(18, 0)")]
         public decimal? Fye2023 { get; set; }
 

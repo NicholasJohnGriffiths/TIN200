@@ -28,7 +28,11 @@ namespace TINWeb.Services
                     var year = lastTin200Year.Value;
                     query = query.Where(t => t.LastTIN200Year == year);
                 }
-                return await query.OrderByDescending(t => t.Id).ToListAsync();
+                return await query
+                    .OrderBy(t => string.IsNullOrWhiteSpace(t.CompanyName))
+                    .ThenBy(t => t.CompanyName)
+                    .ThenBy(t => t.Id)
+                    .ToListAsync();
             }
             catch (Exception ex)
             {
@@ -405,10 +409,6 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
 
         private async Task<ResetFyeValuesResult> BuildResetFyeValuesResultAsync(bool applyUpdates, int previewLimit)
         {
-            const string titleLastFinancialYear = "Total Revenue Last Financial Year";
-            const string titleYearMinus1 = "Total Revenue Year-1";
-            const string titleYearMinus2 = "Total Revenue Year-2";
-
             var currentSurveyYear = await _context.Survey
                 .Where(s => s.CurrentSurvey)
                 .OrderByDescending(s => s.FinancialYear)
@@ -441,14 +441,7 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                 };
             }
 
-            var revenueTitles = new[]
-            {
-                titleLastFinancialYear,
-                titleYearMinus1,
-                titleYearMinus2
-            };
-
-            var revenueQuestionIds = await _context.Question
+            var allQuestions = await _context.Question
                 .AsNoTracking()
                 .Select(q => new
                 {
@@ -460,13 +453,22 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                 })
                 .ToListAsync();
 
-            var matchedRevenueQuestions = revenueQuestionIds
+            var matchedRevenueQuestions = allQuestions
                 .Select(q => new
                 {
                     q.Id,
-                    NormalizedTitle = (q.Title ?? string.Empty).Trim()
+                    FyeField = ResolveFyeFieldFromQuestionMetadata(q.Title, q.QuestionText, q.ImportColumnName, q.ImportColumnNameAlt)
                 })
-                .Where(q => revenueTitles.Any(t => string.Equals(t, q.NormalizedTitle, StringComparison.OrdinalIgnoreCase)))
+                .Where(q => q.FyeField != null)
+                .ToList();
+
+            var matchedCeoQuestions = allQuestions
+                .Select(q => new
+                {
+                    q.Id,
+                    CeoField = ResolveCeoFieldFromQuestionMetadata(q.Title, q.QuestionText, q.ImportColumnName, q.ImportColumnNameAlt)
+                })
+                .Where(q => q.CeoField != null)
                 .ToList();
 
             var matchedRevenueQuestionIds = matchedRevenueQuestions
@@ -474,14 +476,27 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                 .Distinct()
                 .ToList();
 
+            var matchedCeoQuestionIds = matchedCeoQuestions
+                .Select(q => q.Id)
+                .Distinct()
+                .ToList();
+
             var questionIdToFyeField = matchedRevenueQuestions
                 .ToDictionary(
                     q => q.Id,
-                    q => string.Equals(q.NormalizedTitle, titleLastFinancialYear, StringComparison.OrdinalIgnoreCase)
-                        ? "FYE2025"
-                        : string.Equals(q.NormalizedTitle, titleYearMinus1, StringComparison.OrdinalIgnoreCase)
-                            ? "FYE2024"
-                            : "FYE2023");
+                    q => q.FyeField!);
+
+            var fyeFieldToOffset = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["FYE2025"] = 0,
+                ["FYE2024"] = 1,
+                ["FYE2023"] = 2
+            };
+
+            var questionIdToCeoField = matchedCeoQuestions
+                .ToDictionary(
+                    q => q.Id,
+                    q => q.CeoField!);
 
             if (!matchedRevenueQuestionIds.Any())
             {
@@ -496,14 +511,16 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                 };
             }
 
-            var answerRows = await (
+            var revenueAnswerRows = await (
                 from companySurvey in _context.CompanySurvey.AsNoTracking()
+                join survey in _context.Survey.AsNoTracking() on companySurvey.SurveyId equals survey.Id
                 join answer in _context.Answer.AsNoTracking() on companySurvey.Id equals answer.CompanySurveyId
-                where companySurvey.SurveyId == currentSurveyId.Value
-                    && matchedRevenueQuestionIds.Contains(answer.QuestionId)
+                where matchedRevenueQuestionIds.Contains(answer.QuestionId)
                 select new
                 {
                     companySurvey.CompanyId,
+                    companySurvey.SurveyId,
+                    SurveyFinancialYear = survey.FinancialYear,
                     answer.QuestionId,
                     answer.Id,
                     answer.AnswerCurrency,
@@ -512,24 +529,64 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                 })
                 .ToListAsync();
 
-            var latestAnswerByCompanyAndField = answerRows
+            var ceoAnswerRows = await (
+                from companySurvey in _context.CompanySurvey.AsNoTracking()
+                join survey in _context.Survey.AsNoTracking() on companySurvey.SurveyId equals survey.Id
+                join answer in _context.Answer.AsNoTracking() on companySurvey.Id equals answer.CompanySurveyId
+                where matchedCeoQuestionIds.Contains(answer.QuestionId)
+                select new
+                {
+                    companySurvey.CompanyId,
+                    companySurvey.SurveyId,
+                    SurveyFinancialYear = survey.FinancialYear,
+                    answer.QuestionId,
+                    answer.Id,
+                    answer.AnswerText
+                })
+                .ToListAsync();
+
+            var latestRevenueByCompanyYearOffset = revenueAnswerRows
                 .Where(x => questionIdToFyeField.ContainsKey(x.QuestionId))
                 .Select(x => new
                 {
                     x.CompanyId,
-                    FyeField = questionIdToFyeField[x.QuestionId],
+                    x.SurveyId,
+                    x.SurveyFinancialYear,
+                    Offset = fyeFieldToOffset[questionIdToFyeField[x.QuestionId]],
                     x.Id,
-                    x.AnswerCurrency,
-                    x.AnswerNumber,
+                    ParsedValue = ParseRevenueAnswer(x.AnswerCurrency, x.AnswerNumber, x.AnswerText)
+                })
+                .Where(x => x.ParsedValue.HasValue)
+                .GroupBy(x => new { x.CompanyId, x.SurveyFinancialYear, x.Offset })
+                .ToDictionary(
+                    g => (g.Key.CompanyId, g.Key.SurveyFinancialYear, g.Key.Offset),
+                    g => g.OrderByDescending(x => x.SurveyId)
+                          .ThenByDescending(x => x.Id)
+                          .Select(x => x.ParsedValue)
+                          .FirstOrDefault());
+
+            var latestCeoAnswerByCompanyAndField = ceoAnswerRows
+                .Where(x => questionIdToCeoField.ContainsKey(x.QuestionId))
+                .Select(x => new
+                {
+                    x.CompanyId,
+                    CeoField = questionIdToCeoField[x.QuestionId],
+                    x.SurveyFinancialYear,
+                    x.SurveyId,
+                    x.Id,
                     x.AnswerText
                 })
-                .GroupBy(x => new { x.CompanyId, x.FyeField })
+                .GroupBy(x => new { x.CompanyId, x.CeoField })
                 .ToDictionary(
-                    g => (g.Key.CompanyId, g.Key.FyeField),
-                    g => g.OrderByDescending(x => x.Id).First());
+                    g => (g.Key.CompanyId, g.Key.CeoField),
+                    g => g.OrderByDescending(x => x.SurveyFinancialYear)
+                          .ThenByDescending(x => x.SurveyId)
+                          .ThenByDescending(x => x.Id)
+                          .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.AnswerText)));
 
-            var companyIds = latestAnswerByCompanyAndField.Keys
+            var companyIds = latestRevenueByCompanyYearOffset.Keys
                 .Select(x => x.CompanyId)
+                .Concat(latestCeoAnswerByCompanyAndField.Keys.Select(x => x.CompanyId))
                 .Distinct()
                 .ToList();
 
@@ -551,19 +608,53 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                 .ToListAsync();
 
             var updatedCount = 0;
+            var companiesWithRevenueData = 0;
+            var companiesWithCeoData = 0;
             var changedRows = new List<ResetFyePreviewRow>();
+
+            decimal? ResolveRevenueValueForTargetField(int companyId, int targetOffset)
+            {
+                // Example for current year Y:
+                // targetOffset 0 => (Y,0)
+                // targetOffset 1 => (Y,1) then (Y-1,0)
+                // targetOffset 2 => (Y,2) then (Y-1,1) then (Y-2,0)
+                for (var step = 0; step <= targetOffset; step++)
+                {
+                    var surveyYear = currentSurveyYear.Value - step;
+                    var sourceOffset = targetOffset - step;
+                    if (latestRevenueByCompanyYearOffset.TryGetValue((companyId, surveyYear, sourceOffset), out var value) && value.HasValue)
+                    {
+                        return value.Value;
+                    }
+                }
+
+                return null;
+            }
 
             foreach (var company in companies)
             {
-                latestAnswerByCompanyAndField.TryGetValue((company.Id, "FYE2025"), out var lastFinancialYearAnswer);
-                latestAnswerByCompanyAndField.TryGetValue((company.Id, "FYE2024"), out var yearMinus1Answer);
-                latestAnswerByCompanyAndField.TryGetValue((company.Id, "FYE2023"), out var yearMinus2Answer);
+                latestCeoAnswerByCompanyAndField.TryGetValue((company.Id, "CeoFirstName"), out var ceoFirstNameAnswer);
+                latestCeoAnswerByCompanyAndField.TryGetValue((company.Id, "CeoLastName"), out var ceoLastNameAnswer);
+                latestCeoAnswerByCompanyAndField.TryGetValue((company.Id, "Email"), out var ceoEmailAnswer);
 
-                var newFye2025 = ParseRevenueAnswer(lastFinancialYearAnswer?.AnswerCurrency, lastFinancialYearAnswer?.AnswerNumber, lastFinancialYearAnswer?.AnswerText);
-                var newFye2024 = ParseRevenueAnswer(yearMinus1Answer?.AnswerCurrency, yearMinus1Answer?.AnswerNumber, yearMinus1Answer?.AnswerText);
-                var newFye2023 = ParseRevenueAnswer(yearMinus2Answer?.AnswerCurrency, yearMinus2Answer?.AnswerNumber, yearMinus2Answer?.AnswerText);
+                var newFye2025 = ResolveRevenueValueForTargetField(company.Id, 0);
+                var newFye2024 = ResolveRevenueValueForTargetField(company.Id, 1);
+                var newFye2023 = ResolveRevenueValueForTargetField(company.Id, 2);
 
-                var hasChanges = company.Fye2025 != newFye2025 || company.Fye2024 != newFye2024 || company.Fye2023 != newFye2023;
+                var newCeoFirstName = string.IsNullOrWhiteSpace(ceoFirstNameAnswer?.AnswerText) ? null : ceoFirstNameAnswer!.AnswerText?.Trim();
+                var newCeoLastName = string.IsNullOrWhiteSpace(ceoLastNameAnswer?.AnswerText) ? null : ceoLastNameAnswer!.AnswerText?.Trim();
+                var newEmail = string.IsNullOrWhiteSpace(ceoEmailAnswer?.AnswerText) ? null : ceoEmailAnswer!.AnswerText?.Trim();
+
+                if (newFye2025 != null || newFye2024 != null || newFye2023 != null) companiesWithRevenueData++;
+                if (newCeoFirstName != null || newCeoLastName != null || newEmail != null) companiesWithCeoData++;
+
+                var fyeChanged = (newFye2025 != null && company.Fye2025 != newFye2025)
+                              || (newFye2024 != null && company.Fye2024 != newFye2024)
+                              || (newFye2023 != null && company.Fye2023 != newFye2023);
+                var ceoChanged = (newCeoFirstName != null && company.CeoFirstName != newCeoFirstName)
+                              || (newCeoLastName != null && company.CeoLastName != newCeoLastName)
+                              || (newEmail != null && company.Email != newEmail);
+                var hasChanges = fyeChanged || ceoChanged;
 
                 if (hasChanges)
                 {
@@ -571,6 +662,12 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                     {
                         CompanyId = company.Id,
                         CompanyName = company.CompanyName,
+                        CurrentCeoFirstName = company.CeoFirstName,
+                        NewCeoFirstName = newCeoFirstName,
+                        CurrentCeoLastName = company.CeoLastName,
+                        NewCeoLastName = newCeoLastName,
+                        CurrentEmail = company.Email,
+                        NewEmail = newEmail,
                         CurrentFye2025 = company.Fye2025,
                         NewFye2025 = newFye2025,
                         CurrentFye2024 = company.Fye2024,
@@ -582,9 +679,12 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
 
                 if (hasChanges && applyUpdates)
                 {
-                    company.Fye2025 = newFye2025;
-                    company.Fye2024 = newFye2024;
-                    company.Fye2023 = newFye2023;
+                    if (newCeoFirstName != null) company.CeoFirstName = newCeoFirstName;
+                    if (newCeoLastName != null) company.CeoLastName = newCeoLastName;
+                    if (newEmail != null) company.Email = newEmail;
+                    if (newFye2025 != null) company.Fye2025 = newFye2025;
+                    if (newFye2024 != null) company.Fye2024 = newFye2024;
+                    if (newFye2023 != null) company.Fye2023 = newFye2023;
                     updatedCount++;
                 }
             }
@@ -599,6 +699,8 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                 HasCurrentSurvey = true,
                 CurrentSurveyYear = currentSurveyYear.Value,
                 TotalMatchedCompanies = companies.Count,
+                CompaniesWithRevenueData = companiesWithRevenueData,
+                CompaniesWithCeoData = companiesWithCeoData,
                 UpdatedCompanyCount = updatedCount,
                 WouldUpdateCompanyCount = changedRows.Count,
                 PreviewRows = changedRows
@@ -642,6 +744,80 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             }
 
             return null;
+        }
+
+        private static string? ResolveFyeFieldFromQuestionMetadata(params string?[] candidates)
+        {
+            foreach (var candidate in candidates)
+            {
+                var key = NormalizeQuestionKey(candidate);
+                if (string.IsNullOrEmpty(key))
+                {
+                    continue;
+                }
+
+                // FYE Last Financial Year
+                if (key is "totalrevenuelastfinancialyear" or "totalreveuelastfinancialyear" or "revenuelastfinancialyear" or "fyelastfinancialyear" or "fye2025")
+                {
+                    return "FYE2025";
+                }
+
+                // FYE Year-1
+                if (key is "totalrevenueyear1" or "totalrevenueyear01" or "totalreveueyear1" or "totalreveueyear01" or "fyeyear1" or "fye2024")
+                {
+                    return "FYE2024";
+                }
+
+                // FYE Year-2
+                if (key is "totalrevenueyear2" or "totalrevenueyear02" or "totalreveueyear2" or "totalreveueyear02" or "fyeyear2" or "fye2023")
+                {
+                    return "FYE2023";
+                }
+            }
+
+            return null;
+        }
+
+        private static string? ResolveCeoFieldFromQuestionMetadata(params string?[] candidates)
+        {
+            foreach (var candidate in candidates)
+            {
+                var key = NormalizeQuestionKey(candidate);
+                if (string.IsNullOrEmpty(key))
+                {
+                    continue;
+                }
+
+                if (key == "ceofirstname")
+                {
+                    return "CeoFirstName";
+                }
+
+                if (key == "ceolastname")
+                {
+                    return "CeoLastName";
+                }
+
+                if (key is "ceoemail" or "recipientemail")
+                {
+                    return "Email";
+                }
+            }
+
+            return null;
+        }
+
+        private static string NormalizeQuestionKey(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return string.Empty;
+            }
+
+            return new string(text
+                .Where(char.IsLetterOrDigit)
+                .Select(char.ToLowerInvariant)
+                .ToArray());
         }
 
         private async Task<CompanyGlobalImportPlan> BuildCompanyGlobalImportPlanAsync(Stream excelStream)
@@ -895,6 +1071,8 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             public bool HasCurrentSurvey { get; set; }
             public int? CurrentSurveyYear { get; set; }
             public int TotalMatchedCompanies { get; set; }
+            public int CompaniesWithRevenueData { get; set; }
+            public int CompaniesWithCeoData { get; set; }
             public int UpdatedCompanyCount { get; set; }
             public int WouldUpdateCompanyCount { get; set; }
             public List<ResetFyePreviewRow> PreviewRows { get; set; } = new();
@@ -904,6 +1082,12 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
         {
             public int CompanyId { get; set; }
             public string? CompanyName { get; set; }
+            public string? CurrentCeoFirstName { get; set; }
+            public string? NewCeoFirstName { get; set; }
+            public string? CurrentCeoLastName { get; set; }
+            public string? NewCeoLastName { get; set; }
+            public string? CurrentEmail { get; set; }
+            public string? NewEmail { get; set; }
             public decimal? CurrentFye2025 { get; set; }
             public decimal? NewFye2025 { get; set; }
             public decimal? CurrentFye2024 { get; set; }
@@ -1024,7 +1208,7 @@ FROM [Company]";
                     cmd.Parameters.Add(yearParameter);
                 }
 
-                sql += $" ORDER BY [{map["Id"]}] DESC";
+                sql += $" ORDER BY CASE WHEN [{map["CompanyName"]}] IS NULL OR LTRIM(RTRIM([{map["CompanyName"]}])) = '' THEN 1 ELSE 0 END ASC, [{map["CompanyName"]}] ASC, [{map["Id"]}] ASC";
                 cmd.CommandText = sql;
 
                 using var reader = await cmd.ExecuteReaderAsync();
