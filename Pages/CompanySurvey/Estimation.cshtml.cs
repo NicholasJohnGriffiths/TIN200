@@ -104,6 +104,8 @@ namespace TINWeb.Pages.CompanySurvey
         public string CheckMetricLabel { get; set; } = string.Empty;
         public string CheckMetricKey { get; set; } = string.Empty;
         public decimal? CheckSelectedValue { get; set; }
+        public string AppliedMetricKey { get; set; } = string.Empty;
+        public string AppliedRegionQuestionTitle { get; set; } = string.Empty;
         public List<CalculationCandidate> CheckCandidates { get; set; } = new();
 
         public List<MetricHistoryRow> LastFiveYearsRevenue { get; set; } = new();
@@ -125,6 +127,10 @@ namespace TINWeb.Pages.CompanySurvey
     public List<string> AvailableRegionalEmploymentQuestionTitles { get; set; } = new();
     public List<MetricHistoryRow> LastFiveYearsRegionalEmploymentSelected { get; set; } = new();
     public Dictionary<string, List<MetricHistoryRow>> LastFiveYearsRegionalEmploymentByQuestionTitle { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+        public List<EstimationGroupSection> EstimationGroupSections { get; set; } = new();
+        public Dictionary<string, decimal> GroupQuestionAppliedValues { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, string> GroupQuestionAppliedReasons { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
         public EstimationModel(ApplicationDbContext context)
         {
@@ -304,6 +310,9 @@ namespace TINWeb.Pages.CompanySurvey
                 history: calculation.History,
                 forecastValue: valueToApply,
                 reason: reasonToApply);
+
+            AppliedMetricKey = metricKey ?? string.Empty;
+            AppliedRegionQuestionTitle = regionQuestionTitle ?? string.Empty;
 
             return Page();
         }
@@ -500,6 +509,52 @@ namespace TINWeb.Pages.CompanySurvey
                 history: regionalHistory,
                 forecastValue: ForecastedRegionalEmployment,
                 reason: RegionalEmploymentForecastReason);
+
+            return Page();
+        }
+
+        public async Task<IActionResult> OnPostCalculateGroupQuestionAsync(int companySurveyId, int? financialYear, string? regionQuestionTitle)
+        {
+            CompanySurveyId = companySurveyId;
+            FinancialYearFilter = financialYear;
+
+            var loaded = await LoadPageDataAsync();
+            if (!loaded) return NotFound();
+
+            if (!EstimateEnabled)
+            {
+                ModelState.AddModelError(string.Empty, "Group question calculation is only available when Estimate is enabled for this Company Survey record.");
+                return Page();
+            }
+
+            if (IsLocked)
+            {
+                ModelState.AddModelError(string.Empty, "Group question calculation is not allowed because this Company Survey record is locked.");
+                return Page();
+            }
+
+            if (string.IsNullOrWhiteSpace(regionQuestionTitle))
+            {
+                ModelState.AddModelError(string.Empty, "Question title is required.");
+                return Page();
+            }
+
+            var gqHistory = await GetCompanyMetricHistoryAsync(CompanyId, regionQuestionTitle);
+            var calc = CalculateSimpleTrendForecast(gqHistory, TargetFinancialYear);
+
+            ClearForecastOutputs();
+            if (calc.Value.HasValue)
+            {
+                GroupQuestionAppliedValues[regionQuestionTitle] = calc.Value.Value;
+                GroupQuestionAppliedReasons[regionQuestionTitle] = calc.Reason;
+            }
+
+            GeneratedSummary = BuildSingleMetricSummary(
+                metricName: regionQuestionTitle,
+                targetYear: TargetFinancialYear,
+                history: gqHistory,
+                forecastValue: calc.Value,
+                reason: calc.Reason);
 
             return Page();
         }
@@ -1403,6 +1458,20 @@ namespace TINWeb.Pages.CompanySurvey
                     return await BuildRegionalRevenuePreviewAsync("Revenue Africa", RevenueAfricaQuestionTitle);
                 case "RevenueOther":
                     return await BuildRegionalRevenuePreviewAsync("Revenue Other", RevenueOtherQuestionTitle);
+                case "GroupQuestion":
+                {
+                    if (string.IsNullOrWhiteSpace(regionQuestionTitle))
+                    {
+                        return ("Group Question", new List<CalculationCandidate>
+                        {
+                            new() { StepName = "Actual", Details = "Question title is missing." },
+                            new() { StepName = "Trend", Details = "Question title is missing." },
+                            new() { StepName = "Fallback", Details = "Question title is missing." }
+                        });
+                    }
+                    var gqHistory = await GetCompanyMetricHistoryAsync(CompanyId, regionQuestionTitle);
+                    return await BuildSectorCagrPreviewAsync(regionQuestionTitle, gqHistory, regionQuestionTitle);
+                }
                 default:
                     return (metricKey, new List<CalculationCandidate>
                     {
@@ -1492,6 +1561,14 @@ namespace TINWeb.Pages.CompanySurvey
                     return await CalculateRegionalRevenueByTitleAsync("Revenue Africa", RevenueAfricaQuestionTitle);
                 case "RevenueOther":
                     return await CalculateRegionalRevenueByTitleAsync("Revenue Other", RevenueOtherQuestionTitle);
+                case "GroupQuestion":
+                {
+                    if (string.IsNullOrWhiteSpace(regionQuestionTitle))
+                        return ("Group Question", new List<MetricHistoryRow>(), null, "Question title is required.");
+                    var gqHistory = await GetCompanyMetricHistoryAsync(CompanyId, regionQuestionTitle);
+                    var gqCalc = CalculateSimpleTrendForecast(gqHistory, TargetFinancialYear);
+                    return (regionQuestionTitle, gqHistory, gqCalc.Value, gqCalc.Reason);
+                }
                 default:
                     return (metricKey, new List<MetricHistoryRow>(), null, "Unsupported metric for Apply.");
             }
@@ -1542,6 +1619,8 @@ namespace TINWeb.Pages.CompanySurvey
             ForecastedRegionalEmployment = null;
             RegionalEmploymentForecastReason = string.Empty;
             SelectedRegionalEmploymentRegionLabel = string.Empty;
+            GroupQuestionAppliedValues.Clear();
+            GroupQuestionAppliedReasons.Clear();
         }
 
         private async Task ReloadHistoricalDataForMetricAsync(string metricKey, string? regionQuestionTitle)
@@ -1620,6 +1699,23 @@ namespace TINWeb.Pages.CompanySurvey
                         LastFiveYearsRegionalEmploymentSelected = LastFiveYearsRegionalEmploymentByQuestionTitle[regionQuestionTitle];
                     }
                     break;
+                case "GroupQuestion":
+                    if (!string.IsNullOrWhiteSpace(regionQuestionTitle))
+                    {
+                        var gqReloadHistory = await GetCompanyMetricHistoryAsync(CompanyId, regionQuestionTitle);
+                        var gqLastFive = GetLastFiveYears(gqReloadHistory);
+                        foreach (var section in EstimationGroupSections)
+                        {
+                            var gqQuestion = section.Questions.FirstOrDefault(q =>
+                                string.Equals(q.QuestionTitle, regionQuestionTitle, StringComparison.OrdinalIgnoreCase));
+                            if (gqQuestion != null)
+                            {
+                                gqQuestion.LastFiveYears = gqLastFive;
+                                break;
+                            }
+                        }
+                    }
+                    break;
             }
         }
 
@@ -1644,6 +1740,7 @@ namespace TINWeb.Pages.CompanySurvey
                 "RevenueAfrica" => RevenueAfricaQuestionTitle,
                 "RevenueOther" => RevenueOtherQuestionTitle,
                 "RegionalEmployment" => regionQuestionTitle,
+                "GroupQuestion" => regionQuestionTitle,
                 _ => null
             };
 
@@ -1766,6 +1863,13 @@ namespace TINWeb.Pages.CompanySurvey
                     RegionalEmploymentForecastReason = reason;
                     SelectedRegionalEmploymentQuestionTitle = regionQuestionTitle ?? string.Empty;
                     SelectedRegionalEmploymentRegionLabel = GetRegionalEmploymentRegionLabel(SelectedRegionalEmploymentQuestionTitle);
+                    break;
+                case "GroupQuestion":
+                    if (!string.IsNullOrWhiteSpace(regionQuestionTitle))
+                    {
+                        GroupQuestionAppliedValues[regionQuestionTitle] = value;
+                        GroupQuestionAppliedReasons[regionQuestionTitle] = reason;
+                    }
                     break;
             }
         }
@@ -1980,6 +2084,26 @@ namespace TINWeb.Pages.CompanySurvey
                 .FirstOrDefault();
         }
 
+        private static (decimal? Value, string Reason) CalculateSimpleTrendForecast(List<MetricHistoryRow> history, int targetYear)
+        {
+            var actual = GetActualValueForTargetYear(history, targetYear);
+            if (actual.HasValue)
+                return (actual, $"Actual value exists for FY {targetYear}.");
+
+            var trend = TryCalculateLogLinearTrend(history, targetYear, 3, out var trendDetail);
+            if (trend.HasValue)
+                return (trend, $"Log-linear trend (3-year): {trendDetail}");
+
+            var lastKnown = history
+                .Where(x => x.FinancialYear < targetYear && x.Value.HasValue)
+                .OrderByDescending(x => x.FinancialYear)
+                .FirstOrDefault();
+            if (lastKnown?.Value.HasValue == true)
+                return (lastKnown.Value, $"Last known value carried forward from FY {lastKnown.FinancialYear}.");
+
+            return (null, "No historical data available to calculate a forecast.");
+        }
+
         private static decimal? TryCalculateLogLinearTrend(List<MetricHistoryRow> history, int targetYear, int minimumPoints, out string details)
         {
             var points = history
@@ -2176,8 +2300,8 @@ namespace TINWeb.Pages.CompanySurvey
             AvailableRegionalEmploymentQuestionTitles = await _context.Question
                 .AsNoTracking()
                 .Where(q => !string.IsNullOrWhiteSpace(q.Title)
-                    && q.Title!.StartsWith(RegionalEmploymentQuestionPrefix)
-                    && q.Title.EndsWith(RegionalEmploymentQuestionSuffix))
+                    && q.IncludeInEstimation == true
+                    && q.Title!.StartsWith(RegionalEmploymentQuestionPrefix))
                 .Select(q => q.Title!)
                 .Distinct()
                 .OrderBy(x => x)
@@ -2212,7 +2336,208 @@ namespace TINWeb.Pages.CompanySurvey
                 SelectedRegionalEmploymentRegionLabel = string.Empty;
             }
 
+            var groupQRows = await (
+                from q in _context.Question
+                join g in _context.QuestionGroup on q.GroupId equals g.Id
+                where q.IncludeInEstimation == true && !string.IsNullOrWhiteSpace(q.Title)
+                    && !q.Title!.ToLower().Contains("year-1")
+                    && !q.Title!.ToLower().Contains("year-2")
+                orderby g.OrderNumber ?? 0, g.Id, q.OrderNumber ?? 0, q.Id
+                select new { GroupId = g.Id, GroupTitle = g.Title ?? string.Empty, QuestionTitle = q.Title! }
+            ).ToListAsync();
+
+            EstimationGroupSections = new List<EstimationGroupSection>();
+            foreach (var grouping in groupQRows.GroupBy(x => new { x.GroupId, x.GroupTitle }))
+            {
+                var section = new EstimationGroupSection { GroupId = grouping.Key.GroupId, GroupTitle = grouping.Key.GroupTitle };
+                foreach (var gq in grouping)
+                {
+                    section.Questions.Add(await BuildEstimationGroupQuestionAsync(gq.QuestionTitle));
+                }
+                EstimationGroupSections.Add(section);
+            }
+
             return true;
+        }
+
+        private async Task<EstimationGroupQuestion> BuildEstimationGroupQuestionAsync(string questionTitle)
+        {
+            var metadata = GetEstimationQuestionMetadata(questionTitle);
+            var history = await GetCompanyMetricHistoryAsync(CompanyId, metadata.HistoryQuestionTitles);
+
+            return new EstimationGroupQuestion
+            {
+                QuestionTitle = questionTitle,
+                HandlerName = metadata.HandlerName,
+                ValueLabel = metadata.ValueLabel,
+                EmptyStateMessage = metadata.EmptyStateMessage,
+                LastFiveYears = GetLastFiveYears(history)
+            };
+        }
+
+        private (string HandlerName, string ValueLabel, string EmptyStateMessage, string[] HistoryQuestionTitles) GetEstimationQuestionMetadata(string questionTitle)
+        {
+            if (string.Equals(questionTitle, RevenueQuestionTitle, StringComparison.OrdinalIgnoreCase))
+            {
+                return (
+                    "CalculateRevenue",
+                    "Revenue",
+                    "No historical revenue values were found for this company.",
+                    new[] { RevenueQuestionTitle });
+            }
+
+            if (string.Equals(questionTitle, EmploymentQuestionTitle, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(questionTitle, EmploymentQuestionTitleLegacy, StringComparison.OrdinalIgnoreCase))
+            {
+                return (
+                    "CalculateEmployment",
+                    "Employment Total",
+                    "No historical employment values were found for this company.",
+                    new[] { EmploymentQuestionTitle, EmploymentQuestionTitleLegacy });
+            }
+
+            if (string.Equals(questionTitle, WagesQuestionTitle, StringComparison.OrdinalIgnoreCase))
+            {
+                return (
+                    "CalculateWages",
+                    "Wages & Salaries",
+                    "No historical wages and salaries values were found for this company.",
+                    new[] { WagesQuestionTitle });
+            }
+
+            if (string.Equals(questionTitle, ResearchDevelopmentQuestionTitle, StringComparison.OrdinalIgnoreCase))
+            {
+                return (
+                    "CalculateResearchDevelopment",
+                    "Research & Development",
+                    "No historical research and development values were found for this company.",
+                    new[] { ResearchDevelopmentQuestionTitle });
+            }
+
+            if (string.Equals(questionTitle, SalesMarketingQuestionTitle, StringComparison.OrdinalIgnoreCase))
+            {
+                return (
+                    "CalculateSalesMarketing",
+                    "Sales & Marketing",
+                    "No historical sales and marketing values were found for this company.",
+                    new[] { SalesMarketingQuestionTitle });
+            }
+
+            if (string.Equals(questionTitle, EbitdaQuestionTitle, StringComparison.OrdinalIgnoreCase))
+            {
+                return (
+                    "CalculateEbitda",
+                    "EBITDA",
+                    "No historical EBITDA values were found for this company.",
+                    new[] { EbitdaQuestionTitle });
+            }
+
+            if (string.Equals(questionTitle, RevenueNzQuestionTitle, StringComparison.OrdinalIgnoreCase))
+            {
+                return (
+                    "CalculateRevenueNz",
+                    "Revenue NZ",
+                    "No historical Revenue NZ values were found for this company.",
+                    new[] { RevenueNzQuestionTitle });
+            }
+
+            if (string.Equals(questionTitle, RevenueAustraliaQuestionTitle, StringComparison.OrdinalIgnoreCase))
+            {
+                return (
+                    "CalculateRevenueAustralia",
+                    "Revenue Australia",
+                    "No historical Revenue Australia values were found for this company.",
+                    new[] { RevenueAustraliaQuestionTitle });
+            }
+
+            if (string.Equals(questionTitle, RevenueChinaQuestionTitle, StringComparison.OrdinalIgnoreCase))
+            {
+                return (
+                    "CalculateRevenueChina",
+                    "Revenue China",
+                    "No historical Revenue China values were found for this company.",
+                    new[] { RevenueChinaQuestionTitle });
+            }
+
+            if (string.Equals(questionTitle, RevenueRestOfAsiaQuestionTitle, StringComparison.OrdinalIgnoreCase))
+            {
+                return (
+                    "CalculateRevenueRestOfAsia",
+                    "Revenue Rest of Asia",
+                    "No historical Revenue Rest of Asia values were found for this company.",
+                    new[] { RevenueRestOfAsiaQuestionTitle });
+            }
+
+            if (string.Equals(questionTitle, RevenueNorthAmericaQuestionTitle, StringComparison.OrdinalIgnoreCase))
+            {
+                return (
+                    "CalculateRevenueNorthAmerica",
+                    "Revenue North America",
+                    "No historical Revenue North America values were found for this company.",
+                    new[] { RevenueNorthAmericaQuestionTitle });
+            }
+
+            if (string.Equals(questionTitle, RevenueEuropeQuestionTitle, StringComparison.OrdinalIgnoreCase))
+            {
+                return (
+                    "CalculateRevenueEurope",
+                    "Revenue Europe",
+                    "No historical Revenue Europe values were found for this company.",
+                    new[] { RevenueEuropeQuestionTitle });
+            }
+
+            if (string.Equals(questionTitle, RevenueMiddleEastQuestionTitle, StringComparison.OrdinalIgnoreCase))
+            {
+                return (
+                    "CalculateRevenueMiddleEast",
+                    "Revenue Middle East",
+                    "No historical Revenue Middle East values were found for this company.",
+                    new[] { RevenueMiddleEastQuestionTitle });
+            }
+
+            if (string.Equals(questionTitle, RevenueLatinAmericaQuestionTitle, StringComparison.OrdinalIgnoreCase))
+            {
+                return (
+                    "CalculateRevenueLatinAmerica",
+                    "Revenue Latin America",
+                    "No historical Revenue Latin America values were found for this company.",
+                    new[] { RevenueLatinAmericaQuestionTitle });
+            }
+
+            if (string.Equals(questionTitle, RevenueAfricaQuestionTitle, StringComparison.OrdinalIgnoreCase))
+            {
+                return (
+                    "CalculateRevenueAfrica",
+                    "Revenue Africa",
+                    "No historical Revenue Africa values were found for this company.",
+                    new[] { RevenueAfricaQuestionTitle });
+            }
+
+            if (string.Equals(questionTitle, RevenueOtherQuestionTitle, StringComparison.OrdinalIgnoreCase))
+            {
+                return (
+                    "CalculateRevenueOther",
+                    "Revenue Other",
+                    "No historical Revenue Other values were found for this company.",
+                    new[] { RevenueOtherQuestionTitle });
+            }
+
+            if (!string.IsNullOrWhiteSpace(questionTitle)
+                && questionTitle.StartsWith(RegionalEmploymentQuestionPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                var regionLabel = GetRegionalEmploymentRegionLabel(questionTitle);
+                return (
+                    "CalculateRegionalEmployment",
+                    $"Regional Employment ({regionLabel})",
+                    $"No historical regional employment values were found for {regionLabel}.",
+                    new[] { questionTitle });
+            }
+
+            return (
+                "CalculateGroupQuestion",
+                questionTitle,
+                "No historical values were found for this question.",
+                new[] { questionTitle });
         }
 
         private async Task<List<MetricHistoryRow>> GetCompanyMetricHistoryAsync(int companyId, params string[] questionTitles)
@@ -3470,6 +3795,22 @@ namespace TINWeb.Pages.CompanySurvey
             public int CompanySurveyId { get; set; }
             public int FinancialYear { get; set; }
             public decimal? Value { get; set; }
+        }
+
+        public class EstimationGroupSection
+        {
+            public int GroupId { get; set; }
+            public string GroupTitle { get; set; } = string.Empty;
+            public List<EstimationGroupQuestion> Questions { get; set; } = new();
+        }
+
+        public class EstimationGroupQuestion
+        {
+            public string QuestionTitle { get; set; } = string.Empty;
+            public string HandlerName { get; set; } = string.Empty;
+            public string ValueLabel { get; set; } = string.Empty;
+            public string EmptyStateMessage { get; set; } = string.Empty;
+            public List<MetricHistoryRow> LastFiveYears { get; set; } = new();
         }
 
         public class CalculationCandidate
