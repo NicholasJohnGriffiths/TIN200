@@ -9,8 +9,33 @@
         gap: 0.5rem;
     }
 
+    .estimation-preview-card {
+        border-top: 1px solid rgba(0, 0, 0, 0.08);
+        background: #f8f9fa;
+    }
+
+    .estimation-preview-info {
+        background-color: #e7f5ff;
+        color: #084298;
+    }
+
+    .estimation-preview-used {
+        background-color: #d1e7dd;
+        color: #0f5132;
+        font-weight: 600;
+    }
+
     .estimation-generate-btn {
         white-space: nowrap;
+    }
+
+    .estimation-check-btn {
+        white-space: nowrap;
+    }
+
+    .estimation-manual-input {
+        width: 160px;
+        min-width: 120px;
     }
 
     .btn-label-short {
@@ -37,6 +62,15 @@
             padding: 0.2rem 0.5rem;
         }
 
+        .estimation-check-btn {
+            font-size: 0.75rem;
+            padding: 0.2rem 0.5rem;
+        }
+
+        .estimation-manual-input {
+            width: 120px;
+        }
+
         .estimation-generate-btn .btn-label-full {
             display: none;
         }
@@ -47,7 +81,7 @@
     }
 </style>
 
-<div class="container mt-4">
+<div class="container mt-4" data-target-financial-year="@Model.TargetFinancialYear" data-check-metric-key="@Model.CheckMetricKey" data-check-has-value="@(Model.CheckSelectedValue.HasValue ? "true" : "false")" data-check-selected-value="@(Model.CheckSelectedValue.HasValue ? Model.CheckSelectedValue.Value.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture) : string.Empty)" data-check-region-question-title="@Model.SelectedRegionalEmploymentQuestionTitle">
     <div class="row mb-3">
         <div class="col-md-8">
             <h1>Company Survey Estimation</h1>
@@ -805,6 +839,60 @@
         </div>
     }
 
+    @if (Model.CheckCandidates.Any())
+    {
+        <div class="card mt-3 estimation-preview-card estimation-preview-global">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><strong>Check Preview:</strong> @Model.CheckMetricLabel</span>
+                <span class="small text-muted">Actual -> Trend -> Fallback</span>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <thead>
+                            <tr>
+                                <th style="width: 200px;">Calculation Step</th>
+                                <th style="width: 220px;">Candidate Value</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var candidate in Model.CheckCandidates)
+                            {
+                                <tr class="@(candidate.IsUsed ? "estimation-preview-used" : "estimation-preview-info")">
+                                    <td>
+                                        @candidate.StepName
+                                        @if (candidate.IsUsed)
+                                        {
+                                            <span class="badge bg-success ms-2">Used</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-info text-dark ms-2">Info</span>
+                                        }
+                                    </td>
+                                    <td>@(candidate.Value.HasValue ? candidate.Value.Value.ToString("N2") : "n/a")</td>
+                                    <td>
+                                        <div>@candidate.Details</div>
+                                        @if (candidate.FailureReasons.Any())
+                                        {
+                                            <ul class="mb-0 mt-1 small">
+                                                @foreach (var reason in candidate.FailureReasons)
+                                                {
+                                                    <li>@reason</li>
+                                                }
+                                            </ul>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    }
+
     <div class="mb-3">
         <a asp-page="./Index" asp-route-financialYear="@Model.FinancialYearFilter" class="btn btn-secondary">Back to Company Survey Records</a>
     </div>
@@ -1022,5 +1110,212 @@
 
 @section Scripts {
     @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+
+    <script>
+        (function () {
+            function isValidManualValue(raw) {
+                if (raw === null || raw === undefined) {
+                    return false;
+                }
+
+                var value = raw.trim();
+                if (!value) {
+                    return false;
+                }
+
+                var normalized = value.replace(/,/g, '');
+                var parsed = Number(normalized);
+                if (!Number.isFinite(parsed) || parsed < 0) {
+                    return false;
+                }
+
+                var decimalParts = normalized.split('.');
+                if (decimalParts.length > 2) {
+                    return false;
+                }
+
+                return decimalParts.length === 1 || decimalParts[1].length <= 2;
+            }
+
+            function updateApplyState(form, manualInput) {
+                var applyButton = form.querySelector('.estimation-generate-btn');
+                if (!applyButton) {
+                    return;
+                }
+
+                var manualRaw = manualInput ? manualInput.value : '';
+                var manualHasValue = manualRaw.trim().length > 0;
+                var manualValid = isValidManualValue(manualRaw);
+                var logicValid = form.getAttribute('data-logic-valid') === 'true';
+
+                if (manualInput) {
+                    manualInput.classList.toggle('is-invalid', manualHasValue && !manualValid);
+                }
+
+                applyButton.disabled = !((manualHasValue && manualValid) || (!manualHasValue && logicValid));
+            }
+
+            function formatToTwoDecimals(raw) {
+                if (raw === null || raw === undefined) {
+                    return '';
+                }
+
+                var normalized = String(raw).trim().replace(/,/g, '');
+                if (!normalized) {
+                    return '';
+                }
+
+                var parsed = Number(normalized);
+                if (!Number.isFinite(parsed) || parsed < 0) {
+                    return '';
+                }
+
+                return parsed.toFixed(2);
+            }
+
+            document.addEventListener('DOMContentLoaded', function () {
+                var container = document.querySelector('.container[data-target-financial-year]');
+                var checkedMetricKey = container ? (container.getAttribute('data-check-metric-key') || '') : '';
+                var checkedHasValue = container ? (container.getAttribute('data-check-has-value') === 'true') : false;
+                var checkedSelectedValue = container ? (container.getAttribute('data-check-selected-value') || '') : '';
+                var checkedRegionQuestionTitle = container ? (container.getAttribute('data-check-region-question-title') || '') : '';
+                var previewCard = document.querySelector('.estimation-preview-global');
+                var previewMoved = false;
+
+                var headers = Array.from(document.querySelectorAll('.card-header.estimation-header'));
+                headers.forEach(function (header) {
+                    var generateForm = header.querySelector('form');
+                    if (!generateForm || header.querySelector('.estimation-check-btn')) {
+                        return;
+                    }
+
+                    var action = generateForm.getAttribute('action') || '';
+                    var actionUrl = new URL(action || window.location.href, window.location.origin);
+                    var metricKey = actionUrl.searchParams.get('handler') || '';
+                    if (metricKey.startsWith('Calculate')) {
+                        metricKey = metricKey.substring('Calculate'.length);
+                    }
+
+                    generateForm.action = '?handler=Apply';
+                    generateForm.setAttribute('data-metric-key', metricKey);
+                    generateForm.classList.add('d-flex', 'align-items-center', 'gap-2', 'mb-0');
+
+                    var metricField = generateForm.querySelector('input[name="metricKey"]');
+                    if (!metricField) {
+                        metricField = document.createElement('input');
+                        metricField.type = 'hidden';
+                        metricField.name = 'metricKey';
+                        generateForm.appendChild(metricField);
+                    }
+                    metricField.value = metricKey;
+
+                    var applyButton = generateForm.querySelector('.estimation-generate-btn');
+                    if (applyButton) {
+                        applyButton.innerHTML = '<span class="btn-label-full">Apply</span><span class="btn-label-short">Apply</span>';
+                    }
+
+                    var manualInput = generateForm.querySelector('input[name="manualValue"]');
+                    if (!manualInput) {
+                        manualInput = document.createElement('input');
+                        manualInput.type = 'text';
+                        manualInput.name = 'manualValue';
+                        manualInput.placeholder = 'Manual value';
+                        manualInput.setAttribute('inputmode', 'decimal');
+                        manualInput.setAttribute('title', 'Enter a number with up to 2 decimal places.');
+                        manualInput.className = 'form-control form-control-sm estimation-manual-input';
+                        generateForm.insertBefore(manualInput, applyButton || null);
+                    }
+
+                    var regionInput = generateForm.querySelector('input[name="regionQuestionTitle"]');
+                    var regionQuestionTitle = regionInput ? regionInput.value : '';
+                    var isMatchingCheckedMetric = metricKey === checkedMetricKey
+                        && ((metricKey !== 'RegionalEmployment') || regionQuestionTitle === checkedRegionQuestionTitle);
+
+                    if (isMatchingCheckedMetric && checkedHasValue && checkedSelectedValue) {
+                        manualInput.value = formatToTwoDecimals(checkedSelectedValue);
+                    }
+
+                    var logicValid = isMatchingCheckedMetric && checkedHasValue;
+                    generateForm.setAttribute('data-logic-valid', logicValid ? 'true' : 'false');
+                    updateApplyState(generateForm, manualInput);
+
+                    if (previewCard && isMatchingCheckedMetric && !previewMoved) {
+                        var card = header.closest('.card');
+                        if (card) {
+                            card.insertAdjacentElement('afterend', previewCard);
+                            previewMoved = true;
+                        }
+                    }
+
+                    manualInput.addEventListener('input', function () {
+                        updateApplyState(generateForm, manualInput);
+                    });
+
+                    var checkButton = document.createElement('button');
+                    checkButton.type = 'button';
+                    checkButton.className = 'btn btn-sm btn-outline-primary estimation-check-btn';
+                    checkButton.textContent = 'Check';
+                    checkButton.addEventListener('click', function () {
+                        var companySurveyInput = generateForm.querySelector('input[name="companySurveyId"]');
+                        if (!companySurveyInput) {
+                            return;
+                        }
+
+                        var postForm = document.createElement('form');
+                        postForm.method = 'post';
+                        postForm.action = '?handler=Check';
+
+                        var antiForgery = document.querySelector('input[name="__RequestVerificationToken"]');
+                        if (antiForgery) {
+                            var tokenInput = document.createElement('input');
+                            tokenInput.type = 'hidden';
+                            tokenInput.name = '__RequestVerificationToken';
+                            tokenInput.value = antiForgery.value;
+                            postForm.appendChild(tokenInput);
+                        }
+
+                        var companySurveyField = document.createElement('input');
+                        companySurveyField.type = 'hidden';
+                        companySurveyField.name = 'companySurveyId';
+                        companySurveyField.value = companySurveyInput.value;
+                        postForm.appendChild(companySurveyField);
+
+                        var yearInput = generateForm.querySelector('input[name="financialYear"]');
+                        if (yearInput) {
+                            var yearField = document.createElement('input');
+                            yearField.type = 'hidden';
+                            yearField.name = 'financialYear';
+                            yearField.value = yearInput.value;
+                            postForm.appendChild(yearField);
+                        }
+
+                        var metricField = document.createElement('input');
+                        metricField.type = 'hidden';
+                        metricField.name = 'metricKey';
+                        metricField.value = metricKey;
+                        postForm.appendChild(metricField);
+
+                        var regionInput = generateForm.querySelector('input[name="regionQuestionTitle"]');
+                        if (regionInput) {
+                            var regionField = document.createElement('input');
+                            regionField.type = 'hidden';
+                            regionField.name = 'regionQuestionTitle';
+                            regionField.value = regionInput.value;
+                            postForm.appendChild(regionField);
+                        }
+
+                        document.body.appendChild(postForm);
+                        postForm.submit();
+                    });
+
+                    generateForm.insertAdjacentElement('beforebegin', checkButton);
+                });
+
+                if (previewCard && !previewMoved) {
+                    previewCard.classList.remove('estimation-preview-global');
+                }
+            });
+        })();
+    </script>
 }
 

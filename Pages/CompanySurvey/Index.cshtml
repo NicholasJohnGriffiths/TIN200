@@ -4,6 +4,19 @@
     ViewData["Title"] = "Company Survey Records";
 }
 
+@functions {
+    string SortHref(string column) => Url.Page(
+        "/CompanySurvey/Index",
+        null,
+        new
+        {
+            financialYear = Model.SelectedFinancialYear,
+            sortBy = column,
+            sortDir = Model.GetNextSortDirection(column)
+        },
+        null) ?? "#";
+}
+
 <div class="container mt-4">
     <div class="row mb-3">
         <div class="col-md-8">
@@ -32,16 +45,16 @@
         <table class="table table-striped table-hover company-table">
             <thead class="table-dark">
                 <tr>
-                    <th>Company Name</th>
-                    <th>Saved</th>
-                    <th>Saved Date</th>
-                    <th>Submitted</th>
-                    <th>Submitted Date</th>
-                    <th>Requested</th>
-                    <th>Requested Date</th>
-                    <th>Locked</th>
-                    <th>Estimate</th>
-                    <th>Answers</th>
+                    <th><a class="link-light text-decoration-none" href="@SortHref("CompanyName")"><span>Company Name</span><span>@Model.GetSortIndicator("CompanyName")</span></a></th>
+                    <th><a class="link-light text-decoration-none" href="@SortHref("Saved")"><span>Saved</span><span>@Model.GetSortIndicator("Saved")</span></a></th>
+                    <th><a class="link-light text-decoration-none" href="@SortHref("SavedDate")"><span>Saved Date</span><span>@Model.GetSortIndicator("SavedDate")</span></a></th>
+                    <th><a class="link-light text-decoration-none" href="@SortHref("Submitted")"><span>Submitted</span><span>@Model.GetSortIndicator("Submitted")</span></a></th>
+                    <th><a class="link-light text-decoration-none" href="@SortHref("SubmittedDate")"><span>Submitted Date</span><span>@Model.GetSortIndicator("SubmittedDate")</span></a></th>
+                    <th><a class="link-light text-decoration-none" href="@SortHref("Requested")"><span>Requested</span><span>@Model.GetSortIndicator("Requested")</span></a></th>
+                    <th><a class="link-light text-decoration-none" href="@SortHref("RequestedDate")"><span>Requested Date</span><span>@Model.GetSortIndicator("RequestedDate")</span></a></th>
+                    <th><a class="link-light text-decoration-none" href="@SortHref("Locked")"><span>Locked</span><span>@Model.GetSortIndicator("Locked")</span></a></th>
+                    <th><a class="link-light text-decoration-none" href="@SortHref("Estimate")"><span>Estimate</span><span>@Model.GetSortIndicator("Estimate")</span></a></th>
+                    <th><a class="link-light text-decoration-none" href="@SortHref("AnswerCount")"><span>Answers</span><span>@Model.GetSortIndicator("AnswerCount")</span></a></th>
                     <th>Actions</th>
                 </tr>
             </thead>

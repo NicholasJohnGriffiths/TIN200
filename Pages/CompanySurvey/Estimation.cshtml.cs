@@ -101,6 +101,10 @@ namespace TINWeb.Pages.CompanySurvey
         public string SelectedRegionalEmploymentRegionLabel { get; set; } = string.Empty;
         public string GeneratedSummary { get; set; } = string.Empty;
         public string SaveMessage { get; set; } = string.Empty;
+        public string CheckMetricLabel { get; set; } = string.Empty;
+        public string CheckMetricKey { get; set; } = string.Empty;
+        public decimal? CheckSelectedValue { get; set; }
+        public List<CalculationCandidate> CheckCandidates { get; set; } = new();
 
         public List<MetricHistoryRow> LastFiveYearsRevenue { get; set; } = new();
         public List<MetricHistoryRow> LastFiveYearsEmployment { get; set; } = new();
@@ -211,6 +215,95 @@ namespace TINWeb.Pages.CompanySurvey
                 history: allRevenueHistory,
                 forecastValue: ForecastedRevenue,
                 reason: ForecastReason);
+
+            return Page();
+        }
+
+        public async Task<IActionResult> OnPostCheckAsync(int companySurveyId, int? financialYear, string metricKey, string? regionQuestionTitle)
+        {
+            CompanySurveyId = companySurveyId;
+            FinancialYearFilter = financialYear;
+            SelectedRegionalEmploymentQuestionTitle = regionQuestionTitle ?? string.Empty;
+
+            var loaded = await LoadPageDataAsync();
+            if (!loaded)
+            {
+                return NotFound();
+            }
+
+            var preview = await BuildCheckPreviewAsync(metricKey, regionQuestionTitle);
+            CheckMetricLabel = preview.MetricLabel;
+            CheckMetricKey = metricKey;
+            CheckCandidates = preview.Candidates;
+            CheckSelectedValue = CheckCandidates.FirstOrDefault(x => x.IsUsed)?.Value;
+
+            return Page();
+        }
+
+        public async Task<IActionResult> OnPostApplyAsync(int companySurveyId, int? financialYear, string metricKey, string? regionQuestionTitle, decimal? manualValue)
+        {
+            CompanySurveyId = companySurveyId;
+            FinancialYearFilter = financialYear;
+            SelectedRegionalEmploymentQuestionTitle = regionQuestionTitle ?? string.Empty;
+
+            var loaded = await LoadPageDataAsync();
+            if (!loaded)
+            {
+                return NotFound();
+            }
+
+            if (!EstimateEnabled)
+            {
+                ModelState.AddModelError(string.Empty, "Apply is only available when Estimate is enabled for this Company Survey record.");
+                return Page();
+            }
+
+            if (IsLocked)
+            {
+                ModelState.AddModelError(string.Empty, "Apply is not allowed because this Company Survey record is locked.");
+                return Page();
+            }
+
+            if (manualValue.HasValue && manualValue.Value < 0)
+            {
+                ModelState.AddModelError(string.Empty, "Manual value must be zero or greater.");
+                return Page();
+            }
+
+            if (manualValue.HasValue && HasMoreThanTwoDecimalPlaces(manualValue.Value))
+            {
+                ModelState.AddModelError(string.Empty, "Manual value can have at most 2 decimal places.");
+                return Page();
+            }
+
+            var calculation = await CalculateMetricByKeyAsync(metricKey, regionQuestionTitle);
+            var valueToApply = manualValue ?? calculation.Value;
+
+            if (!valueToApply.HasValue)
+            {
+                ModelState.AddModelError(string.Empty, "No valid value available to apply. Enter a manual value or use Check to verify a calculated value exists.");
+                return Page();
+            }
+
+            var reasonToApply = manualValue.HasValue
+                ? $"Manual input applied ({manualValue.Value:N2})."
+                : calculation.Reason;
+
+            ClearForecastOutputs();
+            ApplyForecastByMetricKey(metricKey, regionQuestionTitle, valueToApply.Value, reasonToApply);
+
+            // Save the applied value to the Answer table in the database
+            await SaveAppliedAnswerAsync(metricKey, regionQuestionTitle, valueToApply.Value, TargetFinancialYear);
+
+            // Reload the historical data for the applied metric so the table reflects the new 2026 value
+            await ReloadHistoricalDataForMetricAsync(metricKey, regionQuestionTitle);
+
+            GeneratedSummary = BuildSingleMetricSummary(
+                metricName: calculation.MetricLabel,
+                targetYear: TargetFinancialYear,
+                history: calculation.History,
+                forecastValue: valueToApply,
+                reason: reasonToApply);
 
             return Page();
         }
@@ -1233,6 +1326,791 @@ namespace TINWeb.Pages.CompanySurvey
             return null;
         }
 
+        private async Task<(string MetricLabel, List<CalculationCandidate> Candidates)> BuildCheckPreviewAsync(string metricKey, string? regionQuestionTitle)
+        {
+            metricKey = (metricKey ?? string.Empty).Trim();
+
+            switch (metricKey)
+            {
+                case "Revenue":
+                {
+                    var history = await GetCompanyMetricHistoryAsync(CompanyId, RevenueQuestionTitle);
+                    return await BuildSectorCagrPreviewAsync("Revenue", history, RevenueQuestionTitle);
+                }
+                case "Employment":
+                {
+                    var history = await GetCompanyMetricHistoryAsync(CompanyId, EmploymentQuestionTitle, EmploymentQuestionTitleLegacy);
+                    return await BuildSectorCagrPreviewAsync("Employment", history, EmploymentQuestionTitle, EmploymentQuestionTitleLegacy);
+                }
+                case "Wages":
+                {
+                    var history = await GetCompanyMetricHistoryAsync(CompanyId, WagesQuestionTitle);
+                    var revenueHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueQuestionTitle);
+                    return await BuildRevenueRatioPreviewAsync("Wages & Salaries", history, revenueHistory, WagesQuestionTitle, 4, CalculateSectorWagesRatioAsync);
+                }
+                case "ResearchDevelopment":
+                {
+                    var history = await GetCompanyMetricHistoryAsync(CompanyId, ResearchDevelopmentQuestionTitle);
+                    var revenueHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueQuestionTitle);
+                    return await BuildRevenueRatioPreviewAsync("Research & Development", history, revenueHistory, ResearchDevelopmentQuestionTitle, 3, CalculateSectorResearchDevelopmentRatioAsync);
+                }
+                case "SalesMarketing":
+                {
+                    var history = await GetCompanyMetricHistoryAsync(CompanyId, SalesMarketingQuestionTitle);
+                    var revenueHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueQuestionTitle);
+                    return await BuildRevenueRatioPreviewAsync("Sales & Marketing", history, revenueHistory, SalesMarketingQuestionTitle, 3, CalculateSectorSalesMarketingRatioAsync);
+                }
+                case "Ebitda":
+                {
+                    var history = await GetCompanyMetricHistoryAsync(CompanyId, EbitdaQuestionTitle);
+                    var revenueHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueQuestionTitle);
+                    return await BuildEbitdaPreviewAsync(history, revenueHistory);
+                }
+                case "RegionalEmployment":
+                {
+                    if (string.IsNullOrWhiteSpace(regionQuestionTitle))
+                    {
+                        return ("Regional Employment", new List<CalculationCandidate>
+                        {
+                            new() { StepName = "Actual", Details = "Regional question title is missing." },
+                            new() { StepName = "Trend", Details = "Regional question title is missing." },
+                            new() { StepName = "Fallback", Details = "Regional question title is missing." }
+                        });
+                    }
+
+                    var regionLabel = GetRegionalEmploymentRegionLabel(regionQuestionTitle);
+                    var history = await GetCompanyMetricHistoryAsync(CompanyId, regionQuestionTitle);
+                    var totalEmploymentHistory = await GetCompanyMetricHistoryAsync(CompanyId, EmploymentQuestionTitle, EmploymentQuestionTitleLegacy);
+                    return await BuildRegionalEmploymentPreviewAsync($"Regional Employment - {regionLabel}", history, totalEmploymentHistory, regionQuestionTitle);
+                }
+                case "RevenueNz":
+                    return await BuildRegionalRevenuePreviewAsync("Revenue NZ", RevenueNzQuestionTitle);
+                case "RevenueAustralia":
+                    return await BuildRegionalRevenuePreviewAsync("Revenue Australia", RevenueAustraliaQuestionTitle);
+                case "RevenueChina":
+                    return await BuildRegionalRevenuePreviewAsync("Revenue China", RevenueChinaQuestionTitle);
+                case "RevenueRestOfAsia":
+                    return await BuildRegionalRevenuePreviewAsync("Revenue Rest of Asia", RevenueRestOfAsiaQuestionTitle);
+                case "RevenueNorthAmerica":
+                    return await BuildRegionalRevenuePreviewAsync("Revenue North America", RevenueNorthAmericaQuestionTitle);
+                case "RevenueEurope":
+                    return await BuildRegionalRevenuePreviewAsync("Revenue Europe", RevenueEuropeQuestionTitle);
+                case "RevenueMiddleEast":
+                    return await BuildRegionalRevenuePreviewAsync("Revenue Middle East", RevenueMiddleEastQuestionTitle);
+                case "RevenueLatinAmerica":
+                    return await BuildRegionalRevenuePreviewAsync("Revenue Latin America", RevenueLatinAmericaQuestionTitle);
+                case "RevenueAfrica":
+                    return await BuildRegionalRevenuePreviewAsync("Revenue Africa", RevenueAfricaQuestionTitle);
+                case "RevenueOther":
+                    return await BuildRegionalRevenuePreviewAsync("Revenue Other", RevenueOtherQuestionTitle);
+                default:
+                    return (metricKey, new List<CalculationCandidate>
+                    {
+                        new() { StepName = "Actual", Details = "Unsupported metric for Check preview." },
+                        new() { StepName = "Trend", Details = "Unsupported metric for Check preview." },
+                        new() { StepName = "Fallback", Details = "Unsupported metric for Check preview." }
+                    });
+            }
+        }
+
+        private async Task<(string MetricLabel, List<MetricHistoryRow> History, decimal? Value, string Reason)> CalculateMetricByKeyAsync(string metricKey, string? regionQuestionTitle)
+        {
+            metricKey = (metricKey ?? string.Empty).Trim();
+
+            switch (metricKey)
+            {
+                case "Revenue":
+                {
+                    var history = await GetCompanyMetricHistoryAsync(CompanyId, RevenueQuestionTitle);
+                    var calc = await CalculateForecastedRevenueWithSectorFallbackAsync(history, TargetFinancialYear);
+                    return ("Revenue", history, calc.Value, calc.Reason);
+                }
+                case "Employment":
+                {
+                    var history = await GetCompanyMetricHistoryAsync(CompanyId, EmploymentQuestionTitle, EmploymentQuestionTitleLegacy);
+                    var calc = await CalculateForecastedEmploymentWithSectorFallbackAsync(history, TargetFinancialYear);
+                    return ("Employment", history, calc.Value, calc.Reason);
+                }
+                case "Wages":
+                {
+                    var history = await GetCompanyMetricHistoryAsync(CompanyId, WagesQuestionTitle);
+                    var revenueHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueQuestionTitle);
+                    var calc = await CalculateForecastedWagesWithSectorFallbackAsync(history, revenueHistory, TargetFinancialYear);
+                    return ("Wages & Salaries", history, calc.Value, calc.Reason);
+                }
+                case "ResearchDevelopment":
+                {
+                    var history = await GetCompanyMetricHistoryAsync(CompanyId, ResearchDevelopmentQuestionTitle);
+                    var revenueHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueQuestionTitle);
+                    var calc = await CalculateForecastedResearchDevelopmentWithSectorFallbackAsync(history, revenueHistory, TargetFinancialYear);
+                    return ("Research & Development", history, calc.Value, calc.Reason);
+                }
+                case "SalesMarketing":
+                {
+                    var history = await GetCompanyMetricHistoryAsync(CompanyId, SalesMarketingQuestionTitle);
+                    var revenueHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueQuestionTitle);
+                    var calc = await CalculateForecastedSalesMarketingWithSectorFallbackAsync(history, revenueHistory, TargetFinancialYear);
+                    return ("Sales & Marketing", history, calc.Value, calc.Reason);
+                }
+                case "Ebitda":
+                {
+                    var history = await GetCompanyMetricHistoryAsync(CompanyId, EbitdaQuestionTitle);
+                    var revenueHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueQuestionTitle);
+                    var calc = await CalculateForecastedEbitdaWithSectorFallbackAsync(history, revenueHistory, TargetFinancialYear);
+                    return ("EBITDA", history, calc.Value, calc.Reason);
+                }
+                case "RegionalEmployment":
+                {
+                    if (string.IsNullOrWhiteSpace(regionQuestionTitle))
+                    {
+                        return ("Regional Employment", new List<MetricHistoryRow>(), null, "Regional question title is required.");
+                    }
+
+                    var history = await GetCompanyMetricHistoryAsync(CompanyId, regionQuestionTitle);
+                    var totalEmploymentHistory = await GetCompanyMetricHistoryAsync(CompanyId, EmploymentQuestionTitle, EmploymentQuestionTitleLegacy);
+                    var calc = await CalculateForecastedRegionalEmploymentWithSectorFallbackAsync(history, totalEmploymentHistory, TargetFinancialYear, regionQuestionTitle);
+                    var label = $"Regional Employment - {GetRegionalEmploymentRegionLabel(regionQuestionTitle)}";
+                    return (label, history, calc.Value, calc.Reason);
+                }
+                case "RevenueNz":
+                    return await CalculateRegionalRevenueByTitleAsync("Revenue NZ", RevenueNzQuestionTitle);
+                case "RevenueAustralia":
+                    return await CalculateRegionalRevenueByTitleAsync("Revenue Australia", RevenueAustraliaQuestionTitle);
+                case "RevenueChina":
+                    return await CalculateRegionalRevenueByTitleAsync("Revenue China", RevenueChinaQuestionTitle);
+                case "RevenueRestOfAsia":
+                    return await CalculateRegionalRevenueByTitleAsync("Revenue Rest of Asia", RevenueRestOfAsiaQuestionTitle);
+                case "RevenueNorthAmerica":
+                    return await CalculateRegionalRevenueByTitleAsync("Revenue North America", RevenueNorthAmericaQuestionTitle);
+                case "RevenueEurope":
+                    return await CalculateRegionalRevenueByTitleAsync("Revenue Europe", RevenueEuropeQuestionTitle);
+                case "RevenueMiddleEast":
+                    return await CalculateRegionalRevenueByTitleAsync("Revenue Middle East", RevenueMiddleEastQuestionTitle);
+                case "RevenueLatinAmerica":
+                    return await CalculateRegionalRevenueByTitleAsync("Revenue Latin America", RevenueLatinAmericaQuestionTitle);
+                case "RevenueAfrica":
+                    return await CalculateRegionalRevenueByTitleAsync("Revenue Africa", RevenueAfricaQuestionTitle);
+                case "RevenueOther":
+                    return await CalculateRegionalRevenueByTitleAsync("Revenue Other", RevenueOtherQuestionTitle);
+                default:
+                    return (metricKey, new List<MetricHistoryRow>(), null, "Unsupported metric for Apply.");
+            }
+        }
+
+        private async Task<(string MetricLabel, List<MetricHistoryRow> History, decimal? Value, string Reason)> CalculateRegionalRevenueByTitleAsync(string metricLabel, string questionTitle)
+        {
+            var history = await GetCompanyMetricHistoryAsync(CompanyId, questionTitle);
+            var revenueHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueQuestionTitle);
+            var calc = await CalculateForecastedRegionalRevenueWithSectorFallbackAsync(history, revenueHistory, TargetFinancialYear, questionTitle, metricLabel);
+            return (metricLabel, history, calc.Value, calc.Reason);
+        }
+
+        private void ClearForecastOutputs()
+        {
+            ForecastedRevenue = null;
+            ForecastReason = string.Empty;
+            ForecastedEmployment = null;
+            EmploymentForecastReason = string.Empty;
+            ForecastedWages = null;
+            WagesForecastReason = string.Empty;
+            ForecastedResearchDevelopment = null;
+            ResearchDevelopmentForecastReason = string.Empty;
+            ForecastedSalesMarketing = null;
+            SalesMarketingForecastReason = string.Empty;
+            ForecastedEbitda = null;
+            EbitdaForecastReason = string.Empty;
+            ForecastedRevenueNz = null;
+            RevenueNzForecastReason = string.Empty;
+            ForecastedRevenueAustralia = null;
+            RevenueAustraliaForecastReason = string.Empty;
+            ForecastedRevenueChina = null;
+            RevenueChinaForecastReason = string.Empty;
+            ForecastedRevenueRestOfAsia = null;
+            RevenueRestOfAsiaForecastReason = string.Empty;
+            ForecastedRevenueNorthAmerica = null;
+            RevenueNorthAmericaForecastReason = string.Empty;
+            ForecastedRevenueEurope = null;
+            RevenueEuropeForecastReason = string.Empty;
+            ForecastedRevenueMiddleEast = null;
+            RevenueMiddleEastForecastReason = string.Empty;
+            ForecastedRevenueLatinAmerica = null;
+            RevenueLatinAmericaForecastReason = string.Empty;
+            ForecastedRevenueAfrica = null;
+            RevenueAfricaForecastReason = string.Empty;
+            ForecastedRevenueOther = null;
+            RevenueOtherForecastReason = string.Empty;
+            ForecastedRegionalEmployment = null;
+            RegionalEmploymentForecastReason = string.Empty;
+            SelectedRegionalEmploymentRegionLabel = string.Empty;
+        }
+
+        private async Task ReloadHistoricalDataForMetricAsync(string metricKey, string? regionQuestionTitle)
+        {
+            switch ((metricKey ?? string.Empty).Trim())
+            {
+                case "Revenue":
+                    var revenueHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueQuestionTitle);
+                    LastFiveYearsRevenue = GetLastFiveYears(revenueHistory);
+                    break;
+                case "Employment":
+                    var employmentHistory = await GetCompanyMetricHistoryAsync(CompanyId, EmploymentQuestionTitle, EmploymentQuestionTitleLegacy);
+                    LastFiveYearsEmployment = GetLastFiveYears(employmentHistory);
+                    break;
+                case "Wages":
+                    var wagesHistory = await GetCompanyMetricHistoryAsync(CompanyId, WagesQuestionTitle);
+                    LastFiveYearsWages = GetLastFiveYears(wagesHistory);
+                    break;
+                case "ResearchDevelopment":
+                    var rdHistory = await GetCompanyMetricHistoryAsync(CompanyId, ResearchDevelopmentQuestionTitle);
+                    LastFiveYearsResearchDevelopment = GetLastFiveYears(rdHistory);
+                    break;
+                case "SalesMarketing":
+                    var smHistory = await GetCompanyMetricHistoryAsync(CompanyId, SalesMarketingQuestionTitle);
+                    LastFiveYearsSalesMarketing = GetLastFiveYears(smHistory);
+                    break;
+                case "Ebitda":
+                    var ebitdaHistory = await GetCompanyMetricHistoryAsync(CompanyId, EbitdaQuestionTitle);
+                    LastFiveYearsEbitda = GetLastFiveYears(ebitdaHistory);
+                    break;
+                case "RevenueNz":
+                    var revNzHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueNzQuestionTitle);
+                    LastFiveYearsRevenueNz = GetLastFiveYears(revNzHistory);
+                    break;
+                case "RevenueAustralia":
+                    var revAuHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueAustraliaQuestionTitle);
+                    LastFiveYearsRevenueAustralia = GetLastFiveYears(revAuHistory);
+                    break;
+                case "RevenueChina":
+                    var revCnHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueChinaQuestionTitle);
+                    LastFiveYearsRevenueChina = GetLastFiveYears(revCnHistory);
+                    break;
+                case "RevenueRestOfAsia":
+                    var revRoaHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueRestOfAsiaQuestionTitle);
+                    LastFiveYearsRevenueRestOfAsia = GetLastFiveYears(revRoaHistory);
+                    break;
+                case "RevenueNorthAmerica":
+                    var revNaHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueNorthAmericaQuestionTitle);
+                    LastFiveYearsRevenueNorthAmerica = GetLastFiveYears(revNaHistory);
+                    break;
+                case "RevenueEurope":
+                    var revEuHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueEuropeQuestionTitle);
+                    LastFiveYearsRevenueEurope = GetLastFiveYears(revEuHistory);
+                    break;
+                case "RevenueMiddleEast":
+                    var revMeHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueMiddleEastQuestionTitle);
+                    LastFiveYearsRevenueMiddleEast = GetLastFiveYears(revMeHistory);
+                    break;
+                case "RevenueLatinAmerica":
+                    var revLaHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueLatinAmericaQuestionTitle);
+                    LastFiveYearsRevenueLatinAmerica = GetLastFiveYears(revLaHistory);
+                    break;
+                case "RevenueAfrica":
+                    var revAfHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueAfricaQuestionTitle);
+                    LastFiveYearsRevenueAfrica = GetLastFiveYears(revAfHistory);
+                    break;
+                case "RevenueOther":
+                    var revOtherHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueOtherQuestionTitle);
+                    LastFiveYearsRevenueOther = GetLastFiveYears(revOtherHistory);
+                    break;
+                case "RegionalEmployment":
+                    if (!string.IsNullOrWhiteSpace(regionQuestionTitle))
+                    {
+                        var regionalHistory = await GetCompanyMetricHistoryAsync(CompanyId, regionQuestionTitle);
+                        LastFiveYearsRegionalEmploymentByQuestionTitle[regionQuestionTitle] = GetLastFiveYears(regionalHistory);
+                        LastFiveYearsRegionalEmploymentSelected = LastFiveYearsRegionalEmploymentByQuestionTitle[regionQuestionTitle];
+                    }
+                    break;
+            }
+        }
+
+        private async Task SaveAppliedAnswerAsync(string metricKey, string? regionQuestionTitle, decimal appliedValue, int targetFinancialYear)
+        {
+            string? questionTitle = metricKey switch
+            {
+                "Revenue" => RevenueQuestionTitle,
+                "Employment" => EmploymentQuestionTitle,
+                "Wages" => WagesQuestionTitle,
+                "ResearchDevelopment" => ResearchDevelopmentQuestionTitle,
+                "SalesMarketing" => SalesMarketingQuestionTitle,
+                "Ebitda" => EbitdaQuestionTitle,
+                "RevenueNz" => RevenueNzQuestionTitle,
+                "RevenueAustralia" => RevenueAustraliaQuestionTitle,
+                "RevenueChina" => RevenueChinaQuestionTitle,
+                "RevenueRestOfAsia" => RevenueRestOfAsiaQuestionTitle,
+                "RevenueNorthAmerica" => RevenueNorthAmericaQuestionTitle,
+                "RevenueEurope" => RevenueEuropeQuestionTitle,
+                "RevenueMiddleEast" => RevenueMiddleEastQuestionTitle,
+                "RevenueLatinAmerica" => RevenueLatinAmericaQuestionTitle,
+                "RevenueAfrica" => RevenueAfricaQuestionTitle,
+                "RevenueOther" => RevenueOtherQuestionTitle,
+                "RegionalEmployment" => regionQuestionTitle,
+                _ => null
+            };
+
+            if (string.IsNullOrWhiteSpace(questionTitle))
+            {
+                return;
+            }
+
+            // Get the question ID
+            var question = await _context.Question
+                .AsNoTracking()
+                .FirstOrDefaultAsync(q => q.Title == questionTitle);
+
+            if (question == null)
+            {
+                return;
+            }
+
+            // Look for existing answer for this company survey and question
+            var existingAnswer = await _context.Answer
+                .FirstOrDefaultAsync(a =>
+                    a.CompanySurveyId == CompanySurveyId &&
+                    a.QuestionId == question.Id);
+
+            // All metrics are stored as currency values
+            if (existingAnswer != null)
+            {
+                existingAnswer.AnswerCurrency = appliedValue;
+                existingAnswer.AnswerNumber = null;
+                existingAnswer.AnswerText = null;
+                _context.Answer.Update(existingAnswer);
+            }
+            else
+            {
+                var newAnswer = new Answer
+                {
+                    CompanySurveyId = CompanySurveyId,
+                    QuestionId = question.Id,
+                    AnswerCurrency = appliedValue,
+                    AnswerNumber = null,
+                    AnswerText = null
+                };
+                _context.Answer.Add(newAnswer);
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+
+        private void ApplyForecastByMetricKey(string metricKey, string? regionQuestionTitle, decimal value, string reason)
+        {
+            switch ((metricKey ?? string.Empty).Trim())
+            {
+                case "Revenue":
+                    ForecastedRevenue = value;
+                    ForecastReason = reason;
+                    break;
+                case "Employment":
+                    ForecastedEmployment = value;
+                    EmploymentForecastReason = reason;
+                    break;
+                case "Wages":
+                    ForecastedWages = value;
+                    WagesForecastReason = reason;
+                    break;
+                case "ResearchDevelopment":
+                    ForecastedResearchDevelopment = value;
+                    ResearchDevelopmentForecastReason = reason;
+                    break;
+                case "SalesMarketing":
+                    ForecastedSalesMarketing = value;
+                    SalesMarketingForecastReason = reason;
+                    break;
+                case "Ebitda":
+                    ForecastedEbitda = value;
+                    EbitdaForecastReason = reason;
+                    break;
+                case "RevenueNz":
+                    ForecastedRevenueNz = value;
+                    RevenueNzForecastReason = reason;
+                    break;
+                case "RevenueAustralia":
+                    ForecastedRevenueAustralia = value;
+                    RevenueAustraliaForecastReason = reason;
+                    break;
+                case "RevenueChina":
+                    ForecastedRevenueChina = value;
+                    RevenueChinaForecastReason = reason;
+                    break;
+                case "RevenueRestOfAsia":
+                    ForecastedRevenueRestOfAsia = value;
+                    RevenueRestOfAsiaForecastReason = reason;
+                    break;
+                case "RevenueNorthAmerica":
+                    ForecastedRevenueNorthAmerica = value;
+                    RevenueNorthAmericaForecastReason = reason;
+                    break;
+                case "RevenueEurope":
+                    ForecastedRevenueEurope = value;
+                    RevenueEuropeForecastReason = reason;
+                    break;
+                case "RevenueMiddleEast":
+                    ForecastedRevenueMiddleEast = value;
+                    RevenueMiddleEastForecastReason = reason;
+                    break;
+                case "RevenueLatinAmerica":
+                    ForecastedRevenueLatinAmerica = value;
+                    RevenueLatinAmericaForecastReason = reason;
+                    break;
+                case "RevenueAfrica":
+                    ForecastedRevenueAfrica = value;
+                    RevenueAfricaForecastReason = reason;
+                    break;
+                case "RevenueOther":
+                    ForecastedRevenueOther = value;
+                    RevenueOtherForecastReason = reason;
+                    break;
+                case "RegionalEmployment":
+                    ForecastedRegionalEmployment = value;
+                    RegionalEmploymentForecastReason = reason;
+                    SelectedRegionalEmploymentQuestionTitle = regionQuestionTitle ?? string.Empty;
+                    SelectedRegionalEmploymentRegionLabel = GetRegionalEmploymentRegionLabel(SelectedRegionalEmploymentQuestionTitle);
+                    break;
+            }
+        }
+
+        private async Task<(string MetricLabel, List<CalculationCandidate> Candidates)> BuildSectorCagrPreviewAsync(string metricLabel, List<MetricHistoryRow> history, params string[] questionTitles)
+        {
+            var actual = GetActualValueForTargetYear(history, TargetFinancialYear);
+            var trend = TryCalculateLogLinearTrend(history, TargetFinancialYear, 3, out var trendDetail);
+
+            var secondarySector = await GetCompanySecondarySectorAsync(CompanyId, TargetFinancialYear);
+            var sectorCagr = questionTitles.Contains(EmploymentQuestionTitle) || questionTitles.Contains(EmploymentQuestionTitleLegacy)
+                ? await CalculateSectorCAGREmploymentAsync(secondarySector, TargetFinancialYear)
+                : await CalculateSectorCAGRAsync(secondarySector, TargetFinancialYear);
+
+            var latestPositive = history
+                .Where(x => x.FinancialYear < TargetFinancialYear && x.Value.HasValue && x.Value.Value > 0)
+                .OrderByDescending(x => x.FinancialYear)
+                .FirstOrDefault();
+
+            var fallbackReasons = new List<string>();
+            if (string.IsNullOrWhiteSpace(secondarySector))
+            {
+                fallbackReasons.Add("No Secondary Sector answer is available for this company.");
+            }
+            if (latestPositive?.Value.HasValue != true)
+            {
+                fallbackReasons.Add($"No positive company value exists before FY {TargetFinancialYear}.");
+            }
+            if (!sectorCagr.HasValue)
+            {
+                fallbackReasons.Add("Sector CAGR could not be calculated from peer company history.");
+            }
+            else if (sectorCagr.Value <= -1)
+            {
+                fallbackReasons.Add($"Sector CAGR is invalid for forecasting ({sectorCagr.Value:P2}).");
+            }
+
+            var fallback = TryCalculateSectorCagrFallback(history, TargetFinancialYear, sectorCagr, out var fallbackDetail);
+            if (!fallback.HasValue)
+            {
+                fallbackDetail = $"Secondary sector: {(string.IsNullOrWhiteSpace(secondarySector) ? "n/a" : secondarySector)}. "
+                    + $"Latest positive company value before FY {TargetFinancialYear}: {(latestPositive?.Value.HasValue == true ? latestPositive.Value.Value.ToString("N2") : "n/a")}. "
+                    + $"Sector CAGR: {(sectorCagr.HasValue ? sectorCagr.Value.ToString("P2") : "n/a")}. "
+                    + fallbackDetail;
+            }
+            else
+            {
+                fallbackDetail = $"Secondary sector: {(string.IsNullOrWhiteSpace(secondarySector) ? "n/a" : secondarySector)}. Sector CAGR: {(sectorCagr.HasValue ? sectorCagr.Value.ToString("P2") : "n/a")}. {fallbackDetail}";
+            }
+
+            var candidates = BuildCandidates(actual, trend, fallback,
+                "Actual",
+                actual.HasValue ? $"Actual {metricLabel} for FY {TargetFinancialYear}." : $"No actual {metricLabel} for FY {TargetFinancialYear}.",
+                "Trend",
+                trendDetail,
+                "Fallback",
+                fallbackDetail,
+                fallbackReasons);
+
+            return (metricLabel, candidates);
+        }
+
+        private async Task<(string MetricLabel, List<CalculationCandidate> Candidates)> BuildRevenueRatioPreviewAsync(
+            string metricLabel,
+            List<MetricHistoryRow> metricHistory,
+            List<MetricHistoryRow> revenueHistory,
+            string metricQuestionTitle,
+            int minimumTrendPoints,
+            Func<string?, int, Task<decimal?>> sectorRatioFunc)
+        {
+            var actual = GetActualValueForTargetYear(metricHistory, TargetFinancialYear);
+            var trend = TryCalculateLogLinearTrend(metricHistory, TargetFinancialYear, minimumTrendPoints, out var trendDetail);
+
+            var primarySector = await GetCompanyPrimarySectorAsync(CompanyId, TargetFinancialYear);
+            var sectorRatio = await sectorRatioFunc(primarySector, TargetFinancialYear);
+            var revenueForecast = await CalculateForecastedRevenueWithSectorFallbackAsync(revenueHistory, TargetFinancialYear);
+
+            decimal? fallback = null;
+            var fallbackDetail = "Sector ratio fallback not available.";
+            if (sectorRatio.HasValue && sectorRatio.Value > 0 && revenueForecast.Value.HasValue && revenueForecast.Value.Value > 0)
+            {
+                fallback = revenueForecast.Value.Value * sectorRatio.Value;
+                fallbackDetail = $"Primary sector ratio {sectorRatio:P2} x forecasted revenue {revenueForecast.Value.Value:N2}.";
+            }
+            else
+            {
+                fallbackDetail = $"Missing ratio or revenue forecast (ratio: {(sectorRatio.HasValue ? sectorRatio.Value.ToString("P2") : "n/a")}, revenue forecast: {(revenueForecast.Value.HasValue ? revenueForecast.Value.Value.ToString("N2") : "n/a")}).";
+            }
+
+            var candidates = BuildCandidates(actual, trend, fallback,
+                "Actual",
+                actual.HasValue ? $"Actual {metricLabel} for FY {TargetFinancialYear}." : $"No actual {metricLabel} for FY {TargetFinancialYear}.",
+                "Trend",
+                trendDetail,
+                "Fallback",
+                fallbackDetail);
+
+            return (metricLabel, candidates);
+        }
+
+        private async Task<(string MetricLabel, List<CalculationCandidate> Candidates)> BuildEbitdaPreviewAsync(
+            List<MetricHistoryRow> ebitdaHistory,
+            List<MetricHistoryRow> revenueHistory)
+        {
+            var actual = GetActualValueForTargetYear(ebitdaHistory, TargetFinancialYear);
+            var trend = TryCalculateLinearTrend(ebitdaHistory, TargetFinancialYear, 4, out var trendDetail);
+
+            var primarySector = await GetCompanyPrimarySectorAsync(CompanyId, TargetFinancialYear);
+            var sectorRatio = await CalculateSectorEbitdaRatioAsync(primarySector, TargetFinancialYear);
+            var revenueForecast = await CalculateForecastedRevenueWithSectorFallbackAsync(revenueHistory, TargetFinancialYear);
+
+            decimal? fallback = null;
+            var fallbackDetail = "Sector EBITDA ratio fallback not available.";
+            if (EnableEbitdaSectorFallback && sectorRatio.HasValue && revenueForecast.Value.HasValue)
+            {
+                fallback = revenueForecast.Value.Value * sectorRatio.Value;
+                fallbackDetail = $"Primary sector EBITDA/revenue ratio {sectorRatio:P2} x forecasted revenue {revenueForecast.Value.Value:N2}.";
+            }
+            else
+            {
+                fallbackDetail = $"Missing ratio or revenue forecast (ratio: {(sectorRatio.HasValue ? sectorRatio.Value.ToString("P2") : "n/a")}, revenue forecast: {(revenueForecast.Value.HasValue ? revenueForecast.Value.Value.ToString("N2") : "n/a")}).";
+            }
+
+            var candidates = BuildCandidates(actual, trend, fallback,
+                "Actual",
+                actual.HasValue ? $"Actual EBITDA for FY {TargetFinancialYear}." : $"No actual EBITDA for FY {TargetFinancialYear}.",
+                "Trend",
+                trendDetail,
+                "Fallback",
+                fallbackDetail);
+
+            return ("EBITDA", candidates);
+        }
+
+        private async Task<(string MetricLabel, List<CalculationCandidate> Candidates)> BuildRegionalRevenuePreviewAsync(string metricLabel, string questionTitle)
+        {
+            var regionalHistory = await GetCompanyMetricHistoryAsync(CompanyId, questionTitle);
+            var revenueHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueQuestionTitle);
+
+            var actual = GetActualValueForTargetYear(regionalHistory, TargetFinancialYear);
+            var trend = TryCalculateLogLinearTrend(regionalHistory, TargetFinancialYear, 2, out var trendDetail);
+
+            var primarySector = await GetCompanyPrimarySectorAsync(CompanyId, TargetFinancialYear);
+            var sectorRatio = await CalculateSectorRegionalExportRatioAsync(primarySector, questionTitle, TargetFinancialYear);
+            var revenueForecast = await CalculateForecastedRevenueWithSectorFallbackAsync(revenueHistory, TargetFinancialYear);
+
+            decimal? fallback = null;
+            var fallbackDetail = "Sector export ratio fallback not available.";
+            if (sectorRatio.HasValue && revenueForecast.Value.HasValue)
+            {
+                fallback = revenueForecast.Value.Value * sectorRatio.Value;
+                fallbackDetail = $"Primary sector export ratio {sectorRatio:P2} x forecasted total revenue {revenueForecast.Value.Value:N2}.";
+            }
+            else
+            {
+                fallbackDetail = $"Missing ratio or revenue forecast (ratio: {(sectorRatio.HasValue ? sectorRatio.Value.ToString("P2") : "n/a")}, revenue forecast: {(revenueForecast.Value.HasValue ? revenueForecast.Value.Value.ToString("N2") : "n/a")}).";
+            }
+
+            var candidates = BuildCandidates(actual, trend, fallback,
+                "Actual",
+                actual.HasValue ? $"Actual {metricLabel} for FY {TargetFinancialYear}." : $"No actual {metricLabel} for FY {TargetFinancialYear}.",
+                "Trend",
+                trendDetail,
+                "Fallback",
+                fallbackDetail);
+
+            return (metricLabel, candidates);
+        }
+
+        private async Task<(string MetricLabel, List<CalculationCandidate> Candidates)> BuildRegionalEmploymentPreviewAsync(
+            string metricLabel,
+            List<MetricHistoryRow> regionalHistory,
+            List<MetricHistoryRow> totalEmploymentHistory,
+            string questionTitle)
+        {
+            var actual = GetActualValueForTargetYear(regionalHistory, TargetFinancialYear);
+            var trend = TryCalculateLogLinearTrend(regionalHistory, TargetFinancialYear, 2, out var trendDetail);
+
+            var primarySector = await GetCompanyPrimarySectorAsync(CompanyId, TargetFinancialYear);
+            var sectorRatio = await CalculateSectorRegionalEmploymentRatioAsync(primarySector, questionTitle, TargetFinancialYear);
+            var employmentForecast = await CalculateForecastedEmploymentWithSectorFallbackAsync(totalEmploymentHistory, TargetFinancialYear);
+
+            decimal? fallback = null;
+            var fallbackDetail = "Sector employment ratio fallback not available.";
+            if (sectorRatio.HasValue && employmentForecast.Value.HasValue)
+            {
+                fallback = employmentForecast.Value.Value * sectorRatio.Value;
+                fallbackDetail = $"Primary sector employment share {sectorRatio:P2} x forecasted total employment {employmentForecast.Value.Value:N2}.";
+            }
+            else
+            {
+                fallbackDetail = $"Missing ratio or employment forecast (ratio: {(sectorRatio.HasValue ? sectorRatio.Value.ToString("P2") : "n/a")}, employment forecast: {(employmentForecast.Value.HasValue ? employmentForecast.Value.Value.ToString("N2") : "n/a")}).";
+            }
+
+            var candidates = BuildCandidates(actual, trend, fallback,
+                "Actual",
+                actual.HasValue ? $"Actual {metricLabel} for FY {TargetFinancialYear}." : $"No actual {metricLabel} for FY {TargetFinancialYear}.",
+                "Trend",
+                trendDetail,
+                "Fallback",
+                fallbackDetail);
+
+            return (metricLabel, candidates);
+        }
+
+        private static decimal? GetActualValueForTargetYear(List<MetricHistoryRow> history, int targetYear)
+        {
+            return history
+                .Where(x => x.FinancialYear == targetYear)
+                .OrderByDescending(x => x.CompanySurveyId)
+                .Select(x => x.Value)
+                .FirstOrDefault();
+        }
+
+        private static decimal? TryCalculateLogLinearTrend(List<MetricHistoryRow> history, int targetYear, int minimumPoints, out string details)
+        {
+            var points = history
+                .Where(x => x.FinancialYear < targetYear && x.Value.HasValue && x.Value.Value > 0)
+                .OrderByDescending(x => x.FinancialYear)
+                .Take(5)
+                .Select(x => (Year: (double)x.FinancialYear, Value: (double)x.Value!.Value))
+                .ToList();
+
+            if (points.Count < minimumPoints)
+            {
+                details = $"Insufficient positive points ({points.Count}, minimum {minimumPoints}).";
+                return null;
+            }
+
+            var meanYear = points.Average(d => d.Year);
+            var meanLnValue = points.Average(d => Math.Log(d.Value));
+            var numerator = points.Sum(d => (d.Year - meanYear) * (Math.Log(d.Value) - meanLnValue));
+            var denominator = points.Sum(d => Math.Pow(d.Year - meanYear, 2));
+
+            if (denominator <= 0)
+            {
+                details = "Cannot fit trend (year variance is zero).";
+                return null;
+            }
+
+            var slope = numerator / denominator;
+            var lnForecast = meanLnValue + slope * (targetYear - meanYear);
+            var growthFit = Math.Exp(lnForecast);
+
+            details = $"Log-linear trend from {points.Count} point(s).";
+            return growthFit < 0 ? 0m : Convert.ToDecimal(growthFit);
+        }
+
+        private static decimal? TryCalculateLinearTrend(List<MetricHistoryRow> history, int targetYear, int minimumPoints, out string details)
+        {
+            var points = history
+                .Where(x => x.FinancialYear < targetYear && x.Value.HasValue)
+                .Select(x => (Year: (double)x.FinancialYear, Value: (double)x.Value!.Value))
+                .ToList();
+
+            if (points.Count < minimumPoints)
+            {
+                details = $"Insufficient points ({points.Count}, minimum {minimumPoints}).";
+                return null;
+            }
+
+            var avgX = points.Average(d => d.Year);
+            var avgY = points.Average(d => d.Value);
+            var numerator = points.Sum(d => (d.Year - avgX) * (d.Value - avgY));
+            var denominator = points.Sum(d => Math.Pow(d.Year - avgX, 2));
+
+            if (denominator == 0)
+            {
+                details = "Cannot fit linear trend (year variance is zero).";
+                return null;
+            }
+
+            var slope = numerator / denominator;
+            var intercept = avgY - slope * avgX;
+            var forecastValue = slope * targetYear + intercept;
+            details = $"Linear trend from {points.Count} point(s).";
+            return forecastValue < 0 ? 0m : Convert.ToDecimal(forecastValue);
+        }
+
+        private static decimal? TryCalculateSectorCagrFallback(List<MetricHistoryRow> history, int targetYear, decimal? sectorCagr, out string details)
+        {
+            if (!sectorCagr.HasValue || sectorCagr.Value <= -1)
+            {
+                details = "Sector CAGR is not available.";
+                return null;
+            }
+
+            var latest = history
+                .Where(x => x.FinancialYear < targetYear && x.Value.HasValue && x.Value.Value > 0)
+                .OrderByDescending(x => x.FinancialYear)
+                .FirstOrDefault();
+
+            if (latest == null || !latest.Value.HasValue || latest.Value.Value <= 0)
+            {
+                details = "No latest positive historical value available for CAGR fallback.";
+                return null;
+            }
+
+            var yearsToForecast = targetYear - latest.FinancialYear;
+            var fallback = latest.Value.Value * Convert.ToDecimal(Math.Pow(1 + (double)sectorCagr.Value, yearsToForecast));
+            details = $"Sector CAGR {sectorCagr.Value:P2} applied to latest value over {yearsToForecast} year(s).";
+            return fallback > 0 ? fallback : 0m;
+        }
+
+        private static List<CalculationCandidate> BuildCandidates(
+            decimal? actual,
+            decimal? trend,
+            decimal? fallback,
+            string actualStep,
+            string actualDetail,
+            string trendStep,
+            string trendDetail,
+            string fallbackStep,
+            string fallbackDetail,
+            List<string>? fallbackFailureReasons = null)
+        {
+            var usedStep = actual.HasValue ? actualStep : trend.HasValue ? trendStep : fallback.HasValue ? fallbackStep : string.Empty;
+
+            return new List<CalculationCandidate>
+            {
+                new()
+                {
+                    StepName = actualStep,
+                    Value = actual,
+                    Details = actualDetail,
+                    IsUsed = string.Equals(usedStep, actualStep, StringComparison.OrdinalIgnoreCase)
+                },
+                new()
+                {
+                    StepName = trendStep,
+                    Value = trend,
+                    Details = trendDetail,
+                    IsUsed = string.Equals(usedStep, trendStep, StringComparison.OrdinalIgnoreCase)
+                },
+                new()
+                {
+                    StepName = fallbackStep,
+                    Value = fallback,
+                    Details = fallbackDetail,
+                    FailureReasons = fallbackFailureReasons ?? new List<string>(),
+                    IsUsed = string.Equals(usedStep, fallbackStep, StringComparison.OrdinalIgnoreCase)
+                }
+            };
+        }
+
         private async Task<bool> LoadPageDataAsync()
         {
             var context = await (
@@ -1418,28 +2296,45 @@ namespace TINWeb.Pages.CompanySurvey
             return null;
         }
 
-        private async Task<string?> GetCompanyPrimarySectorAsync(int companyId)
+        private static bool HasMoreThanTwoDecimalPlaces(decimal value)
         {
+            return decimal.Round(value, 2, MidpointRounding.AwayFromZero) != value;
+        }
+
+        private async Task<string?> GetCompanyPrimarySectorAsync(int companyId, int targetYear)
+        {
+            var fallbackYear = targetYear - 1;
+
             var primarySector = await (
                 from companySurvey in _context.CompanySurvey
+                join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
                 join answer in _context.Answer on companySurvey.Id equals answer.CompanySurveyId
                 join question in _context.Question on answer.QuestionId equals question.Id
-                where companySurvey.CompanyId == companyId && question.Title == "Primary Sector"
-                orderby companySurvey.Id descending
+                where companySurvey.CompanyId == companyId
+                    && (survey.FinancialYear == targetYear || survey.FinancialYear == fallbackYear)
+                    && question.Title == "Primary Sector"
+                    && !string.IsNullOrWhiteSpace(answer.AnswerText)
+                orderby survey.FinancialYear descending, companySurvey.Id descending
                 select answer.AnswerText
             ).FirstOrDefaultAsync();
 
             return primarySector;
         }
 
-        private async Task<string?> GetCompanySecondarySectorAsync(int companyId)
+        private async Task<string?> GetCompanySecondarySectorAsync(int companyId, int targetYear)
         {
+            var fallbackYear = targetYear - 1;
+
             var secondarySector = await (
                 from companySurvey in _context.CompanySurvey
+                join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
                 join answer in _context.Answer on companySurvey.Id equals answer.CompanySurveyId
                 join question in _context.Question on answer.QuestionId equals question.Id
-                where companySurvey.CompanyId == companyId && question.Title == "Secondary Sector"
-                orderby companySurvey.Id descending
+                where companySurvey.CompanyId == companyId
+                    && (survey.FinancialYear == targetYear || survey.FinancialYear == fallbackYear)
+                    && question.Title == "Secondary Sector"
+                    && !string.IsNullOrWhiteSpace(answer.AnswerText)
+                orderby survey.FinancialYear descending, companySurvey.Id descending
                 select answer.AnswerText
             ).FirstOrDefaultAsync();
 
@@ -1620,7 +2515,7 @@ namespace TINWeb.Pages.CompanySurvey
             }
 
             // Step 3: Sector CAGR fallback (now active)
-            var secondarySector = await GetCompanySecondarySectorAsync(CompanyId);
+            var secondarySector = await GetCompanySecondarySectorAsync(CompanyId, TargetFinancialYear);
             var sectorCAGR = await CalculateSectorCAGREmploymentAsync(secondarySector, targetYear);
 
             if (sectorCAGR.HasValue && sectorCAGR.Value > -1) // CAGR must be > -100%
@@ -1690,7 +2585,7 @@ namespace TINWeb.Pages.CompanySurvey
             }
 
             // Step 3: Sector CAGR fallback (now active)
-            var secondarySector = await GetCompanySecondarySectorAsync(CompanyId);
+            var secondarySector = await GetCompanySecondarySectorAsync(CompanyId, TargetFinancialYear);
             var sectorCAGR = await CalculateSectorCAGRAsync(secondarySector, targetYear);
 
             if (sectorCAGR.HasValue && sectorCAGR.Value > -1) // CAGR must be > -100%
@@ -1826,7 +2721,7 @@ namespace TINWeb.Pages.CompanySurvey
             }
 
             // 3. Sector-specific export ratio fallback (active)
-            var primarySector = await GetCompanyPrimarySectorAsync(CompanyId);
+            var primarySector = await GetCompanyPrimarySectorAsync(CompanyId, TargetFinancialYear);
             var sectorExportRatio = await CalculateSectorRegionalExportRatioAsync(primarySector, regionQuestionTitle, targetYear);
 
             if (sectorExportRatio.HasValue)
@@ -1953,7 +2848,7 @@ namespace TINWeb.Pages.CompanySurvey
             }
 
             // 3. Sector-percentage fallback (active): Regional Employment = Sector % × Total Employment.
-            var primarySector = await GetCompanyPrimarySectorAsync(CompanyId);
+            var primarySector = await GetCompanyPrimarySectorAsync(CompanyId, TargetFinancialYear);
             var sectorRatio = await CalculateSectorRegionalEmploymentRatioAsync(primarySector, regionQuestionTitle, targetYear);
 
             if (sectorRatio.HasValue)
@@ -2060,7 +2955,7 @@ namespace TINWeb.Pages.CompanySurvey
 
             if (numPoints <= 3)
             {
-                var primarySector = await GetCompanyPrimarySectorAsync(CompanyId);
+                var primarySector = await GetCompanyPrimarySectorAsync(CompanyId, TargetFinancialYear);
                 var sectorRatio = await CalculateSectorEbitdaRatioAsync(primarySector, targetYear);
 
                 if (EnableEbitdaSectorFallback && sectorRatio.HasValue)
@@ -2356,7 +3251,7 @@ namespace TINWeb.Pages.CompanySurvey
             }
 
             // Step 3: Sector-ratio fallback (active)
-            var primarySector = await GetCompanyPrimarySectorAsync(CompanyId);
+            var primarySector = await GetCompanyPrimarySectorAsync(CompanyId, TargetFinancialYear);
             var sectorRatio = await CalculateSectorWagesRatioAsync(primarySector, targetYear);
 
             if (sectorRatio.HasValue && sectorRatio.Value > 0)
@@ -2422,7 +3317,7 @@ namespace TINWeb.Pages.CompanySurvey
             }
 
             // Step 3: Sector-ratio fallback (active)
-            var primarySector = await GetCompanyPrimarySectorAsync(CompanyId);
+            var primarySector = await GetCompanyPrimarySectorAsync(CompanyId, TargetFinancialYear);
             var sectorRatio = await CalculateSectorResearchDevelopmentRatioAsync(primarySector, targetYear);
 
             if (sectorRatio.HasValue && sectorRatio.Value > 0)
@@ -2488,7 +3383,7 @@ namespace TINWeb.Pages.CompanySurvey
             }
 
             // Step 3: Sector-ratio fallback (active)
-            var primarySector = await GetCompanyPrimarySectorAsync(CompanyId);
+            var primarySector = await GetCompanyPrimarySectorAsync(CompanyId, TargetFinancialYear);
             var sectorRatio = await CalculateSectorSalesMarketingRatioAsync(primarySector, targetYear);
 
             if (sectorRatio.HasValue && sectorRatio.Value > 0)
@@ -2575,6 +3470,15 @@ namespace TINWeb.Pages.CompanySurvey
             public int CompanySurveyId { get; set; }
             public int FinancialYear { get; set; }
             public decimal? Value { get; set; }
+        }
+
+        public class CalculationCandidate
+        {
+            public string StepName { get; set; } = string.Empty;
+            public decimal? Value { get; set; }
+            public string Details { get; set; } = string.Empty;
+            public List<string> FailureReasons { get; set; } = new();
+            public bool IsUsed { get; set; }
         }
     }
 }
