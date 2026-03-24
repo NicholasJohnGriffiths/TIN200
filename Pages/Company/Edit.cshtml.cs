@@ -17,8 +17,12 @@ namespace TINWeb.Pages.Company
             _service = service;
         }
 
-        public async Task<IActionResult> OnGetAsync(int id)
+        [BindProperty(SupportsGet = true)]
+        public int? LastTin200Year { get; set; }
+
+        public async Task<IActionResult> OnGetAsync(int id, int? lastTin200Year)
         {
+            LastTin200Year = lastTin200Year;
             var record = await _service.GetCompanyByIdAsync(id);
             if (record == null)
             {
@@ -50,7 +54,7 @@ namespace TINWeb.Pages.Company
             }
 
             await _service.UpdateCompanyAsync(Record);
-            return RedirectToPage("./Index");
+            return RedirectToPage("./Index", new { lastTin200Year = LastTin200Year, focusId = Record.Id });
         }
     }
 }

@@ -20,5 +20,7 @@ namespace TINWeb.Models
         public int? ImageId2 { get; set; }
 
         public int? ImageId3 { get; set; }
+
+        public bool? IncludeInEstimation { get; set; }
     }
 }

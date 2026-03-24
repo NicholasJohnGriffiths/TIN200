@@ -14,6 +14,7 @@ namespace TINWeb.Pages.Company
         public List<Models.Tin200> Records { get; set; } = new();
         public List<int> AvailableLastTin200Years { get; set; } = new();
         public int? SelectedLastTin200Year { get; set; }
+        public int? FocusId { get; set; }
         public CompanyService.ResetFyeValuesResult? PreviewSummary { get; set; }
         public CompanyService.CompanyGlobalImportPreviewResult? GlobalImportPreview { get; set; }
         public string? PendingGlobalImportToken { get; set; }
@@ -30,8 +31,9 @@ namespace TINWeb.Pages.Company
             _service = service;
         }
 
-        public async Task OnGetAsync(int? lastTin200Year)
+        public async Task OnGetAsync(int? lastTin200Year, int? focusId)
         {
+            FocusId = focusId;
             await LoadPageAsync(lastTin200Year);
         }
 

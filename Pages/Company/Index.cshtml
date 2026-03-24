@@ -268,7 +268,7 @@
                 <tbody>
                     @foreach (var record in Model.Records)
                     {
-                        <tr>
+                        <tr id="company-row-@record.Id">
                             <td>@record.Id</td>
                             <td>@record.CompanyName</td>
                             <td>@record.CeoFirstName @record.CeoLastName</td>
@@ -281,7 +281,7 @@
                             <td>@record.LastTIN200Year</td>
                             <td class="actions-col">
                                 <a asp-page="./Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
-                                <a asp-page="./Edit" asp-route-id="@record.Id" class="btn btn-sm btn-warning">Edit</a>
+                                <a asp-page="./Edit" asp-route-id="@record.Id" asp-route-lastTin200Year="@Model.SelectedLastTin200Year" class="btn btn-sm btn-warning">Edit</a>
                                 <a asp-page="./SurveyHistory" asp-route-id="@record.Id" class="btn btn-sm btn-outline-secondary">Survey History</a>
                                 <a asp-page="./SendSurvey" asp-route-id="@record.Id" class="btn btn-sm btn-primary">Survey</a>
                                 <a asp-page="./Delete" asp-route-id="@record.Id" class="btn btn-sm btn-danger">Delete</a>
@@ -445,6 +445,36 @@
         }
     })();
 </script>
+
+<!-- Focus on edited company row -->
+<script>
+    (function() {
+        const focusId = @(Model.FocusId != null ? Model.FocusId.Value.ToString() : "null");
+        
+        if (focusId !== null) {
+            const rowElement = document.getElementById('company-row-' + focusId);
+            if (rowElement) {
+                // Add highlight class
+                rowElement.classList.add('focused-row');
+                
+                // Scroll into view with smooth behavior
+                rowElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Remove highlight after 3 seconds
+                setTimeout(function() {
+                    rowElement.classList.remove('focused-row');
+                }, 3000);
+            }
+        }
+    })();
+</script>
+
+<style>
+    .focused-row {
+        background-color: #fff3cd !important;
+        box-shadow: inset 0 0 6px rgba(255, 193, 7, 0.3);
+    }
+</style>
 <style>
     .company-table td.actions-col {
         white-space: nowrap;
