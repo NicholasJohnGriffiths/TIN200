@@ -11,6 +11,7 @@
         new
         {
             financialYear = Model.SelectedFinancialYear,
+            companySearch = Model.CompanySearch,
             sortBy = column,
             sortDir = Model.GetNextSortDirection(column)
         },
@@ -35,7 +36,9 @@
                         <option value="@year" selected="@(Model.SelectedFinancialYear == year ? "selected" : null)">@year</option>
                     }
                 </select>
+                <input type="text" name="companySearch" value="@Model.CompanySearch" class="form-control me-2" style="max-width: 340px;" placeholder="Company name or External ID" />
                 <button class="btn btn-outline-primary" type="submit">Apply</button>
+                <a class="btn btn-link" asp-page="./Index" asp-route-financialYear="@Model.SelectedFinancialYear">Clear</a>
             </form>
         </div>
     </div>
@@ -76,7 +79,7 @@
                             <a asp-page="/CompanySurvey/Edit" asp-route-id="@record.Id" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-sm btn-secondary">Edit</a>
                             <a asp-page="/CompanySurvey/Estimation" asp-route-companySurveyId="@record.Id" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-sm btn-outline-success">Estimatation</a>
                             <a asp-page="/CompanySurvey/Notes" asp-route-companySurveyId="@record.Id" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-sm btn-outline-dark">Notes</a>
-                            <a asp-page="/Answers/Index" asp-route-companySurveyId="@record.Id" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-sm btn-primary">Open Answers</a>
+                            <a asp-page="/Answers/Index" asp-route-companySurveyId="@record.Id" asp-route-financialYear="@Model.SelectedFinancialYear" asp-route-companySearch="@Model.CompanySearch" class="btn btn-sm btn-primary">Open Answers</a>
                             <a asp-page="/Company/SendSurvey"
                                asp-route-id="@record.CompanyId"
                                class="btn btn-sm btn-outline-primary send-survey-email-btn"

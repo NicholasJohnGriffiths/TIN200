@@ -27,16 +27,18 @@ namespace TINWeb.Services
             }
 
             var recipientName = string.IsNullOrWhiteSpace(companyName) ? "there" : companyName.Trim();
-            var supportEmail = _surveyLinkSettings.SupportEmail?.Trim();
+            var supportEmail = "tin100@tin100.com";
             var subject = "TIN200 survey request: please review your company details";
             var plainTextBody = $@"Hello {recipientName},
 
 You have been invited to review and update your company details for TIN200.
 
-Open your secure survey link:
+Open your secure survey link
 {surveyUrl}
 
-If you did not expect this email, you can safely ignore it.{(string.IsNullOrWhiteSpace(supportEmail) ? string.Empty : $"\n\nNeed help? Contact {supportEmail}.")}
+If you did not expect this email, you can safely ignore it.
+
+Need help? Contact {supportEmail}.
 
 Regards,
 TIN200 Team";
@@ -45,7 +47,7 @@ TIN200 Team";
 <p>You have been invited to review and update your company details for <strong>TIN200</strong>.</p>
 <p><a href=""{WebUtility.HtmlEncode(surveyUrl)}"">Open your secure survey link</a></p>
 <p>If you did not expect this email, you can safely ignore it.</p>
-{(string.IsNullOrWhiteSpace(supportEmail) ? string.Empty : $"<p>Need help? Contact <a href=\"mailto:{WebUtility.HtmlEncode(supportEmail)}\">{WebUtility.HtmlEncode(supportEmail)}</a>.</p>")}
+<p>Need help? Contact <a href=""mailto:{WebUtility.HtmlEncode(supportEmail)}"">{WebUtility.HtmlEncode(supportEmail)}</a>.</p>
 <p>Regards,<br/>TIN200 Team</p>";
 
             var emailClient = new EmailClient(_emailSettings.ConnectionString);

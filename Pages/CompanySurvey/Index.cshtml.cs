@@ -12,6 +12,7 @@ namespace TINWeb.Pages.CompanySurvey
         public List<int> FinancialYears { get; set; } = new();
         public int? SelectedFinancialYear { get; set; }
         public int TotalCompaniesWithAnswers { get; set; }
+        public string CompanySearch { get; set; } = string.Empty;
         public string SortBy { get; set; } = "CompanyName";
         public string SortDir { get; set; } = "asc";
 
@@ -20,23 +21,32 @@ namespace TINWeb.Pages.CompanySurvey
             _service = service;
         }
 
-        public async Task OnGetAsync(int? financialYear, string? sortBy, string? sortDir)
+        public async Task OnGetAsync(int? financialYear, string? sortBy, string? sortDir, string? companySearch)
         {
             FinancialYears = await _service.GetAvailableFinancialYearsAsync();
 
             SelectedFinancialYear = financialYear ?? await _service.GetCurrentSurveyFinancialYearAsync();
+            CompanySearch = (companySearch ?? string.Empty).Trim();
             SortBy = NormalizeSortBy(sortBy);
             SortDir = NormalizeSortDir(sortDir);
 
             Records = await _service.GetListRowsAsync(SelectedFinancialYear);
+            if (!string.IsNullOrWhiteSpace(CompanySearch))
+            {
+                Records = Records
+                    .Where(x =>
+                        (!string.IsNullOrWhiteSpace(x.CompanyName) && x.CompanyName.Contains(CompanySearch, StringComparison.OrdinalIgnoreCase))
+                        || (!string.IsNullOrWhiteSpace(x.ExternalId) && x.ExternalId.Contains(CompanySearch, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+            }
             Records = ApplySorting(Records, SortBy, SortDir).ToList();
             TotalCompaniesWithAnswers = Records.Count(r => r.AnswerCount > 0);
         }
 
-        public async Task<IActionResult> OnPostBulkSubmitWithAnswersAsync(int? financialYear)
+        public async Task<IActionResult> OnPostBulkSubmitWithAnswersAsync(int? financialYear, string? companySearch)
         {
             await _service.BulkSubmitWithAnswersAsync(financialYear);
-            return RedirectToPage(new { financialYear });
+            return RedirectToPage(new { financialYear, companySearch });
         }
 
         public string GetNextSortDirection(string column)

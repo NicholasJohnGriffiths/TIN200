@@ -233,8 +233,9 @@
                         var submittedDate = option.SubmittedDate?.ToString("dd/MM/yyyy") ?? string.Empty;
                         var requestedDate = option.RequestedDate?.ToString("dd/MM/yyyy") ?? string.Empty;
                         var estimate = option.Estimate ? "Yes" : "No";
+                        var externalId = option.ExternalId ?? string.Empty;
                         <option value="@option.CompanySurveyId" selected="@(Model.SelectedCompanySurveyId == option.CompanySurveyId ? "selected" : null)">
-                            CompanySurvey: #@option.CompanySurveyId | @option.CompanyName | FY: @option.FinancialYear | Estimate: @estimate | Answers: @option.AnswerCount | SavedDate: @savedDate | SubmittedDate: @submittedDate | RequestedDate: @requestedDate
+                            CompanySurvey: #@option.CompanySurveyId | @option.CompanyName | ExternalID: @externalId | FY: @option.FinancialYear | Estimate: @estimate | Answers: @option.AnswerCount | SavedDate: @savedDate | SubmittedDate: @submittedDate | RequestedDate: @requestedDate
                         </option>
                     }
                 </select>

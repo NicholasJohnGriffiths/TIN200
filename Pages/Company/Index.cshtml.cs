@@ -15,6 +15,7 @@ namespace TINWeb.Pages.Company
         public List<int> AvailableLastTin200Years { get; set; } = new();
         public int? SelectedLastTin200Year { get; set; }
         public int? FocusId { get; set; }
+        public string CompanySearch { get; set; } = string.Empty;
         public CompanyService.ResetFyeValuesResult? PreviewSummary { get; set; }
         public CompanyService.CompanyGlobalImportPreviewResult? GlobalImportPreview { get; set; }
         public string? PendingGlobalImportToken { get; set; }
@@ -31,52 +32,52 @@ namespace TINWeb.Pages.Company
             _service = service;
         }
 
-        public async Task OnGetAsync(int? lastTin200Year, int? focusId)
+        public async Task OnGetAsync(int? lastTin200Year, int? focusId, string? companySearch)
         {
             FocusId = focusId;
-            await LoadPageAsync(lastTin200Year);
+            await LoadPageAsync(lastTin200Year, companySearch);
         }
 
-        public async Task<IActionResult> OnPostPreviewResetFyeValuesAsync(int? lastTin200Year)
+        public async Task<IActionResult> OnPostPreviewResetFyeValuesAsync(int? lastTin200Year, string? companySearch)
         {
             PreviewSummary = await _service.PreviewResetFyeValuesFromSurveyAnswersAsync();
-            await LoadPageAsync(lastTin200Year);
+            await LoadPageAsync(lastTin200Year, companySearch);
             return Page();
         }
 
-        public async Task<IActionResult> OnPostResetFyeValuesAsync(int? lastTin200Year)
+        public async Task<IActionResult> OnPostResetFyeValuesAsync(int? lastTin200Year, string? companySearch)
         {
             var result = await _service.ResetFyeValuesFromSurveyAnswersAsync();
 
             if (!result.HasCurrentSurvey)
             {
                 StatusMessage = "Update Company Info skipped: no current survey is configured.";
-                return RedirectToPage(new { lastTin200Year });
+                return RedirectToPage(new { lastTin200Year, companySearch });
             }
 
             StatusMessage = $"Update Company Info complete (Current survey year: {result.CurrentSurveyYear}). Updated {result.UpdatedCompanyCount} of {result.TotalMatchedCompanies} matched company record(s).";
-            return RedirectToPage(new { lastTin200Year });
+            return RedirectToPage(new { lastTin200Year, companySearch });
         }
 
-        public async Task<IActionResult> OnPostPreviewGlobalImportAsync(IFormFile? importFile, int? lastTin200Year, int? importYear)
+        public async Task<IActionResult> OnPostPreviewGlobalImportAsync(IFormFile? importFile, int? lastTin200Year, int? importYear, string? companySearch)
         {
             if (importFile == null || importFile.Length == 0)
             {
                 ErrorMessage = "Global company import failed: please select an Excel file.";
-                return RedirectToPage(new { lastTin200Year });
+                return RedirectToPage(new { lastTin200Year, companySearch });
             }
 
             if (!importYear.HasValue || importYear.Value <= 0)
             {
                 ErrorMessage = "Global company import failed: please provide a valid Import Year.";
-                return RedirectToPage(new { lastTin200Year });
+                return RedirectToPage(new { lastTin200Year, companySearch });
             }
 
             var fileName = importFile.FileName ?? string.Empty;
             if (!fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
             {
                 ErrorMessage = "Global company import failed: only .xlsx Excel files are supported.";
-                return RedirectToPage(new { lastTin200Year });
+                return RedirectToPage(new { lastTin200Year, companySearch });
             }
 
             CleanupExpiredPendingImports();
@@ -103,10 +104,11 @@ namespace TINWeb.Pages.Company
                 TempFilePath = tempFilePath,
                 CreatedUtc = DateTime.UtcNow,
                 LastTin200Year = lastTin200Year,
+                CompanySearch = companySearch,
                 ImportYear = importYear.Value
             };
 
-            await LoadPageAsync(lastTin200Year);
+            await LoadPageAsync(lastTin200Year, companySearch);
             GlobalImportPreview = preview;
             PendingGlobalImportToken = token;
             SelectedImportYear = importYear.Value;
@@ -145,13 +147,14 @@ namespace TINWeb.Pages.Company
                 }
             }
 
-            return RedirectToPage(new { lastTin200Year = pendingImport.LastTin200Year });
+            return RedirectToPage(new { lastTin200Year = pendingImport.LastTin200Year, companySearch = pendingImport.CompanySearch });
         }
 
-        private async Task LoadPageAsync(int? lastTin200Year)
+        private async Task LoadPageAsync(int? lastTin200Year, string? companySearch)
         {
             AvailableLastTin200Years = await _service.GetAvailableLastTin200YearsAsync();
             SelectedImportYear ??= SelectedLastTin200Year;
+            CompanySearch = (companySearch ?? string.Empty).Trim();
             if (lastTin200Year.HasValue)
             {
                 SelectedLastTin200Year = lastTin200Year.Value;
@@ -163,6 +166,15 @@ namespace TINWeb.Pages.Company
             }
 
             Records = await _service.GetAllCompaniesAsync(SelectedLastTin200Year);
+
+            if (!string.IsNullOrWhiteSpace(CompanySearch))
+            {
+                Records = Records
+                    .Where(x =>
+                        (!string.IsNullOrWhiteSpace(x.CompanyName) && x.CompanyName.Contains(CompanySearch, StringComparison.OrdinalIgnoreCase))
+                        || (!string.IsNullOrWhiteSpace(x.ExternalId) && x.ExternalId.Contains(CompanySearch, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+            }
         }
 
         private static void CleanupExpiredPendingImports()
@@ -187,6 +199,7 @@ namespace TINWeb.Pages.Company
             public string TempFilePath { get; set; } = string.Empty;
             public DateTime CreatedUtc { get; set; }
             public int? LastTin200Year { get; set; }
+            public string? CompanySearch { get; set; }
             public int ImportYear { get; set; }
         }
     }

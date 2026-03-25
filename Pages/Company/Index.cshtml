@@ -198,16 +198,19 @@
             <div class="d-inline-flex align-items-center gap-2 flex-wrap justify-content-end">
                 <form method="post" asp-page-handler="PreviewGlobalImport" enctype="multipart/form-data" class="d-inline-flex align-items-center gap-2" id="globalImportForm">
                     <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
+                    <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
                     <input type="number" name="importYear" value="@Model.SelectedImportYear" class="form-control form-control-sm" style="max-width: 120px;" placeholder="Import Year" min="1900" max="9999" />
                     <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="max-width: 220px;" />
                     <button type="submit" class="btn btn-outline-dark btn-sm">Import Global File</button>
                 </form>
                 <form method="post" asp-page-handler="PreviewResetFyeValues" class="d-inline">
                     <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
+                    <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
                     <button type="submit" class="btn btn-outline-secondary me-2" id="companyResetPreviewButton">Preview Summary</button>
                 </form>
                 <form method="post" asp-page-handler="ResetFyeValues" class="d-inline" onsubmit="return confirm('Update company info (CEO name, email, FYE Last Financial Year / Year-1 / Year-2) from survey answers? This will overwrite existing values.');">
                     <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
+                    <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
                     <button type="submit" class="btn btn-outline-warning me-2" id="companyResetButton">Update Company Info</button>
                 </form>
                 <a asp-page="./Create" class="btn btn-primary">
@@ -228,6 +231,7 @@
                         <option value="@y" selected="@(Model.SelectedLastTin200Year == y ? "selected" : null)">@y</option>
                     }
                 </select>
+                <input type="text" name="companySearch" value="@Model.CompanySearch" class="form-control me-2" style="max-width: 340px;" placeholder="Company name or External ID" />
                 <button class="btn btn-outline-primary" type="submit">Apply</button>
                 <button class="btn btn-success ms-2" id="companyExportButton" type="submit" formaction="@Url.Page("./Export")">Export</button>
                 <button class="btn btn-outline-success ms-2" id="companySmExportButton" type="submit" formaction="@Url.Page("./ExportSurveyMonkey")">SM Export</button>

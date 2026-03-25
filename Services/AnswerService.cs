@@ -64,6 +64,7 @@ namespace TINWeb.Services
                     CompanySurveyId = companySurvey.Id,
                     CompanyId = company.Id,
                     CompanyName = company.CompanyName,
+                    ExternalId = company.ExternalId,
                     FinancialYear = survey.FinancialYear,
                     AnswerCount = answerCount != null ? answerCount.AnswerCount : 0,
                     Saved = companySurvey.Saved,
@@ -1913,6 +1914,7 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             public int CompanySurveyId { get; set; }
             public int CompanyId { get; set; }
             public string? CompanyName { get; set; }
+            public string? ExternalId { get; set; }
             public int FinancialYear { get; set; }
             public int AnswerCount { get; set; }
             public bool Saved { get; set; }
