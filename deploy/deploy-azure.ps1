@@ -33,6 +33,9 @@ param(
     [string]$SurveySupportEmail = "",
 
     [Parameter(Mandatory = $false)]
+    [string]$SurveyBaseUrl = "",
+
+    [Parameter(Mandatory = $false)]
     [string]$ConfigPath = "",
 
     [switch]$AllowMyIp
@@ -92,6 +95,7 @@ $SqlAdminUser = Resolve-Setting -CliValue $SqlAdminUser -ConfigValue $config.Sql
 $SqlAdminPassword = Resolve-Setting -CliValue $SqlAdminPassword -ConfigValue $config.SqlAdminPassword -DefaultValue $env:AZURE_SQL_ADMIN_PASSWORD
 $SurveyLinkSecretKey = Resolve-Setting -CliValue $SurveyLinkSecretKey -ConfigValue $config.SurveyLinkSecretKey
 $SurveySupportEmail = Resolve-Setting -CliValue $SurveySupportEmail -ConfigValue $config.SurveySupportEmail
+$SurveyBaseUrl = Resolve-Setting -CliValue $SurveyBaseUrl -ConfigValue $config.SurveyBaseUrl
 
 if ($SurveyLinkExpiryHours -eq 72 -and $null -ne $config.SurveyLinkExpiryHours) {
     $SurveyLinkExpiryHours = [int]$config.SurveyLinkExpiryHours
@@ -176,7 +180,11 @@ az webapp create `
 $connectionString = "Server=tcp:$SqlServerName.database.windows.net,1433;Initial Catalog=$SqlDatabaseName;Persist Security Info=False;User ID=$SqlAdminUser;Password=$SqlAdminPassword;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
 
 Write-Host "Configuring app settings and SQL connection string..."
-$surveyBaseUrl = "https://$WebAppName.azurewebsites.net"
+$surveyBaseUrl = if (-not [string]::IsNullOrWhiteSpace($SurveyBaseUrl)) {
+    $SurveyBaseUrl.Trim().TrimEnd('/')
+} else {
+    "https://$WebAppName.azurewebsites.net"
+}
 
 $appSettings = @(
     "ASPNETCORE_ENVIRONMENT=Production",
