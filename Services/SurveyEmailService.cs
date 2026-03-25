@@ -27,7 +27,7 @@ namespace TINWeb.Services
             }
 
             var recipientName = string.IsNullOrWhiteSpace(companyName) ? "there" : companyName.Trim();
-            var supportEmail = "tin100@tin100.com";
+            var supportEmail = "tin100@tinetwork.com";
             var subject = "TIN200 survey request: please review your company details";
             var plainTextBody = $@"Hello {recipientName},
 
