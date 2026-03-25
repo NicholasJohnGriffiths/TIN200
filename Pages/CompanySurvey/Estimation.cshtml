@@ -553,6 +553,30 @@
             }
 
             document.addEventListener('DOMContentLoaded', function () {
+                function expandAncestorCollapse(card) {
+                    if (!card) {
+                        return;
+                    }
+
+                    var collapseElement = card.closest('.collapse');
+                    if (!collapseElement || collapseElement.classList.contains('show')) {
+                        return;
+                    }
+
+                    if (window.bootstrap && window.bootstrap.Collapse) {
+                        var collapseInstance = window.bootstrap.Collapse.getOrCreateInstance(collapseElement, { toggle: false });
+                        collapseInstance.show();
+                        return;
+                    }
+
+                    collapseElement.classList.add('show');
+
+                    var toggleButton = document.querySelector('[data-bs-target="#' + collapseElement.id + '"]');
+                    if (toggleButton) {
+                        toggleButton.setAttribute('aria-expanded', 'true');
+                    }
+                }
+
                 var container = document.querySelector('.container[data-target-financial-year]');
                 var checkedMetricKey = container ? (container.getAttribute('data-check-metric-key') || '') : '';
                 var checkedHasValue = container ? (container.getAttribute('data-check-has-value') === 'true') : false;
@@ -716,6 +740,7 @@
                 }
 
                 if (checkedMetricKey && checkedTargetCard) {
+                    expandAncestorCollapse(checkedTargetCard);
                     checkedTargetCard.classList.add('estimation-focus-card');
                     checkedTargetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
@@ -728,6 +753,7 @@
                         checkedTargetCard.classList.remove('estimation-focus-card');
                     }, 1800);
                 } else if (appliedMetricKey && appliedTargetCard) {
+                    expandAncestorCollapse(appliedTargetCard);
                     appliedTargetCard.classList.add('estimation-focus-card');
                     appliedTargetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
