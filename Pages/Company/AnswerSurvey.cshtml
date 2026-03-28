@@ -285,13 +285,13 @@
                                                     }
                                                 </td>
                                                 <td class="text-body-secondary small">
-                                                    <div class="d-flex flex-wrap align-items-center gap-2">
-                                                        <span>@(Model.Rows[i].PreviousYearValue ?? "—")</span>
+                                                    <div class="d-flex align-items-center gap-2 w-100">
+                                                        <span class="text-truncate">@(Model.Rows[i].PreviousYearValue ?? "—")</span>
                                                         @if (hasPreviousYearValue)
                                                         {
                                                             <button
                                                                 type="button"
-                                                                class="btn btn-sm btn-outline-secondary copy-prev-year-btn"
+                                                                class="btn btn-sm btn-outline-secondary copy-prev-year-btn ms-auto"
                                                                 data-row-index="@i"
                                                                 data-answer-type="@answerType"
                                                                 data-prev-text="@previousYearText"
