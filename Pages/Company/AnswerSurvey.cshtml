@@ -207,8 +207,10 @@
 
                                             <tr class="survey-answer-row" data-row-index="@i">
                                                 <td>
-                                                    <div class="small text-muted">Q@(Model.Rows[i].OrderNumber?.ToString() ?? "-")</div>
-                                                    <div class="fw-semibold small">@Model.Rows[i].QuestionText</div>
+                                                    <div class="fw-semibold small d-flex flex-wrap align-items-baseline gap-2">
+                                                        <span class="text-muted">Q@(Model.Rows[i].OrderNumber?.ToString() ?? "-")</span>
+                                                        <span>@Model.Rows[i].QuestionText</span>
+                                                    </div>
                                                     <input type="hidden" asp-for="Rows[i].QuestionId" />
                                                     <input type="hidden" asp-for="Rows[i].OrderNumber" />
                                                     <input type="hidden" asp-for="Rows[i].GroupId" />
@@ -283,20 +285,22 @@
                                                     }
                                                 </td>
                                                 <td class="text-body-secondary small">
-                                                    @(Model.Rows[i].PreviousYearValue ?? "—")
-                                                    @if (hasPreviousYearValue)
-                                                    {
-                                                        <button
-                                                            type="button"
-                                                            class="btn btn-sm btn-outline-secondary d-block mt-1 copy-prev-year-btn"
-                                                            data-row-index="@i"
-                                                            data-answer-type="@answerType"
-                                                            data-prev-text="@previousYearText"
-                                                            data-prev-number="@previousYearNumber"
-                                                            data-prev-currency="@previousYearCurrency">
-                                                            Copy
-                                                        </button>
-                                                    }
+                                                    <div class="d-flex flex-wrap align-items-center gap-2">
+                                                        <span>@(Model.Rows[i].PreviousYearValue ?? "—")</span>
+                                                        @if (hasPreviousYearValue)
+                                                        {
+                                                            <button
+                                                                type="button"
+                                                                class="btn btn-sm btn-outline-secondary copy-prev-year-btn"
+                                                                data-row-index="@i"
+                                                                data-answer-type="@answerType"
+                                                                data-prev-text="@previousYearText"
+                                                                data-prev-number="@previousYearNumber"
+                                                                data-prev-currency="@previousYearCurrency">
+                                                                Copy
+                                                            </button>
+                                                        }
+                                                    </div>
                                                 </td>
                                             </tr>
                                         }
