@@ -35,5 +35,9 @@ namespace TINWeb.Models
         public DateTime? SubmittedDate { get; set; }
 
         public DateTime? RequestedDate { get; set; }
+
+        public bool? SurveyEmailSent { get; set; }
+
+        public DateTime? SurveyEmailSentLastDate { get; set; }
     }
 }

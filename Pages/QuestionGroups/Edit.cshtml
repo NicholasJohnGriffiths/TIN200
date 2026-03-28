@@ -28,6 +28,13 @@
         </div>
 
         <div class="form-group mb-3">
+            <div class="form-check">
+                <input asp-for="Record.TableFormat" class="form-check-input" />
+                <label asp-for="Record.TableFormat" class="form-check-label">Table Format (display questions as a compact table)</label>
+            </div>
+        </div>
+
+        <div class="form-group mb-3">
             <label class="form-label">Image 1</label>
             <input asp-for="Image1File" type="file" class="form-control" accept="image/*" />
             <div class="form-check mt-1">

@@ -134,7 +134,7 @@ namespace TINWeb.Pages.Company
                 var detail = string.IsNullOrWhiteSpace(firstFailureReason)
                     ? string.Empty
                     : $" First error: {firstFailureReason}";
-                ModelState.AddModelError(string.Empty, $"Some emails could not be sent. Please check SMTP settings and retry.{detail}");
+                ModelState.AddModelError(string.Empty, $"Some emails could not be sent. Please check Azure Communication Email settings and retry.{detail}");
                 return Page();
             }
 
@@ -167,18 +167,61 @@ namespace TINWeb.Pages.Company
         {
             var clients = await _companyService.GetAllCompaniesAsync();
             var lockedCompanyIds = await GetLockedCompanyIdsForCurrentSurveyAsync();
+            var surveyEmailStatusByCompanyId = await GetSurveyEmailStatusByCompanyIdForCurrentSurveyAsync();
 
             AvailableClients = clients
                 .OrderBy(c => c.CompanyName)
                 .ThenBy(c => c.Id)
-                .Select(c => new SurveyClientRow
+                .Select(c =>
                 {
-                    Id = c.Id,
-                    CompanyName = c.CompanyName,
-                    Email = c.Email,
-                    IsLocked = lockedCompanyIds.Contains(c.Id)
+                    surveyEmailStatusByCompanyId.TryGetValue(c.Id, out var status);
+
+                    return new SurveyClientRow
+                    {
+                        Id = c.Id,
+                        CompanyName = c.CompanyName,
+                        Email = c.Email,
+                        IsLocked = lockedCompanyIds.Contains(c.Id),
+                        SurveyEmailSent = status?.SurveyEmailSent ?? false,
+                        SurveyEmailSentLastDate = status?.SurveyEmailSentLastDate
+                    };
                 })
                 .ToList();
+        }
+
+        private async Task<Dictionary<int, SurveyEmailStatus>> GetSurveyEmailStatusByCompanyIdForCurrentSurveyAsync()
+        {
+            var currentSurveyId = await _context.Survey
+                .Where(s => s.CurrentSurvey)
+                .OrderByDescending(s => s.FinancialYear)
+                .ThenByDescending(s => s.Id)
+                .Select(s => (int?)s.Id)
+                .FirstOrDefaultAsync();
+
+            if (!currentSurveyId.HasValue)
+            {
+                return new Dictionary<int, SurveyEmailStatus>();
+            }
+
+            return await _context.CompanySurvey
+                .Where(cs => cs.SurveyId == currentSurveyId.Value)
+                .GroupBy(cs => cs.CompanyId)
+                .Select(g => g
+                    .OrderByDescending(cs => cs.Id)
+                    .Select(cs => new
+                    {
+                        cs.CompanyId,
+                        cs.SurveyEmailSent,
+                        cs.SurveyEmailSentLastDate
+                    })
+                    .First())
+                .ToDictionaryAsync(
+                    x => x.CompanyId,
+                    x => new SurveyEmailStatus
+                    {
+                        SurveyEmailSent = x.SurveyEmailSent ?? false,
+                        SurveyEmailSentLastDate = x.SurveyEmailSentLastDate
+                    });
         }
 
         private async Task<HashSet<int>> GetLockedCompanyIdsForCurrentSurveyAsync()
@@ -209,6 +252,14 @@ namespace TINWeb.Pages.Company
             public string? CompanyName { get; set; }
             public string? Email { get; set; }
             public bool IsLocked { get; set; }
+            public bool SurveyEmailSent { get; set; }
+            public DateTime? SurveyEmailSentLastDate { get; set; }
+        }
+
+        private class SurveyEmailStatus
+        {
+            public bool SurveyEmailSent { get; set; }
+            public DateTime? SurveyEmailSentLastDate { get; set; }
         }
     }
 }

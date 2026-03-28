@@ -64,7 +64,23 @@ TIN200 Team";
                     new(recipientEmail)
                 }));
 
-            EmailSendOperation operation = await emailClient.SendAsync(WaitUntil.Completed, emailMessage);
+            EmailSendOperation operation;
+            try
+            {
+                operation = await emailClient.SendAsync(WaitUntil.Completed, emailMessage);
+            }
+            catch (RequestFailedException ex) when (ex.Status == 401)
+            {
+                throw new InvalidOperationException(
+                    "Azure Communication Email authorization failed (401). Verify AzureCommunicationEmail__ConnectionString is from the correct Communication Services resource and AzureCommunicationEmail__FromEmail is a sender address from a verified/connected domain for that resource.",
+                    ex);
+            }
+            catch (RequestFailedException ex)
+            {
+                throw new InvalidOperationException(
+                    $"Azure Communication Email send failed. Status: {ex.Status}, Code: {ex.ErrorCode}, Message: {ex.Message}",
+                    ex);
+            }
 
             if (operation.HasCompleted && operation.Value.Status != EmailSendStatus.Succeeded)
             {

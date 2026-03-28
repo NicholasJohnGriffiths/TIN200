@@ -185,6 +185,14 @@ namespace TINWeb.Data
                     .HasColumnName("RequestedDate")
                     .HasColumnType("datetime2");
 
+                entity.Property(e => e.SurveyEmailSent)
+                    .HasColumnName("SurveyEmailSent")
+                    .HasColumnType("bit");
+
+                entity.Property(e => e.SurveyEmailSentLastDate)
+                    .HasColumnName("SurveyEmailSentLastDate")
+                    .HasColumnType("date");
+
                 entity.HasOne<Tin200>()
                     .WithMany()
                     .HasForeignKey(e => e.CompanyId)

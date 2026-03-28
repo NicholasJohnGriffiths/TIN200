@@ -22,5 +22,7 @@ namespace TINWeb.Models
         public int? ImageId3 { get; set; }
 
         public bool? IncludeInEstimation { get; set; }
+
+        public bool TableFormat { get; set; }
     }
 }

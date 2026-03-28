@@ -12,6 +12,7 @@
         {
             financialYear = Model.SelectedFinancialYear,
             companySearch = Model.CompanySearch,
+            surveyEmailSentFilter = Model.SurveyEmailSentFilter,
             sortBy = column,
             sortDir = Model.GetNextSortDirection(column)
         },
@@ -37,6 +38,11 @@
                     }
                 </select>
                 <input type="text" name="companySearch" value="@Model.CompanySearch" class="form-control me-2" style="max-width: 340px;" placeholder="Company name or External ID" />
+                <select name="surveyEmailSentFilter" class="form-select me-2" aria-label="Survey email sent filter" style="max-width: 160px;">
+                    <option value="all" selected="@(Model.SurveyEmailSentFilter == "all" ? "selected" : null)">All</option>
+                    <option value="sent" selected="@(Model.SurveyEmailSentFilter == "sent" ? "selected" : null)">Sent</option>
+                    <option value="not-sent" selected="@(Model.SurveyEmailSentFilter == "not-sent" ? "selected" : null)">Not sent</option>
+                </select>
                 <button class="btn btn-outline-primary" type="submit">Apply</button>
                 <a class="btn btn-link" asp-page="./Index" asp-route-financialYear="@Model.SelectedFinancialYear">Clear</a>
             </form>
@@ -57,6 +63,8 @@
                     <th><a class="link-light text-decoration-none" href="@SortHref("RequestedDate")"><span>Requested Date</span><span>@Model.GetSortIndicator("RequestedDate")</span></a></th>
                     <th><a class="link-light text-decoration-none" href="@SortHref("Locked")"><span>Locked</span><span>@Model.GetSortIndicator("Locked")</span></a></th>
                     <th><a class="link-light text-decoration-none" href="@SortHref("Estimate")"><span>Estimate</span><span>@Model.GetSortIndicator("Estimate")</span></a></th>
+                    <th>Survey Email Sent</th>
+                    <th>Survey Email Sent Last Date</th>
                     <th><a class="link-light text-decoration-none" href="@SortHref("AnswerCount")"><span>Answers</span><span>@Model.GetSortIndicator("AnswerCount")</span></a></th>
                     <th>Actions</th>
                 </tr>
@@ -74,6 +82,8 @@
                         <td>@(record.RequestedDate?.ToString("dd/MM/yyyy") ?? string.Empty)</td>
                         <td>@(record.Locked ? "Yes" : "No")</td>
                         <td>@(record.Estimate ? "Yes" : "No")</td>
+                        <td>@(record.SurveyEmailSent ? "Yes" : "No")</td>
+                        <td>@(record.SurveyEmailSentLastDate?.ToString("dd/MM/yyyy") ?? string.Empty)</td>
                         <td>@record.AnswerCount</td>
                         <td class="actions-col text-nowrap">
                             <a asp-page="/CompanySurvey/Edit" asp-route-id="@record.Id" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-sm btn-secondary">Edit</a>

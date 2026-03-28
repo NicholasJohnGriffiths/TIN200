@@ -22,6 +22,7 @@
                     <th>Order</th>
                     <th>Title</th>
                     <th>Description</th>
+                    <th>Table Format</th>
                     <th>Image1</th>
                     <th>Image2</th>
                     <th>Image3</th>
@@ -35,6 +36,7 @@
                         <td>@record.OrderNumber</td>
                         <td>@record.Title</td>
                         <td>@record.Description</td>
+                        <td>@(record.TableFormat ? "Yes" : "")</td>
                         <td>
                             @if (record.ImageId1.HasValue && Model.ImageDetailsById.TryGetValue(record.ImageId1.Value, out var image1))
                             {
@@ -62,7 +64,7 @@
                                 </div>
                             }
                         </td>
-                        <td>
+                        <td style="white-space:nowrap;">
                             <a asp-page="./Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
                             <a asp-page="./Edit" asp-route-id="@record.Id" class="btn btn-sm btn-warning">Edit</a>
                             <a asp-page="./Delete" asp-route-id="@record.Id" class="btn btn-sm btn-danger">Delete</a>

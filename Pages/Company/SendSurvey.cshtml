@@ -71,6 +71,15 @@
                             <button type="button" class="btn btn-outline-secondary btn-sm client-filter-btn" data-filter="missing-email">Missing Email</button>
                         </div>
 
+                        <div class="mb-3 d-flex align-items-center" role="group" aria-label="Survey email sent filter">
+                            <label for="surveyEmailSentFilter" class="form-label me-2 mb-0">Survey Email Sent</label>
+                            <select id="surveyEmailSentFilter" class="form-select form-select-sm" style="max-width: 180px;">
+                                <option value="all">All</option>
+                                <option value="sent">Sent</option>
+                                <option value="not-sent">Not sent</option>
+                            </select>
+                        </div>
+
                         <div id="clientListContainer" class="table-responsive" style="max-height: 420px; overflow-y: auto;">
                             <table class="table table-striped align-middle company-table">
                                 <thead class="table-light">
@@ -86,6 +95,8 @@
                                             <button type="button" class="btn btn-link p-0 sort-header" data-sort-key="email">Email</button>
                                         </th>
                                         <th style="width: 120px;">Survey Locked</th>
+                                        <th style="width: 140px;">Survey Email Sent</th>
+                                        <th style="width: 170px;">Survey Email Sent Last Date</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -99,7 +110,7 @@
                                         var searchText = $"{clientRow.Id} {clientRow.CompanyName} {clientRow.Email}".ToLowerInvariant();
                                         var companySort = (clientRow.CompanyName ?? string.Empty).ToLowerInvariant();
                                         var emailSort = (clientRow.Email ?? string.Empty).ToLowerInvariant();
-                                        <tr class="@(Model.SelectedClientIds.Contains(clientRow.Id) ? "preselected-client-row" : string.Empty)" data-search="@searchText" data-has-email="@(hasEmail ? "true" : "false")" data-id="@clientRow.Id" data-company="@companySort" data-email="@emailSort">
+                                        <tr class="@(Model.SelectedClientIds.Contains(clientRow.Id) ? "preselected-client-row" : string.Empty)" data-search="@searchText" data-has-email="@(hasEmail ? "true" : "false")" data-id="@clientRow.Id" data-company="@companySort" data-email="@emailSort" data-survey-email-sent="@(clientRow.SurveyEmailSent ? "true" : "false")">
                                             <td>
                                                 @if (canSend)
                                                 {
@@ -135,6 +146,8 @@
                                                     <span class="text-muted">No</span>
                                                 }
                                             </td>
+                                            <td>@(clientRow.SurveyEmailSent ? "Yes" : "No")</td>
+                                            <td>@(clientRow.SurveyEmailSentLastDate?.ToString("dd/MM/yyyy") ?? string.Empty)</td>
                                         </tr>
                                     }
                                 </tbody>
@@ -182,6 +195,7 @@
             const clearAllBtn = document.getElementById('clearAllClientsBtn');
             const sendToAllToggle = document.getElementById('SendToAllClients');
             const searchInput = document.getElementById('clientSearchInput');
+            const surveyEmailSentFilterSelect = document.getElementById('surveyEmailSentFilter');
             const filterButtons = Array.from(document.querySelectorAll('.client-filter-btn'));
             const sortButtons = Array.from(document.querySelectorAll('.sort-header'));
             const selectableCheckboxes = Array.from(document.querySelectorAll('.client-selector:not([disabled])'));
@@ -206,6 +220,8 @@
             let searchParam = null;
             let filterParam = null;
             let activeFilter = 'all';
+            let surveyEmailSentFilterParam = null;
+            let activeSurveyEmailSentFilter = 'all';
             let sortKey = 'company';
             let sortDir = 'asc';
             let bulkProgressTimerId = null;
@@ -223,6 +239,7 @@
 
             searchParam = url.searchParams.get('search');
             filterParam = url.searchParams.get('filter');
+            surveyEmailSentFilterParam = url.searchParams.get('surveyEmailSentFilter');
 
             const sortParam = (url.searchParams.get('sort') || '').toLowerCase();
             const sortDirParam = (url.searchParams.get('dir') || '').toLowerCase();
@@ -309,6 +326,12 @@
                     url.searchParams.set('filter', activeFilter);
                 } else {
                     url.searchParams.delete('filter');
+                }
+
+                if (activeSurveyEmailSentFilter && activeSurveyEmailSentFilter !== 'all') {
+                    url.searchParams.set('surveyEmailSentFilter', activeSurveyEmailSentFilter);
+                } else {
+                    url.searchParams.delete('surveyEmailSentFilter');
                 }
 
                 if (sortKey !== 'company') {
@@ -418,14 +441,19 @@
                 rows.forEach(function (row) {
                     const haystack = row.getAttribute('data-search') || '';
                     const hasEmail = (row.getAttribute('data-has-email') || 'false') === 'true';
+                    const surveyEmailSent = (row.getAttribute('data-survey-email-sent') || 'false') === 'true';
 
                     const matchesSearch = !term || haystack.includes(term);
                     const matchesEmailFilter =
                         activeFilter === 'all' ||
                         (activeFilter === 'has-email' && hasEmail) ||
                         (activeFilter === 'missing-email' && !hasEmail);
+                    const matchesSurveyEmailSentFilter =
+                        activeSurveyEmailSentFilter === 'all' ||
+                        (activeSurveyEmailSentFilter === 'sent' && surveyEmailSent) ||
+                        (activeSurveyEmailSentFilter === 'not-sent' && !surveyEmailSent);
 
-                    row.style.display = matchesSearch && matchesEmailFilter ? '' : 'none';
+                    row.style.display = matchesSearch && matchesEmailFilter && matchesSurveyEmailSentFilter ? '' : 'none';
                 });
 
                 syncUrlState();
@@ -437,6 +465,14 @@
 
             if (filterParam && ['all', 'has-email', 'missing-email'].includes(filterParam)) {
                 activeFilter = filterParam;
+            }
+
+            if (surveyEmailSentFilterParam && ['all', 'sent', 'not-sent'].includes(surveyEmailSentFilterParam)) {
+                activeSurveyEmailSentFilter = surveyEmailSentFilterParam;
+            }
+
+            if (surveyEmailSentFilterSelect) {
+                surveyEmailSentFilterSelect.value = activeSurveyEmailSentFilter;
             }
 
             setActiveFilterButton();
@@ -456,6 +492,13 @@
                     applyFilters();
                 });
             });
+
+            if (surveyEmailSentFilterSelect) {
+                surveyEmailSentFilterSelect.addEventListener('change', function () {
+                    activeSurveyEmailSentFilter = surveyEmailSentFilterSelect.value || 'all';
+                    applyFilters();
+                });
+            }
 
             sortButtons.forEach(function (button) {
                 button.addEventListener('click', function () {

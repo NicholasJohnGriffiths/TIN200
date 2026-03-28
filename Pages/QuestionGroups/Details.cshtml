@@ -13,6 +13,8 @@
         <dt class="col-sm-3">Order</dt><dd class="col-sm-9">@Model.Record.OrderNumber</dd>
         <dt class="col-sm-3">Title</dt><dd class="col-sm-9">@Model.Record.Title</dd>
         <dt class="col-sm-3">Description</dt><dd class="col-sm-9">@Model.Record.Description</dd>
+        <dt class="col-sm-3">Table Format</dt><dd class="col-sm-9">@(Model.Record.TableFormat ? "Yes" : "No")</dd>
+
         <dt class="col-sm-3">Image 1</dt>
         <dd class="col-sm-9">
             @if (Model.Image1Details != null)

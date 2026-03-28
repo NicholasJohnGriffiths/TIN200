@@ -13,6 +13,7 @@ namespace TINWeb.Pages.CompanySurvey
         public int? SelectedFinancialYear { get; set; }
         public int TotalCompaniesWithAnswers { get; set; }
         public string CompanySearch { get; set; } = string.Empty;
+        public string SurveyEmailSentFilter { get; set; } = "all";
         public string SortBy { get; set; } = "CompanyName";
         public string SortDir { get; set; } = "asc";
 
@@ -21,16 +22,27 @@ namespace TINWeb.Pages.CompanySurvey
             _service = service;
         }
 
-        public async Task OnGetAsync(int? financialYear, string? sortBy, string? sortDir, string? companySearch)
+        public async Task OnGetAsync(int? financialYear, string? sortBy, string? sortDir, string? companySearch, string? surveyEmailSentFilter)
         {
             FinancialYears = await _service.GetAvailableFinancialYearsAsync();
 
             SelectedFinancialYear = financialYear ?? await _service.GetCurrentSurveyFinancialYearAsync();
             CompanySearch = (companySearch ?? string.Empty).Trim();
+            SurveyEmailSentFilter = NormalizeSurveyEmailSentFilter(surveyEmailSentFilter);
             SortBy = NormalizeSortBy(sortBy);
             SortDir = NormalizeSortDir(sortDir);
 
             Records = await _service.GetListRowsAsync(SelectedFinancialYear);
+
+            if (string.Equals(SurveyEmailSentFilter, "sent", StringComparison.OrdinalIgnoreCase))
+            {
+                Records = Records.Where(x => x.SurveyEmailSent).ToList();
+            }
+            else if (string.Equals(SurveyEmailSentFilter, "not-sent", StringComparison.OrdinalIgnoreCase))
+            {
+                Records = Records.Where(x => !x.SurveyEmailSent).ToList();
+            }
+
             if (!string.IsNullOrWhiteSpace(CompanySearch))
             {
                 Records = Records
@@ -43,10 +55,20 @@ namespace TINWeb.Pages.CompanySurvey
             TotalCompaniesWithAnswers = Records.Count(r => r.AnswerCount > 0);
         }
 
-        public async Task<IActionResult> OnPostBulkSubmitWithAnswersAsync(int? financialYear, string? companySearch)
+        public async Task<IActionResult> OnPostBulkSubmitWithAnswersAsync(int? financialYear, string? companySearch, string? surveyEmailSentFilter)
         {
             await _service.BulkSubmitWithAnswersAsync(financialYear);
-            return RedirectToPage(new { financialYear, companySearch });
+            return RedirectToPage(new { financialYear, companySearch, surveyEmailSentFilter });
+        }
+
+        private static string NormalizeSurveyEmailSentFilter(string? surveyEmailSentFilter)
+        {
+            return surveyEmailSentFilter?.Trim().ToLowerInvariant() switch
+            {
+                "sent" => "sent",
+                "not-sent" => "not-sent",
+                _ => "all"
+            };
         }
 
         public string GetNextSortDirection(string column)

@@ -70,6 +70,7 @@ namespace TINWeb.Services
             existing.OrderNumber = record.OrderNumber;
             existing.Title = record.Title;
             existing.Description = record.Description;
+            existing.TableFormat = record.TableFormat;
 
             if (clearImage1)
             {
@@ -194,6 +195,39 @@ END;
 IF COL_LENGTH('dbo.QuestionGroup', 'ImageId3') IS NULL
 BEGIN
     ALTER TABLE [dbo].[QuestionGroup] ADD [ImageId3] [int] NULL;
+END;
+
+IF COL_LENGTH('dbo.QuestionGroup', 'TableFormat') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[QuestionGroup] ADD [TableFormat] [bit] NOT NULL CONSTRAINT [DF_QuestionGroup_TableFormat] DEFAULT (0);
+END;
+
+IF COL_LENGTH('dbo.QuestionGroup', 'TableFormat') IS NOT NULL
+BEGIN
+    UPDATE [dbo].[QuestionGroup]
+    SET [TableFormat] = 0
+    WHERE [TableFormat] IS NULL;
+
+    IF EXISTS (
+        SELECT 1
+        FROM sys.columns
+        WHERE object_id = OBJECT_ID(N'[dbo].[QuestionGroup]')
+          AND name = 'TableFormat'
+          AND is_nullable = 1)
+    BEGIN
+        ALTER TABLE [dbo].[QuestionGroup] ALTER COLUMN [TableFormat] [bit] NOT NULL;
+    END;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM sys.columns
+        WHERE object_id = OBJECT_ID(N'[dbo].[QuestionGroup]')
+          AND name = 'TableFormat'
+          AND default_object_id <> 0)
+    BEGIN
+        ALTER TABLE [dbo].[QuestionGroup]
+        ADD CONSTRAINT [DF_QuestionGroup_TableFormat] DEFAULT (0) FOR [TableFormat];
+    END;
 END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'FK_QuestionGroup_Image1')

@@ -458,6 +458,7 @@ namespace TINWeb.Pages.Company
                         GroupImageId1 = group?.ImageId1,
                         GroupImageId2 = group?.ImageId2,
                         GroupImageId3 = group?.ImageId3,
+                        GroupTableFormat = group?.TableFormat ?? false,
                         QuestionText = question.QuestionText,
                         AnswerType = question.AnswerType,
                         ChoiceOptions = GetChoiceOptions(question),
@@ -681,6 +682,7 @@ namespace TINWeb.Pages.Company
             public int? GroupImageId1 { get; set; }
             public int? GroupImageId2 { get; set; }
             public int? GroupImageId3 { get; set; }
+            public bool GroupTableFormat { get; set; }
             public string? QuestionText { get; set; }
             public string? AnswerType { get; set; }
             public List<string> ChoiceOptions { get; set; } = new();
