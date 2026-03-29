@@ -39,7 +39,8 @@ namespace TINWeb.Pages.Testing.TestCompanies
             }
             catch (Exception ex)
             {
-                ErrorMessage = $"Failed to duplicate test company. {ex.Message}";
+                var rootErrorMessage = ex.GetBaseException().Message;
+                ErrorMessage = $"Failed to duplicate test company. {rootErrorMessage}";
             }
 
             return RedirectToPage(new { search = Search });

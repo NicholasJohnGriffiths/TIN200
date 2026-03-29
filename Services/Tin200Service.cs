@@ -190,18 +190,20 @@ namespace TINWeb.Services
                 .ToListAsync();
 
             var nextExternalId = ResolveNextExternalId(sourceCompany.ExternalId, existingExternalIds);
-            var duplicateName = string.IsNullOrWhiteSpace(sourceCompany.CompanyName)
-                ? "Company - copy"
-                : $"{sourceCompany.CompanyName.Trim()} - copy";
+            var duplicateName = BuildDuplicateCompanyName(sourceCompany.CompanyName);
+            var nextCompanyId = await _context.Tin200
+                .Select(x => (int?)x.Id)
+                .MaxAsync() ?? 0;
 
             await using var transaction = await _context.Database.BeginTransactionAsync();
 
             var duplicatedCompany = new Tin200
             {
+                Id = nextCompanyId + 1,
                 CeoFirstName = sourceCompany.CeoFirstName,
                 CeoLastName = sourceCompany.CeoLastName,
                 Email = sourceCompany.Email,
-                ExternalId = nextExternalId,
+                ExternalId = ClampToMaxLength(nextExternalId, 50),
                 CompanyName = duplicateName,
                 CompanyDescription = sourceCompany.CompanyDescription,
                 ExternalIdImportColumnName = sourceCompany.ExternalIdImportColumnName,
@@ -311,6 +313,32 @@ namespace TINWeb.Services
                 .Max();
 
             return (maxNumericExternalId + 1).ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static string BuildDuplicateCompanyName(string? sourceCompanyName)
+        {
+            var baseName = string.IsNullOrWhiteSpace(sourceCompanyName)
+                ? "Company"
+                : sourceCompanyName.Trim();
+
+            var suffix = " - copy";
+            var maxBaseLength = Math.Max(1, 255 - suffix.Length);
+            if (baseName.Length > maxBaseLength)
+            {
+                baseName = baseName.Substring(0, maxBaseLength);
+            }
+
+            return baseName + suffix;
+        }
+
+        private static string ClampToMaxLength(string value, int maxLength)
+        {
+            if (string.IsNullOrEmpty(value) || value.Length <= maxLength)
+            {
+                return value;
+            }
+
+            return value.Substring(0, maxLength);
         }
 
         public async Task<CompanyGlobalImportPreviewResult> PreviewGlobalImportFromExcelAsync(Stream excelStream, int importYear)
