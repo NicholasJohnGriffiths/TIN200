@@ -184,6 +184,7 @@
 
                 <form method="post" asp-page-handler="ApplyGlobalImport" class="d-inline" id="applyGlobalImportForm">
                     <input type="hidden" name="previewToken" value="@Model.PendingGlobalImportToken" />
+                    <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
                     <button type="submit" class="btn btn-dark">Apply Global Import</button>
                 </form>
             </div>
@@ -199,6 +200,7 @@
                 <form method="post" asp-page-handler="PreviewGlobalImport" enctype="multipart/form-data" class="d-inline-flex align-items-center gap-2" id="globalImportForm">
                     <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
                     <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
+                    <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
                     <input type="number" name="importYear" value="@Model.SelectedImportYear" class="form-control form-control-sm" style="max-width: 120px;" placeholder="Import Year" min="1900" max="9999" />
                     <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="max-width: 220px;" />
                     <button type="submit" class="btn btn-outline-dark btn-sm">Import Global File</button>
@@ -206,11 +208,13 @@
                 <form method="post" asp-page-handler="PreviewResetFyeValues" class="d-inline">
                     <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
                     <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
+                    <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
                     <button type="submit" class="btn btn-outline-secondary me-2" id="companyResetPreviewButton">Preview Summary</button>
                 </form>
                 <form method="post" asp-page-handler="ResetFyeValues" class="d-inline" onsubmit="return confirm('Update company info (CEO name, email, FYE Last Financial Year / Year-1 / Year-2) from survey answers? This will overwrite existing values.');">
                     <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
                     <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
+                    <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
                     <button type="submit" class="btn btn-outline-warning me-2" id="companyResetButton">Update Company Info</button>
                 </form>
                 <a asp-page="./Create" class="btn btn-primary">
@@ -232,6 +236,10 @@
                     }
                 </select>
                 <input type="text" name="companySearch" value="@Model.CompanySearch" class="form-control me-2" style="max-width: 340px;" placeholder="Company name or External ID" />
+                <div class="form-check align-self-center me-2">
+                    <input class="form-check-input" type="checkbox" id="showTestCompanies" name="showTestCompanies" value="true" @(Model.ShowTestCompanies ? "checked" : null) />
+                    <label class="form-check-label" for="showTestCompanies">Show Test Companies</label>
+                </div>
                 <button class="btn btn-outline-primary" type="submit">Apply</button>
                 <button class="btn btn-success ms-2" id="companyExportButton" type="submit" formaction="@Url.Page("./Export")">Export</button>
                 <button class="btn btn-outline-success ms-2" id="companySmExportButton" type="submit" formaction="@Url.Page("./ExportSurveyMonkey")">SM Export</button>
@@ -266,6 +274,7 @@
                         <th class="sortable" data-type="number">FYE Year-2</th>
                         <th class="sortable" data-type="number">Financial Year</th>
                         <th class="sortable" data-type="number">Last TIN200 Year</th>
+                        <th class="sortable" data-type="string">Test</th>
                         <th class="actions-header">Actions</th>
                     </tr>
                 </thead>
@@ -283,6 +292,7 @@
                             <td>@(record.Fye2023.HasValue ? record.Fye2023.Value.ToString("C0") : "")</td>
                             <td>@record.FinancialYear</td>
                             <td>@record.LastTIN200Year</td>
+                            <td>@(record.Test ? "Yes" : "No")</td>
                             <td class="actions-col">
                                 <a asp-page="./Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
                                 <a asp-page="./Edit" asp-route-id="@record.Id" asp-route-lastTin200Year="@Model.SelectedLastTin200Year" class="btn btn-sm btn-warning">Edit</a>

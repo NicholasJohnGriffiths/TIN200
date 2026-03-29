@@ -2,7 +2,7 @@
 @model TINWeb.Pages.Company.DetailsModel
 @{
     ViewData["Title"] = "Company Details";
-    var isTestingReturn = string.Equals(Context.Request.Query["returnTo"], "testing", StringComparison.OrdinalIgnoreCase);
+    var isTestingReturn = string.Equals(Request.Query["returnTo"], "testing", StringComparison.OrdinalIgnoreCase);
     var backPage = isTestingReturn ? "/Testing/TestCompanies/Index" : "./Index";
 }
 
