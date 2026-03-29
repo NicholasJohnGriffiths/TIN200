@@ -1340,6 +1340,16 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             var map = await GetCompanyColumnMapAsync();
             var rows = new List<Tin200>();
 
+            static string SelectOrDefault(Dictionary<string, string?> columnMap, string key, string alias, string defaultSql = "NULL")
+            {
+                if (columnMap.TryGetValue(key, out var columnName) && !string.IsNullOrWhiteSpace(columnName))
+                {
+                    return $"[{columnName}] AS {alias}";
+                }
+
+                return $"{defaultSql} AS {alias}";
+            }
+
             var db = _context.Database.GetDbConnection();
             var shouldClose = db.State != ConnectionState.Open;
             if (shouldClose)
@@ -1360,13 +1370,14 @@ SELECT
     [{map["ExternalId"]}] AS ExternalId,
     [{map["CompanyName"]}] AS CompanyName,
     [{map["CompanyDescription"]}] AS CompanyDescription,
-    [{map["ExternalIdImportColumnName"]}] AS ExternalIdImportColumnName,
-    [{map["CompanyNameImportColumnName"]}] AS CompanyNameImportColumnName,
-    [{map["CompanyDescriptionImportColumnName"]}] AS CompanyDescriptionImportColumnName,
-    [{map["Fye2025"]}] AS Fye2025,
-    [{map["Fye2024"]}] AS Fye2024,
-    [{map["Fye2023"]}] AS Fye2023,
-    [{map["LastTIN200Year"]}] AS LastTIN200Year
+    {SelectOrDefault(map, "ExternalIdImportColumnName", "ExternalIdImportColumnName")},
+    {SelectOrDefault(map, "CompanyNameImportColumnName", "CompanyNameImportColumnName")},
+    {SelectOrDefault(map, "CompanyDescriptionImportColumnName", "CompanyDescriptionImportColumnName")},
+    {SelectOrDefault(map, "Fye2025", "Fye2025")},
+    {SelectOrDefault(map, "Fye2024", "Fye2024")},
+    {SelectOrDefault(map, "Fye2023", "Fye2023")},
+    {SelectOrDefault(map, "LastTIN200Year", "LastTIN200Year")},
+    {SelectOrDefault(map, "Test", "Test", "CAST(0 AS bit)")}
 FROM [Company]";
 
                 if (lastTin200Year.HasValue)
@@ -1399,7 +1410,8 @@ FROM [Company]";
                         Fye2025 = GetDecimal(reader, "Fye2025"),
                         Fye2024 = GetDecimal(reader, "Fye2024"),
                         Fye2023 = GetDecimal(reader, "Fye2023"),
-                        LastTIN200Year = GetNullableInt32(reader, "LastTIN200Year")
+                        LastTIN200Year = GetNullableInt32(reader, "LastTIN200Year"),
+                        Test = GetBoolean(reader, "Test")
                     });
                 }
 
@@ -1450,7 +1462,20 @@ WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'Company'";
                     throw new InvalidOperationException($"None of the expected columns were found: {string.Join(", ", names)}");
                 }
 
-                return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                string? PickOptional(params string[] names)
+                {
+                    foreach (var name in names)
+                    {
+                        if (existing.Contains(name))
+                        {
+                            return name;
+                        }
+                    }
+
+                    return null;
+                }
+
+                return new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
                 {
                     ["Id"] = Pick("Id"),
                     ["CeoFirstName"] = Pick("CEOFirstName", "CeoFirstName", "CEO First Name", "CEO First Name "),
@@ -1459,13 +1484,14 @@ WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'Company'";
                     ["ExternalId"] = Pick("ExternalID", "ExternalId", "External ID"),
                     ["CompanyName"] = Pick("CompanyName", "Company Name"),
                     ["CompanyDescription"] = Pick("CompanyDescription", "Company Description"),
-                    ["ExternalIdImportColumnName"] = Pick("ExternalId_ImportColumnName", "External ID Import Column Name"),
-                    ["CompanyNameImportColumnName"] = Pick("CompanyName_ImportColumnName", "Company Name Import Column Name"),
-                    ["CompanyDescriptionImportColumnName"] = Pick("CompanyDescription_ImportColumnName", "Company Description Import Column Name"),
-                    ["Fye2025"] = Pick("FYE2025", "Fye2025", "FYE 2025"),
-                    ["Fye2024"] = Pick("FYE2024", "Fye2024", "FYE 2024"),
-                    ["Fye2023"] = Pick("FYE2023", "Fye2023", "FYE 2023"),
-                    ["LastTIN200Year"] = Pick("LastTIN200Year", "Last TIN200 Year")
+                    ["ExternalIdImportColumnName"] = PickOptional("ExternalId_ImportColumnName", "External ID Import Column Name"),
+                    ["CompanyNameImportColumnName"] = PickOptional("CompanyName_ImportColumnName", "Company Name Import Column Name"),
+                    ["CompanyDescriptionImportColumnName"] = PickOptional("CompanyDescription_ImportColumnName", "Company Description Import Column Name"),
+                    ["Fye2025"] = PickOptional("FYELastFinancialYear", "FYE2025", "Fye2025", "FYE 2025"),
+                    ["Fye2024"] = PickOptional("FYEYear-1", "FYE2024", "Fye2024", "FYE 2024"),
+                    ["Fye2023"] = PickOptional("FYEYear-2", "FYE2023", "Fye2023", "FYE 2023"),
+                    ["LastTIN200Year"] = PickOptional("LastTIN200Year", "Last TIN200 Year"),
+                    ["Test"] = PickOptional("Test")
                 };
             }
             finally
@@ -1509,6 +1535,17 @@ WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'Company'";
             }
 
             return Convert.ToDecimal(record.GetValue(ordinal));
+        }
+
+        private static bool GetBoolean(IDataRecord record, string name)
+        {
+            var ordinal = record.GetOrdinal(name);
+            if (record.IsDBNull(ordinal))
+            {
+                return false;
+            }
+
+            return Convert.ToBoolean(record.GetValue(ordinal));
         }
     }
 
