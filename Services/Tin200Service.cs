@@ -191,34 +191,63 @@ namespace TINWeb.Services
 
             var nextExternalId = ResolveNextExternalId(sourceCompany.ExternalId, existingExternalIds);
             var duplicateName = BuildDuplicateCompanyName(sourceCompany.CompanyName);
-            var nextCompanyId = await _context.Tin200
-                .Select(x => (int?)x.Id)
-                .MaxAsync() ?? 0;
+            var companyIdIsIdentity = await IsCompanyIdIdentityAsync();
 
             await using var transaction = await _context.Database.BeginTransactionAsync();
 
-            var duplicatedCompany = new Tin200
+            Tin200 duplicatedCompany;
+            if (companyIdIsIdentity)
             {
-                Id = nextCompanyId + 1,
-                CeoFirstName = sourceCompany.CeoFirstName,
-                CeoLastName = sourceCompany.CeoLastName,
-                Email = sourceCompany.Email,
-                ExternalId = ClampToMaxLength(nextExternalId, 50),
-                CompanyName = duplicateName,
-                CompanyDescription = sourceCompany.CompanyDescription,
-                ExternalIdImportColumnName = sourceCompany.ExternalIdImportColumnName,
-                CompanyNameImportColumnName = sourceCompany.CompanyNameImportColumnName,
-                CompanyDescriptionImportColumnName = sourceCompany.CompanyDescriptionImportColumnName,
-                Fye2025 = sourceCompany.Fye2025,
-                Fye2024 = sourceCompany.Fye2024,
-                Fye2023 = sourceCompany.Fye2023,
-                FinancialYear = sourceCompany.FinancialYear,
-                LastTIN200Year = sourceCompany.LastTIN200Year,
-                Test = true
-            };
+                var duplicatedCompanyId = await InsertCompanyShellForIdentityAsync(ClampToMaxLength(nextExternalId, 50), duplicateName);
+                duplicatedCompany = await _context.Tin200.FirstAsync(x => x.Id == duplicatedCompanyId);
 
-            _context.Tin200.Add(duplicatedCompany);
-            await _context.SaveChangesAsync();
+                duplicatedCompany.CeoFirstName = sourceCompany.CeoFirstName;
+                duplicatedCompany.CeoLastName = sourceCompany.CeoLastName;
+                duplicatedCompany.Email = sourceCompany.Email;
+                duplicatedCompany.ExternalId = ClampToMaxLength(nextExternalId, 50);
+                duplicatedCompany.CompanyName = duplicateName;
+                duplicatedCompany.CompanyDescription = sourceCompany.CompanyDescription;
+                duplicatedCompany.ExternalIdImportColumnName = sourceCompany.ExternalIdImportColumnName;
+                duplicatedCompany.CompanyNameImportColumnName = sourceCompany.CompanyNameImportColumnName;
+                duplicatedCompany.CompanyDescriptionImportColumnName = sourceCompany.CompanyDescriptionImportColumnName;
+                duplicatedCompany.Fye2025 = sourceCompany.Fye2025;
+                duplicatedCompany.Fye2024 = sourceCompany.Fye2024;
+                duplicatedCompany.Fye2023 = sourceCompany.Fye2023;
+                duplicatedCompany.FinancialYear = sourceCompany.FinancialYear;
+                duplicatedCompany.LastTIN200Year = sourceCompany.LastTIN200Year;
+                duplicatedCompany.Test = true;
+
+                await _context.SaveChangesAsync();
+            }
+            else
+            {
+                var nextCompanyId = await _context.Tin200
+                    .Select(x => (int?)x.Id)
+                    .MaxAsync() ?? 0;
+
+                duplicatedCompany = new Tin200
+                {
+                    Id = nextCompanyId + 1,
+                    CeoFirstName = sourceCompany.CeoFirstName,
+                    CeoLastName = sourceCompany.CeoLastName,
+                    Email = sourceCompany.Email,
+                    ExternalId = ClampToMaxLength(nextExternalId, 50),
+                    CompanyName = duplicateName,
+                    CompanyDescription = sourceCompany.CompanyDescription,
+                    ExternalIdImportColumnName = sourceCompany.ExternalIdImportColumnName,
+                    CompanyNameImportColumnName = sourceCompany.CompanyNameImportColumnName,
+                    CompanyDescriptionImportColumnName = sourceCompany.CompanyDescriptionImportColumnName,
+                    Fye2025 = sourceCompany.Fye2025,
+                    Fye2024 = sourceCompany.Fye2024,
+                    Fye2023 = sourceCompany.Fye2023,
+                    FinancialYear = sourceCompany.FinancialYear,
+                    LastTIN200Year = sourceCompany.LastTIN200Year,
+                    Test = true
+                };
+
+                _context.Tin200.Add(duplicatedCompany);
+                await _context.SaveChangesAsync();
+            }
 
             var sourceCompanySurveys = await _context.CompanySurvey
                 .Where(x => x.CompanyId == sourceCompanyId)
@@ -339,6 +368,75 @@ namespace TINWeb.Services
             }
 
             return value.Substring(0, maxLength);
+        }
+
+        private async Task<bool> IsCompanyIdIdentityAsync()
+        {
+            var db = _context.Database.GetDbConnection();
+            var shouldClose = db.State != ConnectionState.Open;
+            if (shouldClose)
+            {
+                await db.OpenAsync();
+            }
+
+            try
+            {
+                using var cmd = db.CreateCommand();
+                cmd.CommandText = "SELECT CAST(COLUMNPROPERTY(OBJECT_ID('dbo.Company'), 'Id', 'IsIdentity') AS int)";
+                var result = await cmd.ExecuteScalarAsync();
+                return Convert.ToInt32(result ?? 0) == 1;
+            }
+            finally
+            {
+                if (shouldClose)
+                {
+                    await db.CloseAsync();
+                }
+            }
+        }
+
+        private async Task<int> InsertCompanyShellForIdentityAsync(string externalId, string companyName)
+        {
+            var db = _context.Database.GetDbConnection();
+            var shouldClose = db.State != ConnectionState.Open;
+            if (shouldClose)
+            {
+                await db.OpenAsync();
+            }
+
+            try
+            {
+                using var cmd = db.CreateCommand();
+                cmd.CommandText = @"
+INSERT INTO [Company] ([ExternalID], [CompanyName], [Test])
+OUTPUT INSERTED.[Id]
+VALUES (@externalId, @companyName, @test);";
+
+                var externalIdParam = cmd.CreateParameter();
+                externalIdParam.ParameterName = "@externalId";
+                externalIdParam.Value = (object?)externalId ?? DBNull.Value;
+                cmd.Parameters.Add(externalIdParam);
+
+                var companyNameParam = cmd.CreateParameter();
+                companyNameParam.ParameterName = "@companyName";
+                companyNameParam.Value = (object?)companyName ?? DBNull.Value;
+                cmd.Parameters.Add(companyNameParam);
+
+                var testParam = cmd.CreateParameter();
+                testParam.ParameterName = "@test";
+                testParam.Value = true;
+                cmd.Parameters.Add(testParam);
+
+                var result = await cmd.ExecuteScalarAsync();
+                return Convert.ToInt32(result ?? 0);
+            }
+            finally
+            {
+                if (shouldClose)
+                {
+                    await db.CloseAsync();
+                }
+            }
         }
 
         public async Task<CompanyGlobalImportPreviewResult> PreviewGlobalImportFromExcelAsync(Stream excelStream, int importYear)
