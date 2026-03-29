@@ -2,6 +2,8 @@
 @model TINWeb.Pages.Company.DetailsModel
 @{
     ViewData["Title"] = "Company Details";
+    var isTestingReturn = string.Equals(Context.Request.Query["returnTo"], "testing", StringComparison.OrdinalIgnoreCase);
+    var backPage = isTestingReturn ? "/Testing/TestCompanies/Index" : "./Index";
 }
 
 <div class="container mt-4">
@@ -88,9 +90,9 @@
                 </div>
 
                 <div class="mt-3">
-                    <a asp-page="./Edit" asp-route-id="@Model.Record.Id" class="btn btn-warning">Edit</a>
-                    <a asp-page="./Delete" asp-route-id="@Model.Record.Id" class="btn btn-danger">Delete</a>
-                    <a asp-page="./Index" class="btn btn-secondary">Back to List</a>
+                    <a asp-page="./Edit" asp-route-id="@Model.Record.Id" asp-route-returnTo="@(isTestingReturn ? "testing" : null)" class="btn btn-warning">Edit</a>
+                    <a asp-page="./Delete" asp-route-id="@Model.Record.Id" asp-route-returnTo="@(isTestingReturn ? "testing" : null)" class="btn btn-danger">Delete</a>
+                    <a asp-page="@backPage" class="btn btn-secondary">Back to List</a>
                 </div>
             }
             else

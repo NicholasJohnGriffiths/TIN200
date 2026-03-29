@@ -2,6 +2,9 @@
 @model TINWeb.Pages.Company.EditModel
 @{
     ViewData["Title"] = "Edit Company";
+    var backPage = string.Equals(Model.ReturnTo, "testing", StringComparison.OrdinalIgnoreCase)
+        ? "/Testing/TestCompanies/Index"
+        : "./Index";
 }
 
 <div class="container mt-4">
@@ -12,6 +15,7 @@
             <form method="post">
                 <input type="hidden" asp-for="Record.Id" />
                 <input type="hidden" asp-for="LastTin200Year" />
+                <input type="hidden" asp-for="ReturnTo" />
 
                 <div class="form-group mb-3">
                     <label asp-for="Record.CeoFirstName" class="form-label"></label>
@@ -90,7 +94,7 @@
 
                 <div class="form-group">
                     <button type="submit" class="btn btn-success">Save Changes</button>
-                    <a asp-page="./Index" asp-route-lastTin200Year="@Model.LastTin200Year" class="btn btn-secondary">Cancel</a>
+                    <a asp-page="@backPage" asp-route-lastTin200Year="@(string.Equals(Model.ReturnTo, "testing", StringComparison.OrdinalIgnoreCase) ? null : Model.LastTin200Year)" class="btn btn-secondary">Cancel</a>
                 </div>
             </form>
         </div>

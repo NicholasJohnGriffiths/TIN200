@@ -12,14 +12,18 @@ namespace TINWeb.Pages.Company
         [BindProperty]
         public Models.Tin200 Record { get; set; } = new();
 
+        [BindProperty(SupportsGet = true)]
+        public string? ReturnTo { get; set; }
+
         public CreateModel(CompanyService service)
         {
             _service = service;
         }
 
-        public void OnGet(bool isTest = false)
+        public void OnGet(bool isTest = false, string? returnTo = null)
         {
             Record.Test = isTest;
+            ReturnTo = returnTo;
         }
 
         public async Task<IActionResult> OnPostAsync()
@@ -30,6 +34,11 @@ namespace TINWeb.Pages.Company
             }
 
             await _service.CreateCompanyAsync(Record);
+            if (string.Equals(ReturnTo, "testing", StringComparison.OrdinalIgnoreCase))
+            {
+                return RedirectToPage("/Testing/TestCompanies/Index");
+            }
+
             return RedirectToPage("./Index");
         }
     }

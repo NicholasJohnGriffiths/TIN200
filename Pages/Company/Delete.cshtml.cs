@@ -12,13 +12,17 @@ namespace TINWeb.Pages.Company
         [BindProperty]
         public Models.Tin200? Record { get; set; }
 
+        [BindProperty(SupportsGet = true)]
+        public string? ReturnTo { get; set; }
+
         public DeleteModel(CompanyService service)
         {
             _service = service;
         }
 
-        public async Task<IActionResult> OnGetAsync(int id)
+        public async Task<IActionResult> OnGetAsync(int id, string? returnTo)
         {
+            ReturnTo = returnTo;
             Record = await _service.GetCompanyByIdAsync(id);
             if (Record == null)
             {
@@ -36,6 +40,12 @@ namespace TINWeb.Pages.Company
             }
 
             await _service.DeleteCompanyAsync(Record.Id);
+
+            if (string.Equals(ReturnTo, "testing", StringComparison.OrdinalIgnoreCase))
+            {
+                return RedirectToPage("/Testing/TestCompanies/Index");
+            }
+
             return RedirectToPage("./Index");
         }
     }

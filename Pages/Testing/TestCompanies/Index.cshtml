@@ -7,7 +7,7 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h1 class="mb-0">Test Companies</h1>
-        <a asp-page="/Company/Create" asp-route-isTest="true" class="btn btn-primary">Create Test Company</a>
+        <a asp-page="/Company/Create" asp-route-isTest="true" asp-route-returnTo="testing" class="btn btn-primary">Create Test Company</a>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
@@ -52,9 +52,9 @@
                             <td>@record.Email</td>
                             <td>@record.LastTIN200Year</td>
                             <td class="text-nowrap">
-                                <a asp-page="/Company/Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
-                                <a asp-page="/Company/Edit" asp-route-id="@record.Id" class="btn btn-sm btn-warning">Edit</a>
-                                <a asp-page="/Company/Delete" asp-route-id="@record.Id" class="btn btn-sm btn-danger">Delete</a>
+                                <a asp-page="/Company/Details" asp-route-id="@record.Id" asp-route-returnTo="testing" class="btn btn-sm btn-info">View</a>
+                                <a asp-page="/Company/Edit" asp-route-id="@record.Id" asp-route-returnTo="testing" class="btn btn-sm btn-warning">Edit</a>
+                                <a asp-page="/Company/Delete" asp-route-id="@record.Id" asp-route-returnTo="testing" class="btn btn-sm btn-danger">Delete</a>
 
                                 <form method="post" asp-page-handler="Duplicate" class="d-inline">
                                     <input type="hidden" name="id" value="@record.Id" />

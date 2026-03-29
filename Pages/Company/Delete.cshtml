@@ -2,6 +2,9 @@
 @model TINWeb.Pages.Company.DeleteModel
 @{
     ViewData["Title"] = "Delete Company";
+    var backPage = string.Equals(Model.ReturnTo, "testing", StringComparison.OrdinalIgnoreCase)
+        ? "/Testing/TestCompanies/Index"
+        : "./Index";
 }
 
 <div class="container mt-4">
@@ -29,12 +32,13 @@
 
                 <form method="post">
                     <input type="hidden" asp-for="Record.Id" />
+                    <input type="hidden" asp-for="ReturnTo" />
                     <div class="mb-3">
                         <label for="deleteConfirm" class="form-label">Type <strong>delete</strong> to confirm:</label>
                         <input type="text" id="deleteConfirm" class="form-control" autocomplete="off" />
                     </div>
                     <button type="submit" id="deleteBtn" class="btn btn-danger me-2" disabled>Confirm Delete</button>
-                    <a asp-page="./Index" class="btn btn-secondary">Cancel</a>
+                    <a asp-page="@backPage" class="btn btn-secondary">Cancel</a>
                 </form>
                 <script>
                     (function () {
