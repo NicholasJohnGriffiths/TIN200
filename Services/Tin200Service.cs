@@ -1,5 +1,6 @@
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using TINWeb.Data;
 using TINWeb.Models;
 using System.Data;
@@ -407,6 +408,12 @@ namespace TINWeb.Services
             try
             {
                 using var cmd = db.CreateCommand();
+                var currentTransaction = _context.Database.CurrentTransaction;
+                if (currentTransaction != null)
+                {
+                    cmd.Transaction = currentTransaction.GetDbTransaction();
+                }
+
                 cmd.CommandText = @"
 INSERT INTO [Company] ([ExternalID], [CompanyName], [Test])
 OUTPUT INSERTED.[Id]
