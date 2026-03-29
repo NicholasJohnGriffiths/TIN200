@@ -1,0 +1,75 @@
+@page
+@model TINWeb.Pages.Testing.TestCompanies.IndexModel
+@{
+    ViewData["Title"] = "Test Companies";
+}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="mb-0">Test Companies</h1>
+        <a asp-page="/Company/Create" asp-route-isTest="true" class="btn btn-primary">Create Test Company</a>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <div class="alert alert-success" role="alert">@Model.StatusMessage</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
+    }
+
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-md-4">
+            <input asp-for="Search" class="form-control" placeholder="Search name, external ID, or email" />
+        </div>
+        <div class="col-md-auto">
+            <button type="submit" class="btn btn-outline-primary">Search</button>
+            <a asp-page="./Index" class="btn btn-link">Clear</a>
+        </div>
+    </form>
+
+    @if (Model.Records.Any())
+    {
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>External ID</th>
+                        <th>Company Name</th>
+                        <th>Email</th>
+                        <th>Last TIN200 Year</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var record in Model.Records)
+                    {
+                        <tr>
+                            <td>@record.ExternalId</td>
+                            <td>@record.CompanyName</td>
+                            <td>@record.Email</td>
+                            <td>@record.LastTIN200Year</td>
+                            <td class="text-nowrap">
+                                <a asp-page="/Company/Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
+                                <a asp-page="/Company/Edit" asp-route-id="@record.Id" class="btn btn-sm btn-warning">Edit</a>
+                                <a asp-page="/Company/Delete" asp-route-id="@record.Id" class="btn btn-sm btn-danger">Delete</a>
+
+                                <form method="post" asp-page-handler="Duplicate" class="d-inline">
+                                    <input type="hidden" name="id" value="@record.Id" />
+                                    <input type="hidden" name="Search" value="@Model.Search" />
+                                    <button type="submit" class="btn btn-sm btn-secondary">Duplicate</button>
+                                </form>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">No test companies found.</div>
+    }
+</div>

@@ -1,0 +1,151 @@
+@page
+@{
+    ViewData["Title"] = "TIN Website User Manual";
+    var manualPdfPath = Url.Content("~/docs/TIN%20Website%20Documentation%20Updated.pdf") ?? "/docs/TIN%20Website%20Documentation%20Updated.pdf";
+}
+
+<div class="container mt-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h1 class="mb-1">TIN Website User Manual</h1>
+            <p class="text-muted mb-0">Static HTML guide grouped from the PDF table of contents, with inline manual preview.</p>
+        </div>
+        <a class="btn btn-outline-primary" href="~/docs/TIN%20Website%20Documentation%20Updated.pdf" target="_blank" rel="noopener">Open PDF</a>
+    </div>
+
+    <div class="accordion mb-4" id="tinManualAccordion">
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="manualHeadingIntro">
+                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#manualCollapseIntro" aria-expanded="true" aria-controls="manualCollapseIntro">
+                    Introduction and Core Website Information
+                </button>
+            </h2>
+            <div id="manualCollapseIntro" class="accordion-collapse collapse show" aria-labelledby="manualHeadingIntro" data-bs-parent="#tinManualAccordion">
+                <div class="accordion-body">
+                    <ul class="mb-0">
+                        <li><a href="@($"{manualPdfPath}#page=6")" target="_blank" rel="noopener">Introduction (p6)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=7")" target="_blank" rel="noopener">Important Information (p7)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=7")" target="_blank" rel="noopener">Very important things to remember / warnings (p7)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=8")" target="_blank" rel="noopener">Service Providers (p8)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=9")" target="_blank" rel="noopener">Plugin Map (p9)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=9")" target="_blank" rel="noopener">301 Redirect (p9)</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="manualHeadingTemplates">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#manualCollapseTemplates" aria-expanded="false" aria-controls="manualCollapseTemplates">
+                    Website Templates and Annual Updates
+                </button>
+            </h2>
+            <div id="manualCollapseTemplates" class="accordion-collapse collapse" aria-labelledby="manualHeadingTemplates" data-bs-parent="#tinManualAccordion">
+                <div class="accordion-body">
+                    <ul class="mb-0">
+                        <li><a href="@($"{manualPdfPath}#page=10")" target="_blank" rel="noopener">Website Templates (p10)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=16")" target="_blank" rel="noopener">Annual Updates (p16)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=16")" target="_blank" rel="noopener">Media page (p16)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=16")" target="_blank" rel="noopener">Report mockup download file (p16)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=18")" target="_blank" rel="noopener">FAQs, if required (p18)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=19")" target="_blank" rel="noopener">Event Subscription List Update (p19)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=21")" target="_blank" rel="noopener">Report Landing Pages and navigation link updates (p21-22)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=23")" target="_blank" rel="noopener">Sponsor Logos in Sitewide Footer (p23)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=23")" target="_blank" rel="noopener">TINTech Directory Member Annual Report Rankings and Awards (p23-25)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=26")" target="_blank" rel="noopener">Blog Posts (p26)</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="manualHeadingTinReport">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#manualCollapseTinReport" aria-expanded="false" aria-controls="manualCollapseTinReport">
+                    Flipsnack and New TIN Report Setup
+                </button>
+            </h2>
+            <div id="manualCollapseTinReport" class="accordion-collapse collapse" aria-labelledby="manualHeadingTinReport" data-bs-parent="#tinManualAccordion">
+                <div class="accordion-body">
+                    <ul class="mb-0">
+                        <li><a href="@($"{manualPdfPath}#page=36")" target="_blank" rel="noopener">Uploading a Report to Flipsnack (p36-42)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=45")" target="_blank" rel="noopener">Setting up a new TIN Report (p45-74)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=47")" target="_blank" rel="noopener">Order form setup, Stripe feed, Active Campaign feeds, and purchase page (p47-61)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=65")" target="_blank" rel="noopener">Pricing, coupons and sales (p65-67)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=69")" target="_blank" rel="noopener">TIN Report purchase automations and testing (p69-74)</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="manualHeadingSecondaryReports">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#manualCollapseSecondaryReports" aria-expanded="false" aria-controls="manualCollapseSecondaryReports">
+                    Paid and Free Secondary Reports
+                </button>
+            </h2>
+            <div id="manualCollapseSecondaryReports" class="accordion-collapse collapse" aria-labelledby="manualHeadingSecondaryReports" data-bs-parent="#tinManualAccordion">
+                <div class="accordion-body">
+                    <ul class="mb-0">
+                        <li><a href="@($"{manualPdfPath}#page=75")" target="_blank" rel="noopener">Setting Up a Paid Secondary Report (p75-99)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=77")" target="_blank" rel="noopener">Paid report order form, notifications, Stripe and Active Campaign feeds (p77-85)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=87")" target="_blank" rel="noopener">Paid report purchase page and pricing/coupons (p87-92)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=94")" target="_blank" rel="noopener">Paid report automations and testing (p94-99)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=99")" target="_blank" rel="noopener">Setting Up a Free Secondary Report (p99-119)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=100")" target="_blank" rel="noopener">Free report order form, pages, and Active Campaign download automations (p100-115)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=119")" target="_blank" rel="noopener">Free report testing (p119)</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="manualHeadingMembershipEvents">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#manualCollapseMembershipEvents" aria-expanded="false" aria-controls="manualCollapseMembershipEvents">
+                    Membership and Events
+                </button>
+            </h2>
+            <div id="manualCollapseMembershipEvents" class="accordion-collapse collapse" aria-labelledby="manualHeadingMembershipEvents" data-bs-parent="#tinManualAccordion">
+                <div class="accordion-body">
+                    <ul class="mb-0">
+                        <li><a href="@($"{manualPdfPath}#page=121")" target="_blank" rel="noopener">TIN Membership Purchase Setup (p121-124)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=123")" target="_blank" rel="noopener">Membership offering and pricing updates (p123-124)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=125")" target="_blank" rel="noopener">Events setup overview (p125-140)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=127")" target="_blank" rel="noopener">Save-the-date form, registration form, Stripe feed and coupon codes (p127-131)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=133")" target="_blank" rel="noopener">Event registration page testing and post-event survey (p133-140)</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="manualHeadingLandingStripeDirectory">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#manualCollapseLandingStripeDirectory" aria-expanded="false" aria-controls="manualCollapseLandingStripeDirectory">
+                    Landing Pages, Navigation, Stripe, and Directory
+                </button>
+            </h2>
+            <div id="manualCollapseLandingStripeDirectory" class="accordion-collapse collapse" aria-labelledby="manualHeadingLandingStripeDirectory" data-bs-parent="#tinManualAccordion">
+                <div class="accordion-body">
+                    <ul class="mb-0">
+                        <li><a href="@($"{manualPdfPath}#page=141")" target="_blank" rel="noopener">Report Landing Pages (p141-150)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=141")" target="_blank" rel="noopener">TIN report, investment report, and sector report landing page processes (p141-150)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=154")" target="_blank" rel="noopener">Updating Website Menu / Navigation Bars (p154)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=156")" target="_blank" rel="noopener">Stripe customer details and payment migration (p156-158)</a></li>
+                        <li><a href="@($"{manualPdfPath}#page=161")" target="_blank" rel="noopener">TINTech Directory profile/logo management (p161-168)</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header fw-semibold">Manual Preview</div>
+        <div class="card-body p-0">
+            <iframe
+                src="~/docs/TIN%20Website%20Documentation%20Updated.pdf"
+                title="TIN Website Documentation PDF"
+                style="width:100%; height:80vh; border:0;"
+                loading="lazy">
+            </iframe>
+        </div>
+    </div>
+</div>

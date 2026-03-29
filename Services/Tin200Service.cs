@@ -49,6 +49,27 @@ namespace TINWeb.Services
             }
         }
 
+        public async Task<List<Tin200>> GetTestCompaniesAsync(string? search = null)
+        {
+            var query = _context.Tin200
+                .Where(x => x.Test)
+                .AsQueryable();
+
+            var normalizedSearch = (search ?? string.Empty).Trim();
+            if (!string.IsNullOrWhiteSpace(normalizedSearch))
+            {
+                query = query.Where(x =>
+                    (!string.IsNullOrWhiteSpace(x.CompanyName) && x.CompanyName.Contains(normalizedSearch))
+                    || (!string.IsNullOrWhiteSpace(x.ExternalId) && x.ExternalId.Contains(normalizedSearch))
+                    || (!string.IsNullOrWhiteSpace(x.Email) && x.Email.Contains(normalizedSearch)));
+            }
+
+            return await query
+                .OrderBy(x => x.CompanyName)
+                .ThenBy(x => x.Id)
+                .ToListAsync();
+        }
+
         public async Task<List<int>> GetAvailableLastTin200YearsAsync()
         {
             try
@@ -155,6 +176,102 @@ namespace TINWeb.Services
             return company;
         }
 
+        public async Task<Tin200> DuplicateTestCompanyAsync(int sourceCompanyId)
+        {
+            var sourceCompany = await _context.Tin200.FirstOrDefaultAsync(x => x.Id == sourceCompanyId);
+            if (sourceCompany == null)
+            {
+                throw new InvalidOperationException($"Company with ID {sourceCompanyId} was not found.");
+            }
+
+            var existingExternalIds = await _context.Tin200
+                .Where(x => !string.IsNullOrWhiteSpace(x.ExternalId))
+                .Select(x => x.ExternalId!)
+                .ToListAsync();
+
+            var nextExternalId = ResolveNextExternalId(sourceCompany.ExternalId, existingExternalIds);
+            var duplicateName = string.IsNullOrWhiteSpace(sourceCompany.CompanyName)
+                ? "Company - copy"
+                : $"{sourceCompany.CompanyName.Trim()} - copy";
+
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
+            var duplicatedCompany = new Tin200
+            {
+                CeoFirstName = sourceCompany.CeoFirstName,
+                CeoLastName = sourceCompany.CeoLastName,
+                Email = sourceCompany.Email,
+                ExternalId = nextExternalId,
+                CompanyName = duplicateName,
+                CompanyDescription = sourceCompany.CompanyDescription,
+                ExternalIdImportColumnName = sourceCompany.ExternalIdImportColumnName,
+                CompanyNameImportColumnName = sourceCompany.CompanyNameImportColumnName,
+                CompanyDescriptionImportColumnName = sourceCompany.CompanyDescriptionImportColumnName,
+                Fye2025 = sourceCompany.Fye2025,
+                Fye2024 = sourceCompany.Fye2024,
+                Fye2023 = sourceCompany.Fye2023,
+                FinancialYear = sourceCompany.FinancialYear,
+                LastTIN200Year = sourceCompany.LastTIN200Year,
+                Test = true
+            };
+
+            _context.Tin200.Add(duplicatedCompany);
+            await _context.SaveChangesAsync();
+
+            var sourceCompanySurveys = await _context.CompanySurvey
+                .Where(x => x.CompanyId == sourceCompanyId)
+                .OrderBy(x => x.Id)
+                .ToListAsync();
+
+            var surveyIdMap = new Dictionary<int, int>();
+            foreach (var sourceSurvey in sourceCompanySurveys)
+            {
+                var duplicateSurvey = new CompanySurvey
+                {
+                    CompanyId = duplicatedCompany.Id,
+                    SurveyId = sourceSurvey.SurveyId,
+                    Saved = sourceSurvey.Saved,
+                    Submitted = sourceSurvey.Submitted,
+                    Requested = sourceSurvey.Requested,
+                    Locked = sourceSurvey.Locked,
+                    Estimate = sourceSurvey.Estimate,
+                    SavedDate = sourceSurvey.SavedDate,
+                    SubmittedDate = sourceSurvey.SubmittedDate,
+                    RequestedDate = sourceSurvey.RequestedDate,
+                    SurveyEmailSent = sourceSurvey.SurveyEmailSent,
+                    SurveyEmailSentLastDate = sourceSurvey.SurveyEmailSentLastDate
+                };
+
+                _context.CompanySurvey.Add(duplicateSurvey);
+                await _context.SaveChangesAsync();
+                surveyIdMap[sourceSurvey.Id] = duplicateSurvey.Id;
+            }
+
+            if (surveyIdMap.Count > 0)
+            {
+                var sourceAnswers = await _context.Answer
+                    .Where(x => surveyIdMap.Keys.Contains(x.CompanySurveyId))
+                    .ToListAsync();
+
+                foreach (var sourceAnswer in sourceAnswers)
+                {
+                    _context.Answer.Add(new Answer
+                    {
+                        CompanySurveyId = surveyIdMap[sourceAnswer.CompanySurveyId],
+                        QuestionId = sourceAnswer.QuestionId,
+                        AnswerText = sourceAnswer.AnswerText,
+                        AnswerCurrency = sourceAnswer.AnswerCurrency,
+                        AnswerNumber = sourceAnswer.AnswerNumber
+                    });
+                }
+
+                await _context.SaveChangesAsync();
+            }
+
+            await transaction.CommitAsync();
+            return duplicatedCompany;
+        }
+
         public async Task DeleteCompanyAsync(int id)
         {
             var company = await GetCompanyByIdAsync(id);
@@ -168,6 +285,32 @@ namespace TINWeb.Services
         public async Task<bool> CompanyExistsAsync(int id)
         {
             return await _context.Tin200.AnyAsync(t => t.Id == id);
+        }
+
+        private static string ResolveNextExternalId(string? sourceExternalId, List<string> allExternalIds)
+        {
+            var normalizedExternalIds = allExternalIds
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim())
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (int.TryParse((sourceExternalId ?? string.Empty).Trim(), out var sourceNumericExternalId))
+            {
+                var nextValue = sourceNumericExternalId + 1;
+                while (normalizedExternalIds.Contains(nextValue.ToString(CultureInfo.InvariantCulture)))
+                {
+                    nextValue++;
+                }
+
+                return nextValue.ToString(CultureInfo.InvariantCulture);
+            }
+
+            var maxNumericExternalId = allExternalIds
+                .Select(x => int.TryParse((x ?? string.Empty).Trim(), out var parsed) ? parsed : 0)
+                .DefaultIfEmpty(0)
+                .Max();
+
+            return (maxNumericExternalId + 1).ToString(CultureInfo.InvariantCulture);
         }
 
         public async Task<CompanyGlobalImportPreviewResult> PreviewGlobalImportFromExcelAsync(Stream excelStream, int importYear)

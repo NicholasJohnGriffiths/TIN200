@@ -100,6 +100,10 @@ namespace TINWeb.Data
                     .HasColumnName("LastTIN200Year")
                     .HasColumnType("int");
 
+                entity.Property(e => e.Test)
+                    .HasColumnName("Test")
+                    .HasColumnType("bit");
+
                 // Company column exists in the database but is intentionally not mapped to the model
             });
 

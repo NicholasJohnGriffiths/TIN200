@@ -21,7 +21,8 @@
                         <h5 class="card-title">@Model.Record.CompanyName</h5>
                         <p class="card-text">
                             <strong>CEO:</strong> @Model.Record.CeoFirstName @Model.Record.CeoLastName<br />
-                            <strong>Email:</strong> @Model.Record.Email
+                            <strong>Email:</strong> @Model.Record.Email<br />
+                            <strong>Test Company:</strong> @(Model.Record.Test ? "Yes" : "No")
                         </p>
                     </div>
                 </div>

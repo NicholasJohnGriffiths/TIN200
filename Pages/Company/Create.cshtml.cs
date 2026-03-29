@@ -17,8 +17,9 @@ namespace TINWeb.Pages.Company
             _service = service;
         }
 
-        public void OnGet()
+        public void OnGet(bool isTest = false)
         {
+            Record.Test = isTest;
         }
 
         public async Task<IActionResult> OnPostAsync()
