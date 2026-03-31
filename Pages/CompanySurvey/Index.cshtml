@@ -19,9 +19,9 @@
         null) ?? "#";
 }
 
-<div class="container mt-4">
+<div class="container-fluid mt-4">
     <div class="row mb-3">
-        <div class="col-md-8">
+        <div class="col">
             <h1>Company Survey Records</h1>
             <p class="text-muted mb-0">Companies with answers: <strong>@Model.TotalCompaniesWithAnswers</strong> of <strong>@Model.Records.Count</strong></p>
         </div>
@@ -78,6 +78,7 @@
             <thead class="table-dark">
                 <tr>
                     <th><a class="link-light text-decoration-none" href="@SortHref("CompanyName")"><span>Company Name</span><span>@Model.GetSortIndicator("CompanyName")</span></a></th>
+                    <th>Survey Link</th>
                     <th><a class="link-light text-decoration-none" href="@SortHref("Saved")"><span>Saved</span><span>@Model.GetSortIndicator("Saved")</span></a></th>
                     <th><a class="link-light text-decoration-none" href="@SortHref("SavedDate")"><span>Saved Date</span><span>@Model.GetSortIndicator("SavedDate")</span></a></th>
                     <th><a class="link-light text-decoration-none" href="@SortHref("Submitted")"><span>Submitted</span><span>@Model.GetSortIndicator("Submitted")</span></a></th>
@@ -97,7 +98,13 @@
                 @foreach (var record in Model.Records)
                 {
                     <tr id="record-@record.Id">
-                        <td>@record.CompanyName</td>
+                        <td style="min-width: 250px;">@record.CompanyName</td>
+                        <td style="min-width: 400px;">
+                            @if (!string.IsNullOrWhiteSpace(record.SurveyLink))
+                            {
+                                <a href="@record.SurveyLink" target="_blank" class="text-truncate d-inline-block" style="max-width: 100%;" title="@record.SurveyLink">@record.SurveyLink</a>
+                            }
+                        </td>
                         <td>@(record.Saved ? "Yes" : "No")</td>
                         <td>@(record.SavedDate?.ToString("dd/MM/yyyy") ?? string.Empty)</td>
                         <td>@(record.Submitted ? "Yes" : "No")</td>
