@@ -39,5 +39,9 @@ namespace TINWeb.Models
         public bool? SurveyEmailSent { get; set; }
 
         public DateTime? SurveyEmailSentLastDate { get; set; }
+
+        [Display(Name = "Survey Link")]
+        [StringLength(1000)]
+        public string? SurveyLink { get; set; }
     }
 }

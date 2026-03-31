@@ -94,6 +94,12 @@ namespace TINWeb.Pages.Company
             var failedCount = 0;
             string? firstFailureReason = null;
             var lockedCompanyIds = await GetLockedCompanyIdsForCurrentSurveyAsync();
+            var currentSurveyId = await _context.Survey
+                .Where(s => s.CurrentSurvey)
+                .OrderByDescending(s => s.FinancialYear)
+                .ThenByDescending(s => s.Id)
+                .Select(s => (int?)s.Id)
+                .FirstOrDefaultAsync();
 
             foreach (var clientRow in selected)
             {
@@ -115,12 +121,32 @@ namespace TINWeb.Pages.Company
                 {
                     await _surveyEmailService.SendSurveyLinkAsync(clientRow.Email, surveyUrl, clientRow.CompanyName, clientRow.Id);
                     sentCount++;
+
+                    // Update CompanySurvey with survey link if current survey exists
+                    if (currentSurveyId.HasValue)
+                    {
+                        var companySurvey = await _context.CompanySurvey
+                            .FirstOrDefaultAsync(cs => cs.CompanyId == clientRow.Id && cs.SurveyId == currentSurveyId.Value);
+                        if (companySurvey != null)
+                        {
+                            companySurvey.SurveyLink = surveyUrl;
+                            companySurvey.SurveyEmailSent = true;
+                            companySurvey.SurveyEmailSentLastDate = DateTime.UtcNow.Date;
+                            _context.CompanySurvey.Update(companySurvey);
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
                     failedCount++;
                     firstFailureReason ??= ex.Message;
                 }
+            }
+
+            // Save all SurveyLink updates at once
+            if (sentCount > 0)
+            {
+                await _context.SaveChangesAsync();
             }
 
             StatusMessage = $"Bulk send complete. Sent: {sentCount}, Skipped (no email): {skippedNoEmailCount}, Skipped (locked): {skippedLockedCount}, Failed: {failedCount}.";

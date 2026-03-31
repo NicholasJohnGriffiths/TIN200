@@ -26,7 +26,9 @@
 
         <dt class="col-sm-3">Requested</dt>
         <dd class="col-sm-9">@Model.Record.Requested</dd>
-    </dl>
+
+        <dt class="col-sm-3">Survey Link</dt>
+        <dd class="col-sm-9">@if (!string.IsNullOrWhiteSpace(Model.Record.SurveyLink)) { <a href="@Model.Record.SurveyLink" target="_blank">@Model.Record.SurveyLink</a> } else { <span class="text-muted">Not generated</span> }</dd>
 
     <a asp-page="./Edit" asp-route-id="@Model.Record.Id" class="btn btn-warning">Edit</a>
     <a asp-page="./Index" class="btn btn-secondary">Back to List</a>

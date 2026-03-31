@@ -66,6 +66,12 @@
             <label class="form-check-label" for="Record_Estimate">Estimate</label>
         </div>
 
+        <div class="form-group mb-3">
+            <label asp-for="Record.SurveyLink" class="form-label"></label>
+            <input asp-for="Record.SurveyLink" class="form-control" readonly />
+            <small class="text-muted">Generated when survey is sent via email</small>
+        </div>
+
         <button type="submit" class="btn btn-primary">Save</button>
         <a asp-page="./Index" asp-route-financialYear="@Model.FinancialYear" asp-fragment="record-@Model.Record.Id" class="btn btn-secondary">Back to List</a>
     </form>
