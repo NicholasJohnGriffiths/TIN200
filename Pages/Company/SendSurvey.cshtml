@@ -95,6 +95,7 @@
                                             <button type="button" class="btn btn-link p-0 sort-header" data-sort-key="email">Email</button>
                                         </th>
                                         <th style="width: 120px;">Survey Locked</th>
+                                        <th style="width: 120px;">Unsubscribed</th>
                                         <th style="width: 140px;">Survey Email Sent</th>
                                         <th style="width: 170px;">Survey Email Sent Last Date</th>
                                     </tr>
@@ -103,10 +104,12 @@
                                     @foreach (var clientRow in Model.AvailableClients)
                                     {
                                         var hasEmail = !string.IsNullOrWhiteSpace(clientRow.Email);
-                                        var canSend = hasEmail && !clientRow.IsLocked;
-                                        var disableReason = clientRow.IsLocked
-                                            ? "Survey record is locked. Contact the Technology Investment Network."
-                                            : "Cannot send survey email because no email address is available.";
+                                        var canSend = hasEmail && !clientRow.IsLocked && !clientRow.Unsubscribed;
+                                        var disableReason = clientRow.Unsubscribed
+                                            ? "This company has unsubscribed from surveys."
+                                            : clientRow.IsLocked
+                                                ? "Survey record is locked. Contact the Technology Investment Network."
+                                                : "Cannot send survey email because no email address is available.";
                                         var searchText = $"{clientRow.Id} {clientRow.CompanyName} {clientRow.Email}".ToLowerInvariant();
                                         var companySort = (clientRow.CompanyName ?? string.Empty).ToLowerInvariant();
                                         var emailSort = (clientRow.Email ?? string.Empty).ToLowerInvariant();
@@ -140,6 +143,16 @@
                                                 @if (clientRow.IsLocked)
                                                 {
                                                     <span class="badge bg-warning text-dark">Yes</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">No</span>
+                                                }
+                                            </td>
+                                            <td>
+                                                @if (clientRow.Unsubscribed)
+                                                {
+                                                    <span class="badge bg-danger">Yes</span>
                                                 }
                                                 else
                                                 {

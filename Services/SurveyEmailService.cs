@@ -29,6 +29,13 @@ namespace TINWeb.Services
             var recipientName = string.IsNullOrWhiteSpace(companyName) ? "there" : companyName.Trim();
             var supportEmail = "tin100@tinetwork.com";
             var subject = "TIN200 survey request: please review your company details";
+            
+            // Generate unsubscribe link
+            var unsubscribeToken = GenerateUnsubscribeToken(clientId);
+            var baseUrl = _surveyLinkSettings.BaseUrl ?? string.Empty;
+            baseUrl = baseUrl.Trim().TrimEnd('/');
+            var unsubscribeUrl = $"{baseUrl}/Company/Unsubscribe?id={clientId}&token={Uri.EscapeDataString(unsubscribeToken)}";
+            
             var plainTextBody = $@"Hello {recipientName},
 
 You have been invited to review and update your company details for TIN200.
@@ -40,6 +47,9 @@ If you did not expect this email, you can safely ignore it.
 
 Need help? Contact {supportEmail}.
 
+To unsubscribe from future TIN200 surveys:
+{unsubscribeUrl}
+
 Regards,
 TIN200 Team";
 
@@ -48,6 +58,7 @@ TIN200 Team";
 <p><a href=""{WebUtility.HtmlEncode(surveyUrl)}"">Open your secure survey link</a></p>
 <p>If you did not expect this email, you can safely ignore it.</p>
 <p>Need help? Contact <a href=""mailto:{WebUtility.HtmlEncode(supportEmail)}"">{WebUtility.HtmlEncode(supportEmail)}</a>.</p>
+<p><small><a href=""{WebUtility.HtmlEncode(unsubscribeUrl)}"" style=""color: #999; font-size: 12px;"">Unsubscribe from future surveys</a></small></p>
 <p>Regards,<br/>TIN200 Team</p>";
 
             var emailClient = new EmailClient(_emailSettings.ConnectionString);
@@ -85,6 +96,16 @@ TIN200 Team";
             if (operation.HasCompleted && operation.Value.Status != EmailSendStatus.Succeeded)
             {
                 throw new InvalidOperationException($"Email send failed with status: {operation.Value.Status}");
+            }
+        }
+
+        private string GenerateUnsubscribeToken(int clientId)
+        {
+            // Use HMAC-based token for unsubscribe verification
+            using (var hmac = new System.Security.Cryptography.HMACSHA256(System.Text.Encoding.UTF8.GetBytes("unsubscribe-token-key")))
+            {
+                var hash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes($"{clientId}:{DateTime.UtcNow:yyyyMMdd}"));
+                return Convert.ToBase64String(hash);
             }
         }
     }

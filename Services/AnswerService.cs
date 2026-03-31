@@ -188,6 +188,12 @@ namespace TINWeb.Services
                     g => g.Key,
                     g => g.OrderByDescending(x => x.Id).First().Estimate == true);
 
+            var unsubscribedData = await _context.CompanySurvey
+                .AsNoTracking()
+                .Where(x => x.CompanyId == companyId)
+                .OrderByDescending(x => x.Id)
+                .FirstOrDefaultAsync();
+
             var latestAnswerIds = await (
                 from answer in _context.Answer.AsNoTracking()
                 join companySurvey in _context.CompanySurvey.AsNoTracking() on answer.CompanySurveyId equals companySurvey.Id
@@ -266,6 +272,8 @@ namespace TINWeb.Services
                 LatestEstimate = years.Any()
                     && estimateByYear.TryGetValue(years[0], out var latestEstimate)
                     && latestEstimate,
+                Unsubscribed = unsubscribedData?.Unsubscribed,
+                UnsubscribedDate = unsubscribedData?.UnsubscribedDate,
                 EstimateByYear = years.ToDictionary(
                     year => year,
                     year => estimateByYear.TryGetValue(year, out var estimate) && estimate),
@@ -1932,6 +1940,8 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             public string? CompanyName { get; set; }
             public string? ExternalId { get; set; }
             public bool LatestEstimate { get; set; }
+            public bool? Unsubscribed { get; set; }
+            public DateTime? UnsubscribedDate { get; set; }
             public Dictionary<int, bool> EstimateByYear { get; set; } = new();
             public List<int> Years { get; set; } = new();
             public List<CompanySurveyHistoryRow> Rows { get; set; } = new();

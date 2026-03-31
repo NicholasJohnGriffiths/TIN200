@@ -1,0 +1,39 @@
+@page
+@model TINWeb.Pages.Company.UnsubscribeModel
+@{
+    ViewData["Title"] = "Unsubscribe from TIN200 Surveys";
+}
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            @if (Model.Success)
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <h4 class="alert-heading">
+                        <i class="bi bi-check-circle"></i> Unsubscribed Successfully
+                    </h4>
+                    <p class="mb-0">@Model.Message</p>
+                    <hr />
+                    <p class="mb-0 small">Company: <strong>@Model.CompanyName</strong></p>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <h4 class="alert-heading">
+                        <i class="bi bi-exclamation-triangle"></i> Unable to Unsubscribe
+                    </h4>
+                    <p class="mb-0">@Model.Message</p>
+                </div>
+            }
+
+            <div class="text-center mt-4">
+                <p class="text-muted">
+                    If you have questions about TIN200 surveys, please contact us.
+                </p>
+                <a href="/" class="btn btn-primary">Return Home</a>
+            </div>
+        </div>
+    </div>
+</div>

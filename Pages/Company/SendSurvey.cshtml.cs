@@ -91,6 +91,7 @@ namespace TINWeb.Pages.Company
             var sentCount = 0;
             var skippedNoEmailCount = 0;
             var skippedLockedCount = 0;
+            var skippedUnsubscribedCount = 0;
             var failedCount = 0;
             string? firstFailureReason = null;
             var lockedCompanyIds = await GetLockedCompanyIdsForCurrentSurveyAsync();
@@ -103,6 +104,12 @@ namespace TINWeb.Pages.Company
 
             foreach (var clientRow in selected)
             {
+                if (clientRow.Unsubscribed)
+                {
+                    skippedUnsubscribedCount++;
+                    continue;
+                }
+
                 if (string.IsNullOrWhiteSpace(clientRow.Email))
                 {
                     skippedNoEmailCount++;
@@ -149,9 +156,9 @@ namespace TINWeb.Pages.Company
                 await _context.SaveChangesAsync();
             }
 
-            StatusMessage = $"Bulk send complete. Sent: {sentCount}, Skipped (no email): {skippedNoEmailCount}, Skipped (locked): {skippedLockedCount}, Failed: {failedCount}.";
+            StatusMessage = $"Bulk send complete. Sent: {sentCount}, Skipped (no email): {skippedNoEmailCount}, Skipped (locked): {skippedLockedCount}, Skipped (unsubscribed): {skippedUnsubscribedCount}, Failed: {failedCount}.";
             BulkSentCount = sentCount;
-            BulkSkippedCount = skippedNoEmailCount;
+            BulkSkippedCount = skippedNoEmailCount + skippedLockedCount + skippedUnsubscribedCount;
             BulkFailedCount = failedCount;
             BulkLastRunAt = DateTime.Now.ToString("MMM d, yyyy h:mm tt");
 
@@ -167,6 +174,12 @@ namespace TINWeb.Pages.Company
             if (skippedLockedCount > 0)
             {
                 ModelState.AddModelError(string.Empty, "Locked survey records were skipped and no survey email was sent for them.");
+                return Page();
+            }
+
+            if (skippedUnsubscribedCount > 0)
+            {
+                ModelState.AddModelError(string.Empty, "Unsubscribed records were skipped and no survey email was sent for them.");
                 return Page();
             }
 
@@ -209,7 +222,9 @@ namespace TINWeb.Pages.Company
                         Email = c.Email,
                         IsLocked = lockedCompanyIds.Contains(c.Id),
                         SurveyEmailSent = status?.SurveyEmailSent ?? false,
-                        SurveyEmailSentLastDate = status?.SurveyEmailSentLastDate
+                        SurveyEmailSentLastDate = status?.SurveyEmailSentLastDate,
+                        Unsubscribed = status?.Unsubscribed ?? false,
+                        UnsubscribedDate = status?.UnsubscribedDate
                     };
                 })
                 .ToList();
@@ -238,7 +253,9 @@ namespace TINWeb.Pages.Company
                     {
                         cs.CompanyId,
                         cs.SurveyEmailSent,
-                        cs.SurveyEmailSentLastDate
+                        cs.SurveyEmailSentLastDate,
+                        cs.Unsubscribed,
+                        cs.UnsubscribedDate
                     })
                     .First())
                 .ToDictionaryAsync(
@@ -246,7 +263,9 @@ namespace TINWeb.Pages.Company
                     x => new SurveyEmailStatus
                     {
                         SurveyEmailSent = x.SurveyEmailSent ?? false,
-                        SurveyEmailSentLastDate = x.SurveyEmailSentLastDate
+                        SurveyEmailSentLastDate = x.SurveyEmailSentLastDate,
+                        Unsubscribed = x.Unsubscribed ?? false,
+                        UnsubscribedDate = x.UnsubscribedDate
                     });
         }
 
@@ -280,12 +299,16 @@ namespace TINWeb.Pages.Company
             public bool IsLocked { get; set; }
             public bool SurveyEmailSent { get; set; }
             public DateTime? SurveyEmailSentLastDate { get; set; }
+            public bool Unsubscribed { get; set; }
+            public DateTime? UnsubscribedDate { get; set; }
         }
 
         private class SurveyEmailStatus
         {
             public bool SurveyEmailSent { get; set; }
             public DateTime? SurveyEmailSentLastDate { get; set; }
+            public bool Unsubscribed { get; set; }
+            public DateTime? UnsubscribedDate { get; set; }
         }
     }
 }

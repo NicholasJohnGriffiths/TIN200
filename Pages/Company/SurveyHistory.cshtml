@@ -4,7 +4,7 @@
     ViewData["Title"] = "Survey History";
 }
 
-<div class="container-fluid px-0 mt-3">
+<div class="w-100 mt-3">
     @if (Model.History == null)
     {
         <div class="alert alert-danger" role="alert">Company not found.</div>
@@ -12,16 +12,28 @@
     else
     {
         <div class="row mb-3">
-            <div class="col-md-8">
-                <h1 class="h4 mb-1">Survey History</h1>
-                <p class="mb-0 small"><strong>Company:</strong> @(Model.History.CompanyName ?? "N/A")</p>
-                <p class="mb-0 small"><strong>External ID:</strong> @(Model.History.ExternalId ?? "N/A")</p>
-                <p class="mb-0 small"><strong>Estimate:</strong> @(Model.History.LatestEstimate ? "Yes" : "No")</p>
-                <p class="mb-0 small"><strong>Years found:</strong> @Model.History.Years.Count</p>
-            </div>
-            <div class="col-md-4 text-end d-flex gap-2 justify-content-md-end align-items-start mt-2 mt-md-0">
-                <a asp-page="./Details" asp-route-id="@Model.History.CompanyId" class="btn btn-outline-secondary btn-sm">Company Details</a>
-                <a asp-page="./Index" class="btn btn-secondary btn-sm">Back to List</a>
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h1 class="h4 mb-1">Survey History</h1>
+                        <p class="mb-1 small"><strong>Company:</strong> @(Model.History.CompanyName ?? "N/A")</p>
+                        <p class="mb-1 small"><strong>External ID:</strong> @(Model.History.ExternalId ?? "N/A")</p>
+                        <p class="mb-1 small"><strong>Estimate:</strong> @(Model.History.LatestEstimate ? "Yes" : "No")</p>
+                        <p class="mb-1 small"><strong>Years found:</strong> @Model.History.Years.Count</p>
+                        @if (Model.History.Unsubscribed.HasValue && Model.History.Unsubscribed.Value)
+                        {
+                            <p class="mb-0 small"><strong>Unsubscribed:</strong> <span class="badge bg-danger">Yes</span> @(Model.History.UnsubscribedDate.HasValue ? $"({Model.History.UnsubscribedDate:M/d/yyyy})" : "")</p>
+                        }
+                        else if (Model.History.Unsubscribed.HasValue)
+                        {
+                            <p class="mb-0 small"><strong>Unsubscribed:</strong> <span class="badge bg-success">No</span></p>
+                        }
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a asp-page="./Details" asp-route-id="@Model.History.CompanyId" class="btn btn-outline-secondary btn-sm">Company Details</a>
+                        <a asp-page="./Index" class="btn btn-secondary btn-sm">Back to List</a>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -84,24 +96,21 @@
 
 <style>
     .survey-history-table {
-        font-size: 0.7rem;
+        font-size: 0.75rem;
+        width: 100%;
     }
 
     .survey-history-table th,
     .survey-history-table td {
-        padding: 0.25rem 0.35rem;
-        line-height: 1.1;
+        padding: 0.4rem 0.5rem;
+        line-height: 1.2;
         white-space: normal;
         vertical-align: top;
     }
 
     .survey-history-table thead th {
-        font-size: 0.68rem;
+        font-size: 0.7rem;
         white-space: nowrap;
-    }
-    
-    .survey-history-table td:nth-child(n + 4) {
-        min-width: 120px;
     }
 
     .survey-history-table th:nth-child(1),
@@ -110,25 +119,33 @@
         left: 0;
         z-index: 3;
         background-color: #fff;
-        min-width: 105px;
+        min-width: 120px;
+        max-width: 150px;
     }
 
     .survey-history-table th:nth-child(2),
     .survey-history-table td:nth-child(2) {
         position: sticky;
-        left: 105px;
+        left: 150px;
         z-index: 3;
         background-color: #fff;
-        min-width: 72px;
+        min-width: 70px;
+        text-align: center;
     }
 
     .survey-history-table th:nth-child(3),
     .survey-history-table td:nth-child(3) {
         position: sticky;
-        left: 177px;
+        left: 220px;
         z-index: 3;
         background-color: #fff;
-        min-width: 300px;
+        min-width: 350px;
+        flex-grow: 1;
+    }
+
+    .survey-history-table td:nth-child(n + 4) {
+        min-width: 140px;
+        word-break: break-word;
     }
 
     .survey-history-table thead th:nth-child(1),

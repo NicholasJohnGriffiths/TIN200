@@ -37,7 +37,7 @@
 
     <div class="row mb-3">
         <div class="col-12">
-            <form method="post" asp-page-handler="PopulateSurveyLinks" class="d-flex gap-2">
+            <form id="populateSurveyLinksForm" method="post" asp-page-handler="PopulateSurveyLinks" class="d-flex gap-2">
                 <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
                 <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
                 <input type="hidden" name="surveyEmailSentFilter" value="@Model.SurveyEmailSentFilter" />
@@ -45,7 +45,7 @@
                     <input class="form-check-input" type="checkbox" name="overwriteExisting" id="overwriteExisting" />
                     <label class="form-check-label" for="overwriteExisting">Overwrite Existing Survey Links</label>
                 </div>
-                <button class="btn btn-warning" type="submit">Populate Survey Links</button>
+                <button class="btn btn-warning" type="button" id="previewBtn">Populate Survey Links</button>
             </form>
         </div>
     </div>
@@ -149,4 +149,151 @@
             });
         });
     })();
+
+    // Populate Survey Links Preview Handler
+    (function () {
+        const previewBtn = document.getElementById('previewBtn');
+        const overwriteCheckbox = document.getElementById('overwriteExisting');
+        const populateForm = document.getElementById('populateSurveyLinksForm');
+        const previewModal = new bootstrap.Modal(document.getElementById('previewModal'));
+
+        if (!previewBtn) return;
+
+        previewBtn.addEventListener('click', async function (e) {
+            e.preventDefault();
+            const overwriteExisting = overwriteCheckbox.checked;
+
+            try {
+                // Show loading state
+                previewBtn.disabled = true;
+                previewBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Loading preview...';
+
+                const formData = new FormData(populateForm);
+                const response = await fetch(window.location.pathname + '?handler=PreviewPopulateSurveyLinks', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    alert('Error: ' + data.message);
+                    previewBtn.disabled = false;
+                    previewBtn.innerHTML = 'Populate Survey Links';
+                    return;
+                }
+
+                // Update modal with preview data
+                updatePreviewModal(data, overwriteExisting);
+                previewModal.show();
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error loading preview: ' + error.message);
+            } finally {
+                previewBtn.disabled = false;
+                previewBtn.innerHTML = 'Populate Survey Links';
+            }
+        });
+
+        function updatePreviewModal(data, overwriteExisting) {
+            const totalRecords = data.totalRecords;
+            const blankCount = data.blankCount;
+            const existingCount = data.existingCount;
+            const willUpdate = data.willUpdate;
+            const willSkip = data.willSkip;
+            const previewRows = data.previewRows || [];
+            const moreRows = data.moreRows || 0;
+
+            let warningHtml = '';
+            let summaryHtml = `<strong>${totalRecords}</strong> total survey records`;
+
+            if (overwriteExisting && existingCount > 0) {
+                warningHtml = `<div class="alert alert-warning mt-3" role="alert">
+                    <strong><i class="bi bi-exclamation-triangle"></i> Warning:</strong> You have checked "Overwrite Existing Survey Links". 
+                    This will update <strong>${existingCount}</strong> existing survey links.
+                </div>`;
+            }
+
+            summaryHtml += `<br/>Will update: <strong class="text-success">${willUpdate}</strong> records`;
+            if (willSkip > 0) {
+                summaryHtml += `<br/>Will skip: <strong class="text-muted">${willSkip}</strong> records (already have links)`;
+            }
+
+            document.getElementById('previewSummary').innerHTML = summaryHtml;
+            document.getElementById('previewWarning').innerHTML = warningHtml;
+            document.getElementById('previewCount').textContent = `Showing ${data.totalPreviewShown} of ${totalRecords} records`;
+
+            const previewTableBody = document.getElementById('previewTableBody');
+            previewTableBody.innerHTML = previewRows.map(row => `
+                <tr>
+                    <td>${row.icon}</td>
+                    <td>${escapeHtml(row.companyName)}</td>
+                    <td><span class="${row.statusClass}">${row.status}</span></td>
+                </tr>
+            `).join('');
+
+            if (moreRows > 0) {
+                previewTableBody.innerHTML += `<tr><td colspan="3" class="text-muted text-center">... and ${moreRows} more</td></tr>`;
+            }
+
+            // Update confirm button
+            const confirmBtn = document.getElementById('confirmPopulateBtn');
+            confirmBtn.onclick = function () {
+                populateForm.submit();
+            };
+        }
+
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+    })();
 </script>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="previewModalLabel">Preview: Populate Survey Links</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="previewWarning"></div>
+                <div class="alert alert-info mb-3" role="alert">
+                    <strong>Summary:</strong><br/>
+                    <span id="previewSummary"></span>
+                </div>
+                <div>
+                    <label class="form-label"><strong>Preview</strong> <small class="text-muted" id="previewCount"></small></label>
+                    <div style="max-height: 300px; overflow-y: auto;">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 30px;"></th>
+                                    <th>Company Name</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="previewTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="confirmPopulateBtn">Confirm & Populate</button>
+            </div>
+        </div>
+    </div>
+</div>

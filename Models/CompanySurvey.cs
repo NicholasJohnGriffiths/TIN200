@@ -43,5 +43,9 @@ namespace TINWeb.Models
         [Display(Name = "Survey Link")]
         [StringLength(1000)]
         public string? SurveyLink { get; set; }
+
+        public bool? Unsubscribed { get; set; }
+
+        public DateTime? UnsubscribedDate { get; set; }
     }
 }

@@ -77,6 +77,81 @@ namespace TINWeb.Pages.CompanySurvey
             return RedirectToPage(new { financialYear, companySearch, surveyEmailSentFilter });
         }
 
+        public async Task<IActionResult> OnPostPreviewPopulateSurveyLinksAsync(int? financialYear, bool overwriteExisting)
+        {
+            // Get current survey
+            var currentSurvey = await _context.Survey
+                .Where(s => s.CurrentSurvey)
+                .OrderByDescending(s => s.FinancialYear)
+                .ThenByDescending(s => s.Id)
+                .FirstOrDefaultAsync();
+
+            if (currentSurvey == null)
+            {
+                return new JsonResult(new { success = false, message = "No current survey found." });
+            }
+
+            // Get all CompanySurvey records for the current survey with company names
+            var companySurveys = await _context.CompanySurvey
+                .Where(cs => cs.SurveyId == currentSurvey.Id)
+                .Join(_context.Tin200,
+                    cs => cs.CompanyId,
+                    t => t.Id,
+                    (cs, t) => new { cs, t })
+                .OrderBy(x => x.t.CompanyName)
+                .Select(x => new { x.cs, x.t.CompanyName })
+                .ToListAsync();
+
+            int blankCount = 0;
+            int existingCount = 0;
+            var previewRows = new List<object>();
+
+            foreach (var item in companySurveys)
+            {
+                if (string.IsNullOrWhiteSpace(item.cs.SurveyLink))
+                {
+                    blankCount++;
+                    previewRows.Add(new
+                    {
+                        companyName = item.CompanyName ?? "Unknown",
+                        status = "Will be populated",
+                        statusClass = "text-success",
+                        icon = "✓"
+                    });
+                }
+                else
+                {
+                    existingCount++;
+                    if (overwriteExisting)
+                    {
+                        previewRows.Add(new
+                        {
+                            companyName = item.CompanyName ?? "Unknown",
+                            status = "Will be overwritten",
+                            statusClass = "text-warning",
+                            icon = "⚠"
+                        });
+                    }
+                }
+            }
+
+            var totalToUpdate = overwriteExisting ? blankCount + existingCount : blankCount;
+
+            return new JsonResult(new
+            {
+                success = true,
+                totalRecords = companySurveys.Count,
+                blankCount,
+                existingCount,
+                willUpdate = totalToUpdate,
+                willSkip = companySurveys.Count - totalToUpdate,
+                overwriteExisting,
+                previewRows = previewRows.Take(20).ToList(),
+                totalPreviewShown = Math.Min(20, previewRows.Count),
+                moreRows = previewRows.Count > 20 ? previewRows.Count - 20 : 0
+            });
+        }
+
         public async Task<IActionResult> OnPostPopulateSurveyLinksAsync(int? financialYear, bool overwriteExisting, string? companySearch, string? surveyEmailSentFilter)
         {
             // Get current survey
