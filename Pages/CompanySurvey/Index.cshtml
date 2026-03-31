@@ -263,9 +263,48 @@
 
             // Update confirm button
             const confirmBtn = document.getElementById('confirmPopulateBtn');
-            confirmBtn.onclick = function () {
-                populateForm.submit();
+            confirmBtn.onclick = async function () {
+                // Hide preview modal and show progress
+                previewModal.hide();
+                showProgressModal();
+                
+                try {
+                    const formData = new FormData(populateForm);
+                    const response = await fetch(window.location.pathname + '?handler=PopulateSurveyLinks', {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('Population failed with status ' + response.status);
+                    }
+
+                    // Show success and redirect
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1500);
+                } catch (error) {
+                    console.error('Error:', error);
+                    hideProgressModal();
+                    alert('Error during population: ' + error.message);
+                }
             };
+        }
+
+        function showProgressModal() {
+            const progressModal = new bootstrap.Modal(document.getElementById('progressModal'));
+            progressModal.show();
+        }
+
+        function hideProgressModal() {
+            const progressModal = bootstrap.Modal.getInstance(document.getElementById('progressModal'));
+            if (progressModal) {
+                progressModal.hide();
+            }
+        }
         }
 
         function escapeHtml(text) {
@@ -315,6 +354,23 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-warning" id="confirmPopulateBtn">Confirm & Populate</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Progress Modal -->
+<div class="modal fade" id="progressModal" tabindex="-1" aria-labelledby="progressModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="progressModalLabel">Populating Survey Links</h5>
+            </div>
+            <div class="modal-body">
+                <div class="progress" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+                </div>
+                <p class="text-center mt-3 mb-0"><small class="text-muted">This may take a moment...</small></p>
             </div>
         </div>
     </div>
