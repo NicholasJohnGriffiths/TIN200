@@ -27,6 +27,29 @@
         </div>
     </div>
 
+    @if (!string.IsNullOrEmpty(Model.StatusMessage))
+    {
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            @Model.StatusMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="row mb-3">
+        <div class="col-12">
+            <form method="post" asp-page-handler="PopulateSurveyLinks" class="d-flex gap-2">
+                <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
+                <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
+                <input type="hidden" name="surveyEmailSentFilter" value="@Model.SurveyEmailSentFilter" />
+                <div class="form-check align-self-center">
+                    <input class="form-check-input" type="checkbox" name="overwriteExisting" id="overwriteExisting" />
+                    <label class="form-check-label" for="overwriteExisting">Overwrite Existing Survey Links</label>
+                </div>
+                <button class="btn btn-warning" type="submit">Populate Survey Links</button>
+            </form>
+        </div>
+    </div>
+
     <div class="row mb-3">
         <div class="col-12">
             <form method="get" class="d-flex">

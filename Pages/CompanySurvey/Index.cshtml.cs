@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using TINWeb.Data;
 using TINWeb.Services;
 
 namespace TINWeb.Pages.CompanySurvey
@@ -7,6 +10,9 @@ namespace TINWeb.Pages.CompanySurvey
     public class IndexModel : PageModel
     {
         private readonly CompanySurveyService _service;
+        private readonly ApplicationDbContext _context;
+        private readonly ISurveyLinkTokenService _surveyLinkTokenService;
+        private readonly SurveyLinkSettings _surveyLinkSettings;
 
         public List<CompanySurveyService.CompanySurveyListRow> Records { get; set; } = new();
         public List<int> FinancialYears { get; set; } = new();
@@ -17,9 +23,19 @@ namespace TINWeb.Pages.CompanySurvey
         public string SortBy { get; set; } = "CompanyName";
         public string SortDir { get; set; } = "asc";
 
-        public IndexModel(CompanySurveyService service)
+        [TempData]
+        public string? StatusMessage { get; set; }
+
+        public IndexModel(
+            CompanySurveyService service,
+            ApplicationDbContext context,
+            ISurveyLinkTokenService surveyLinkTokenService,
+            IOptions<SurveyLinkSettings> surveyLinkSettings)
         {
             _service = service;
+            _context = context;
+            _surveyLinkTokenService = surveyLinkTokenService;
+            _surveyLinkSettings = surveyLinkSettings.Value;
         }
 
         public async Task OnGetAsync(int? financialYear, string? sortBy, string? sortDir, string? companySearch, string? surveyEmailSentFilter)
@@ -59,6 +75,68 @@ namespace TINWeb.Pages.CompanySurvey
         {
             await _service.BulkSubmitWithAnswersAsync(financialYear);
             return RedirectToPage(new { financialYear, companySearch, surveyEmailSentFilter });
+        }
+
+        public async Task<IActionResult> OnPostPopulateSurveyLinksAsync(int? financialYear, bool overwriteExisting, string? companySearch, string? surveyEmailSentFilter)
+        {
+            // Get current survey
+            var currentSurvey = await _context.Survey
+                .Where(s => s.CurrentSurvey)
+                .OrderByDescending(s => s.FinancialYear)
+                .ThenByDescending(s => s.Id)
+                .FirstOrDefaultAsync();
+
+            if (currentSurvey == null)
+            {
+                StatusMessage = "Error: No current survey found.";
+                return RedirectToPage(new { financialYear, companySearch, surveyEmailSentFilter });
+            }
+
+            // Get all CompanySurvey records for the current survey
+            var companySurveys = await _context.CompanySurvey
+                .Where(cs => cs.SurveyId == currentSurvey.Id)
+                .ToListAsync();
+
+            int updatedCount = 0;
+            int skippedCount = 0;
+
+            foreach (var companySurvey in companySurveys)
+            {
+                // Only update if SurveyLink is empty/null, or if overwrite is enabled
+                if (string.IsNullOrWhiteSpace(companySurvey.SurveyLink) || overwriteExisting)
+                {
+                    var surveyUrl = BuildSurveyUrl(companySurvey.CompanyId);
+                    companySurvey.SurveyLink = surveyUrl;
+                    _context.CompanySurvey.Update(companySurvey);
+                    updatedCount++;
+                }
+                else
+                {
+                    skippedCount++;
+                }
+            }
+
+            if (updatedCount > 0)
+            {
+                await _context.SaveChangesAsync();
+            }
+
+            StatusMessage = $"Survey links populated. Updated: {updatedCount}, Skipped (existing): {skippedCount}.";
+            return RedirectToPage(new { financialYear, companySearch, surveyEmailSentFilter });
+        }
+
+        private string BuildSurveyUrl(int companyId)
+        {
+            var token = _surveyLinkTokenService.GenerateToken(companyId);
+            var relativePath = Url.Page("/Company/AnswerSurvey", pageHandler: null, values: new { id = companyId, token }, protocol: null) ?? string.Empty;
+            var configuredBaseUrl = (_surveyLinkSettings.BaseUrl ?? string.Empty).Trim().TrimEnd('/');
+
+            if (!string.IsNullOrWhiteSpace(configuredBaseUrl) && Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out _))
+            {
+                return $"{configuredBaseUrl}{relativePath}";
+            }
+
+            return Url.Page("/Company/AnswerSurvey", pageHandler: null, values: new { id = companyId, token }, protocol: Request.Scheme) ?? string.Empty;
         }
 
         private static string NormalizeSurveyEmailSentFilter(string? surveyEmailSentFilter)
