@@ -45,8 +45,44 @@
                     <input class="form-check-input" type="checkbox" name="overwriteExisting" id="overwriteExisting" />
                     <label class="form-check-label" for="overwriteExisting">Overwrite Existing Survey Links</label>
                 </div>
-                <button class="btn btn-warning" type="button" id="previewBtn">Populate Survey Links</button>
+                <button class="btn btn-warning" type="button" id="previewBtn">Preview Populate Survey Links</button>
             </form>
+
+            <div id="populatePreviewPanel" class="card mt-3 d-none" style="max-width: 980px;">
+                <div class="card-body">
+                    <h6 class="card-title mb-2">Populate Survey Links Preview</h6>
+                    <div id="previewWarningInline"></div>
+                    <div class="alert alert-info mb-2" role="alert">
+                        <span id="previewSummaryInline"></span>
+                    </div>
+                    <div>
+                        <label class="form-label mb-1"><strong>Preview</strong> <small class="text-muted" id="previewCountInline"></small></label>
+                        <div style="max-height: 240px; overflow-y: auto;">
+                            <table class="table table-sm table-hover mb-2">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 30px;"></th>
+                                        <th>Company Name</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="previewTableBodyInline"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-warning" id="confirmPopulateBtn">Confirm & Populate</button>
+                        <button type="button" class="btn btn-outline-secondary" id="cancelPopulateBtn">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="populateProgress" class="mt-2 d-none" style="max-width: 520px;">
+                <div class="progress" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+                </div>
+                <small class="text-muted">Populating survey links, please wait...</small>
+            </div>
         </div>
     </div>
 
@@ -172,24 +208,30 @@
         });
     })();
 
-    // Populate Survey Links Preview Handler
+    // Populate Survey Links Handler (inline preview + warning)
     (function () {
         const previewBtn = document.getElementById('previewBtn');
+        const confirmBtn = document.getElementById('confirmPopulateBtn');
+        const cancelBtn = document.getElementById('cancelPopulateBtn');
+        const previewPanel = document.getElementById('populatePreviewPanel');
         const overwriteCheckbox = document.getElementById('overwriteExisting');
         const populateForm = document.getElementById('populateSurveyLinksForm');
-        const previewModal = new bootstrap.Modal(document.getElementById('previewModal'));
+        const progress = document.getElementById('populateProgress');
+        const previewSummary = document.getElementById('previewSummaryInline');
+        const previewWarning = document.getElementById('previewWarningInline');
+        const previewCount = document.getElementById('previewCountInline');
+        const previewTableBody = document.getElementById('previewTableBodyInline');
 
-        if (!previewBtn) return;
+        if (!previewBtn || !populateForm || !confirmBtn || !cancelBtn || !previewPanel) return;
 
         previewBtn.addEventListener('click', async function (e) {
             e.preventDefault();
-            const overwriteExisting = overwriteCheckbox.checked;
+            const overwriteExisting = overwriteCheckbox && overwriteCheckbox.checked;
+
+            previewBtn.disabled = true;
+            previewBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Loading preview...';
 
             try {
-                // Show loading state
-                previewBtn.disabled = true;
-                previewBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Loading preview...';
-
                 const formData = new FormData(populateForm);
                 const response = await fetch(window.location.pathname + '?handler=PreviewPopulateSurveyLinks', {
                     method: 'POST',
@@ -200,114 +242,69 @@
                 });
 
                 const data = await response.json();
-
                 if (!data.success) {
                     alert('Error: ' + data.message);
-                    previewBtn.disabled = false;
-                    previewBtn.innerHTML = 'Populate Survey Links';
                     return;
                 }
 
-                // Update modal with preview data
-                updatePreviewModal(data, overwriteExisting);
-                previewModal.show();
+                let summaryHtml = `<strong>${data.totalRecords}</strong> total survey records`;
+                summaryHtml += `<br/>Will update: <strong class="text-success">${data.willUpdate}</strong> records`;
+                if (data.willSkip > 0) {
+                    summaryHtml += `<br/>Will skip: <strong class="text-muted">${data.willSkip}</strong> records (already have links)`;
+                }
+                previewSummary.innerHTML = summaryHtml;
+
+                if (overwriteExisting && data.existingCount > 0) {
+                    previewWarning.innerHTML = `<div class="alert alert-warning mb-2" role="alert"><strong>Warning:</strong> Overwrite is enabled and <strong>${data.existingCount}</strong> existing links will be replaced.</div>`;
+                } else {
+                    previewWarning.innerHTML = '';
+                }
+
+                previewCount.textContent = `Showing ${data.totalPreviewShown} of ${data.totalRecords} records`;
+                const previewRows = data.previewRows || [];
+                const moreRows = data.moreRows || 0;
+
+                previewTableBody.innerHTML = previewRows.map(row => `
+                    <tr>
+                        <td>${row.icon}</td>
+                        <td>${escapeHtml(row.companyName)}</td>
+                        <td><span class="${row.statusClass}">${row.status}</span></td>
+                    </tr>
+                `).join('');
+
+                if (moreRows > 0) {
+                    previewTableBody.innerHTML += `<tr><td colspan="3" class="text-muted text-center">... and ${moreRows} more</td></tr>`;
+                }
+
+                previewPanel.classList.remove('d-none');
+                previewPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                setTimeout(() => confirmBtn.focus(), 200);
             } catch (error) {
                 console.error('Error:', error);
                 alert('Error loading preview: ' + error.message);
             } finally {
                 previewBtn.disabled = false;
-                previewBtn.innerHTML = 'Populate Survey Links';
+                previewBtn.innerHTML = 'Preview Populate Survey Links';
             }
         });
 
-        function updatePreviewModal(data, overwriteExisting) {
-            const totalRecords = data.totalRecords;
-            const blankCount = data.blankCount;
-            const existingCount = data.existingCount;
-            const willUpdate = data.willUpdate;
-            const willSkip = data.willSkip;
-            const previewRows = data.previewRows || [];
-            const moreRows = data.moreRows || 0;
+        confirmBtn.addEventListener('click', function () {
+            confirmBtn.disabled = true;
+            previewBtn.disabled = true;
+            progress.classList.remove('d-none');
+            populateForm.submit();
+        });
 
-            let warningHtml = '';
-            let summaryHtml = `<strong>${totalRecords}</strong> total survey records`;
-
-            if (overwriteExisting && existingCount > 0) {
-                warningHtml = `<div class="alert alert-warning mt-3" role="alert">
-                    <strong><i class="bi bi-exclamation-triangle"></i> Warning:</strong> You have checked "Overwrite Existing Survey Links". 
-                    This will update <strong>${existingCount}</strong> existing survey links.
-                </div>`;
-            }
-
-            summaryHtml += `<br/>Will update: <strong class="text-success">${willUpdate}</strong> records`;
-            if (willSkip > 0) {
-                summaryHtml += `<br/>Will skip: <strong class="text-muted">${willSkip}</strong> records (already have links)`;
-            }
-
-            document.getElementById('previewSummary').innerHTML = summaryHtml;
-            document.getElementById('previewWarning').innerHTML = warningHtml;
-            document.getElementById('previewCount').textContent = `Showing ${data.totalPreviewShown} of ${totalRecords} records`;
-
-            const previewTableBody = document.getElementById('previewTableBody');
-            previewTableBody.innerHTML = previewRows.map(row => `
-                <tr>
-                    <td>${row.icon}</td>
-                    <td>${escapeHtml(row.companyName)}</td>
-                    <td><span class="${row.statusClass}">${row.status}</span></td>
-                </tr>
-            `).join('');
-
-            if (moreRows > 0) {
-                previewTableBody.innerHTML += `<tr><td colspan="3" class="text-muted text-center">... and ${moreRows} more</td></tr>`;
-            }
-
-            // Update confirm button
-            const confirmBtn = document.getElementById('confirmPopulateBtn');
-            confirmBtn.onclick = async function () {
-                // Hide preview modal and show progress
-                previewModal.hide();
-                showProgressModal();
-                
-                try {
-                    const formData = new FormData(populateForm);
-                    const response = await fetch(window.location.pathname + '?handler=PopulateSurveyLinks', {
-                        method: 'POST',
-                        body: formData,
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest'
-                        }
-                    });
-
-                    if (!response.ok) {
-                        throw new Error('Population failed with status ' + response.status);
-                    }
-
-                    // Show success and redirect
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1500);
-                } catch (error) {
-                    console.error('Error:', error);
-                    hideProgressModal();
-                    alert('Error during population: ' + error.message);
-                }
-            };
-        }
-
-        function showProgressModal() {
-            const progressModal = new bootstrap.Modal(document.getElementById('progressModal'));
-            progressModal.show();
-        }
-
-        function hideProgressModal() {
-            const progressModal = bootstrap.Modal.getInstance(document.getElementById('progressModal'));
-            if (progressModal) {
-                progressModal.hide();
-            }
-        }
-        }
+        cancelBtn.addEventListener('click', function () {
+            previewPanel.classList.add('d-none');
+            previewWarning.innerHTML = '';
+            previewSummary.innerHTML = '';
+            previewCount.textContent = '';
+            previewTableBody.innerHTML = '';
+        });
 
         function escapeHtml(text) {
+            if (!text) return '';
             const map = {
                 '&': '&amp;',
                 '<': '&lt;',
@@ -319,59 +316,3 @@
         }
     })();
 </script>
-
-<!-- Preview Modal -->
-<div class="modal fade" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="previewModalLabel">Preview: Populate Survey Links</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div id="previewWarning"></div>
-                <div class="alert alert-info mb-3" role="alert">
-                    <strong>Summary:</strong><br/>
-                    <span id="previewSummary"></span>
-                </div>
-                <div>
-                    <label class="form-label"><strong>Preview</strong> <small class="text-muted" id="previewCount"></small></label>
-                    <div style="max-height: 300px; overflow-y: auto;">
-                        <table class="table table-sm table-hover">
-                            <thead class="table-light">
-                                <tr>
-                                    <th style="width: 30px;"></th>
-                                    <th>Company Name</th>
-                                    <th>Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="previewTableBody">
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-warning" id="confirmPopulateBtn">Confirm & Populate</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Progress Modal -->
-<div class="modal fade" id="progressModal" tabindex="-1" aria-labelledby="progressModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
-    <div class="modal-dialog modal-sm">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="progressModalLabel">Populating Survey Links</h5>
-            </div>
-            <div class="modal-body">
-                <div class="progress" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
-                </div>
-                <p class="text-center mt-3 mb-0"><small class="text-muted">This may take a moment...</small></p>
-            </div>
-        </div>
-    </div>
-</div>
