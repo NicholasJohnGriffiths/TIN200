@@ -135,10 +135,10 @@
                 {
                     <tr id="record-@record.Id">
                         <td style="min-width: 250px;">@record.CompanyName</td>
-                        <td style="min-width: 400px;">
+                        <td style="min-width: 300px; max-width: 360px;">
                             @if (!string.IsNullOrWhiteSpace(record.SurveyLink))
                             {
-                                <a href="@record.SurveyLink" target="_blank" class="text-truncate d-inline-block" style="max-width: 100%;" title="@record.SurveyLink">@record.SurveyLink</a>
+                                <a href="@record.SurveyLink" target="_blank" class="survey-link-two-line d-inline-block" title="@record.SurveyLink">@record.SurveyLink</a>
                             }
                         </td>
                         <td>@(record.Saved ? "Yes" : "No")</td>
@@ -316,3 +316,17 @@
         }
     })();
 </script>
+
+<style>
+    .survey-link-two-line {
+        max-width: 100%;
+        white-space: normal;
+        word-break: break-all;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        line-height: 1.2em;
+        max-height: 2.4em;
+    }
+</style>
