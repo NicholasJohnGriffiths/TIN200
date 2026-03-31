@@ -49,6 +49,8 @@ namespace TINWeb.Services
                     SavedDate = companySurvey.SavedDate,
                     SubmittedDate = companySurvey.SubmittedDate,
                     RequestedDate = companySurvey.RequestedDate,
+                    Unsubscribed = companySurvey.Unsubscribed,
+                    UnsubscribedDate = companySurvey.UnsubscribedDate,
                     AnswerCount = _context.Answer.Count(a =>
                         a.CompanySurveyId == companySurvey.Id &&
                         (a.AnswerText != null || a.AnswerCurrency != null || a.AnswerNumber != null))
@@ -189,6 +191,8 @@ namespace TINWeb.Services
             public DateTime? SavedDate { get; set; }
             public DateTime? SubmittedDate { get; set; }
             public DateTime? RequestedDate { get; set; }
+            public bool? Unsubscribed { get; set; }
+            public DateTime? UnsubscribedDate { get; set; }
             public int AnswerCount { get; set; }
         }
     }
