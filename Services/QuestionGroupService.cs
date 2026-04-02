@@ -71,6 +71,7 @@ namespace TINWeb.Services
             existing.Title = record.Title;
             existing.Description = record.Description;
             existing.TableFormat = record.TableFormat;
+            existing.NewPage = record.NewPage;
 
             if (clearImage1)
             {
@@ -128,6 +129,42 @@ namespace TINWeb.Services
         {
             await EnsureSchemaAsync();
             return await _context.QuestionGroup.AnyAsync(x => x.Id == id);
+        }
+
+        public async Task MoveOrderAsync(int id, bool moveUp)
+        {
+            await EnsureSchemaAsync();
+
+            var records = await _context.QuestionGroup
+                .OrderBy(x => x.OrderNumber ?? int.MaxValue)
+                .ThenBy(x => x.Id)
+                .ToListAsync();
+
+            if (records.Count <= 1)
+            {
+                return;
+            }
+
+            var currentIndex = records.FindIndex(x => x.Id == id);
+            if (currentIndex < 0)
+            {
+                return;
+            }
+
+            var targetIndex = moveUp ? currentIndex - 1 : currentIndex + 1;
+            if (targetIndex < 0 || targetIndex >= records.Count)
+            {
+                return;
+            }
+
+            (records[currentIndex], records[targetIndex]) = (records[targetIndex], records[currentIndex]);
+
+            for (var i = 0; i < records.Count; i++)
+            {
+                records[i].OrderNumber = i + 1;
+            }
+
+            await _context.SaveChangesAsync();
         }
 
         public async Task<Image?> GetImageByIdAsync(int imageId)
@@ -202,6 +239,11 @@ BEGIN
     ALTER TABLE [dbo].[QuestionGroup] ADD [TableFormat] [bit] NOT NULL CONSTRAINT [DF_QuestionGroup_TableFormat] DEFAULT (0);
 END;
 
+IF COL_LENGTH('dbo.QuestionGroup', 'NewPage') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[QuestionGroup] ADD [NewPage] [bit] NOT NULL CONSTRAINT [DF_QuestionGroup_NewPage] DEFAULT (0);
+END;
+
 IF COL_LENGTH('dbo.QuestionGroup', 'TableFormat') IS NOT NULL
 BEGIN
     UPDATE [dbo].[QuestionGroup]
@@ -227,6 +269,34 @@ BEGIN
     BEGIN
         ALTER TABLE [dbo].[QuestionGroup]
         ADD CONSTRAINT [DF_QuestionGroup_TableFormat] DEFAULT (0) FOR [TableFormat];
+    END;
+END;
+
+IF COL_LENGTH('dbo.QuestionGroup', 'NewPage') IS NOT NULL
+BEGIN
+    UPDATE [dbo].[QuestionGroup]
+    SET [NewPage] = 0
+    WHERE [NewPage] IS NULL;
+
+    IF EXISTS (
+        SELECT 1
+        FROM sys.columns
+        WHERE object_id = OBJECT_ID(N'[dbo].[QuestionGroup]')
+          AND name = 'NewPage'
+          AND is_nullable = 1)
+    BEGIN
+        ALTER TABLE [dbo].[QuestionGroup] ALTER COLUMN [NewPage] [bit] NOT NULL;
+    END;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM sys.columns
+        WHERE object_id = OBJECT_ID(N'[dbo].[QuestionGroup]')
+          AND name = 'NewPage'
+          AND default_object_id <> 0)
+    BEGIN
+        ALTER TABLE [dbo].[QuestionGroup]
+        ADD CONSTRAINT [DF_QuestionGroup_NewPage] DEFAULT (0) FOR [NewPage];
     END;
 END;
 

@@ -24,5 +24,7 @@ namespace TINWeb.Models
         public bool? IncludeInEstimation { get; set; }
 
         public bool TableFormat { get; set; }
+
+        public bool NewPage { get; set; }
     }
 }

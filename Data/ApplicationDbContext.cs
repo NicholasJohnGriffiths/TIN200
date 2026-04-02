@@ -299,6 +299,10 @@ namespace TINWeb.Data
                     .HasColumnName("Description")
                     .HasColumnType("nvarchar(max)");
 
+                entity.Property(e => e.NewPage)
+                    .HasColumnName("NewPage")
+                    .HasColumnType("bit");
+
                 entity.Property(e => e.OrderNumber)
                     .HasColumnName("OrderNumber")
                     .HasColumnType("int");

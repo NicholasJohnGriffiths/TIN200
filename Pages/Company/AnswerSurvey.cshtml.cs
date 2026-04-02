@@ -47,6 +47,7 @@ namespace TINWeb.Pages.Company
         public bool Saved { get; set; }
         public bool Submitted { get; set; }
         public bool IsLocked { get; set; }
+        public List<QuestionGroup> SurveyQuestionGroups { get; set; } = new();
         public HashSet<int> AvailableGroupImageIds { get; set; } = new();
 
         public async Task<IActionResult> OnGetAsync(int id, string token, bool saved = false, bool submitted = false)
@@ -99,7 +100,8 @@ namespace TINWeb.Pages.Company
             IsLocked = (companySurvey?.Locked).GetValueOrDefault();
 
             Rows = await LoadAnswerRowsAsync(company.Id, companySurveyId, survey.FinancialYear);
-            AvailableGroupImageIds = await GetAvailableGroupImageIdsAsync(Rows);
+            SurveyQuestionGroups = await LoadSurveyQuestionGroupsAsync();
+            AvailableGroupImageIds = await GetAvailableGroupImageIdsAsync(Rows, SurveyQuestionGroups);
             return Page();
         }
 
@@ -222,7 +224,8 @@ namespace TINWeb.Pages.Company
             {
                 ModelState.AddModelError(string.Empty, "This survey record is locked. Please contact the Technology Investment Network.");
                 Rows = await LoadAnswerRowsAsync(company.Id, companySurveyId, survey.FinancialYear);
-                AvailableGroupImageIds = await GetAvailableGroupImageIdsAsync(Rows);
+                SurveyQuestionGroups = await LoadSurveyQuestionGroupsAsync();
+                AvailableGroupImageIds = await GetAvailableGroupImageIdsAsync(Rows, SurveyQuestionGroups);
                 return Page();
             }
 
@@ -307,16 +310,27 @@ namespace TINWeb.Pages.Company
             Saved = !Submitted;
 
             Rows = await LoadAnswerRowsAsync(company.Id, companySurveyId, survey.FinancialYear);
-            AvailableGroupImageIds = await GetAvailableGroupImageIdsAsync(Rows);
+            SurveyQuestionGroups = await LoadSurveyQuestionGroupsAsync();
+            AvailableGroupImageIds = await GetAvailableGroupImageIdsAsync(Rows, SurveyQuestionGroups);
             return Page();
         }
 
-        private async Task<HashSet<int>> GetAvailableGroupImageIdsAsync(List<AnswerEditRow> rows)
+        private async Task<HashSet<int>> GetAvailableGroupImageIdsAsync(List<AnswerEditRow> rows, IEnumerable<QuestionGroup> groups)
         {
-            var candidateIds = rows
+            var rowImageIds = rows
                 .SelectMany(r => new[] { r.GroupImageId1, r.GroupImageId2, r.GroupImageId3 })
                 .Where(x => x.HasValue)
                 .Select(x => x!.Value)
+                .ToList();
+
+            var groupImageIds = groups
+                .SelectMany(g => new[] { g.ImageId1, g.ImageId2, g.ImageId3 })
+                .Where(x => x.HasValue)
+                .Select(x => x!.Value)
+                .ToList();
+
+            var candidateIds = rowImageIds
+                .Concat(groupImageIds)
                 .Distinct()
                 .ToList();
 
@@ -340,6 +354,14 @@ namespace TINWeb.Pages.Company
             }
 
             return availableIds;
+        }
+
+        private async Task<List<QuestionGroup>> LoadSurveyQuestionGroupsAsync()
+        {
+            return await _context.QuestionGroup
+                .OrderBy(g => g.OrderNumber ?? int.MaxValue)
+                .ThenBy(g => g.Id)
+                .ToListAsync();
         }
 
         private async Task<string?> BuildSurveyHeaderImageUrlAsync(int companyId, string token, Models.Survey survey)
@@ -486,6 +508,7 @@ namespace TINWeb.Pages.Company
                         GroupImageId2 = group?.ImageId2,
                         GroupImageId3 = group?.ImageId3,
                         GroupTableFormat = group?.TableFormat ?? false,
+                        GroupNewPage = group?.NewPage ?? false,
                         SubgroupId = subgroup?.Id,
                         SubgroupTitle = subgroup?.Title,
                         SubgroupNewHeader = subgroup?.NewHeader,
@@ -715,6 +738,7 @@ namespace TINWeb.Pages.Company
             public int? GroupImageId2 { get; set; }
             public int? GroupImageId3 { get; set; }
             public bool GroupTableFormat { get; set; }
+            public bool GroupNewPage { get; set; }
             public int? SubgroupId { get; set; }
             public string? SubgroupTitle { get; set; }
             public bool? SubgroupNewHeader { get; set; }

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Mvc;
 using TINWeb.Models;
 using TINWeb.Services;
 
@@ -36,6 +37,12 @@ namespace TINWeb.Pages.QuestionGroups
                     Id = pair.Value.Id,
                     FileName = pair.Value.FileName
                 });
+        }
+
+        public async Task<IActionResult> OnPostMoveAsync(int id, string direction)
+        {
+            await _service.MoveOrderAsync(id, string.Equals(direction, "up", StringComparison.OrdinalIgnoreCase));
+            return RedirectToPage();
         }
 
         public class ImageDetailsViewModel

@@ -295,7 +295,24 @@
                     var sectionImageId2 = new List<int?>();
                     var sectionImageId3 = new List<int?>();
                     var sectionTableFormat = new List<bool>();
+                    var sectionNewPage = new List<bool>();
                     var sectionRowIndexes = new List<List<int>>();
+
+                    foreach (var group in Model.SurveyQuestionGroups)
+                    {
+                        var sectionKey = $"group-{group.Id}";
+                        sectionIndexByKey[sectionKey] = sectionTitles.Count;
+
+                        sectionTitles.Add((group.Title ?? string.Empty).Trim());
+                        sectionDescriptions.Add((group.Description ?? string.Empty).Trim());
+                        sectionGroupIds.Add(group.Id);
+                        sectionImageId1.Add(group.ImageId1);
+                        sectionImageId2.Add(group.ImageId2);
+                        sectionImageId3.Add(group.ImageId3);
+                        sectionTableFormat.Add(group.TableFormat);
+                        sectionNewPage.Add(group.NewPage);
+                        sectionRowIndexes.Add(new List<int>());
+                    }
 
                     for (var i = 0; i < Model.Rows.Count; i++)
                     {
@@ -307,13 +324,14 @@
                             sectionIndex = sectionTitles.Count;
                             sectionIndexByKey[sectionKey] = sectionIndex;
 
-                            sectionTitles.Add(!string.IsNullOrWhiteSpace(row.GroupTitle) ? row.GroupTitle.Trim() : "Ungrouped Questions");
+                            sectionTitles.Add((row.GroupTitle ?? string.Empty).Trim());
                             sectionDescriptions.Add((row.GroupDescription ?? string.Empty).Trim());
                             sectionGroupIds.Add(row.GroupId);
                             sectionImageId1.Add(row.GroupImageId1);
                             sectionImageId2.Add(row.GroupImageId2);
                             sectionImageId3.Add(row.GroupImageId3);
                             sectionTableFormat.Add(row.GroupTableFormat);
+                            sectionNewPage.Add(row.GroupNewPage);
                             sectionRowIndexes.Add(new List<int>());
                         }
 
@@ -325,25 +343,28 @@
                         sectionImageId1[sectionIndex] ??= row.GroupImageId1;
                         sectionImageId2[sectionIndex] ??= row.GroupImageId2;
                         sectionImageId3[sectionIndex] ??= row.GroupImageId3;
+                        sectionNewPage[sectionIndex] = sectionNewPage[sectionIndex] || row.GroupNewPage;
                         sectionRowIndexes[sectionIndex].Add(i);
                     }
 
                     if (sectionTitles.Count == 0)
                     {
-                        sectionTitles.Add("Survey");
+                        sectionTitles.Add(string.Empty);
                         sectionDescriptions.Add(string.Empty);
                         sectionGroupIds.Add(null);
                         sectionImageId1.Add(null);
                         sectionImageId2.Add(null);
                         sectionImageId3.Add(null);
                         sectionTableFormat.Add(false);
+                        sectionNewPage.Add(true);
                         sectionRowIndexes.Add(Enumerable.Range(0, Model.Rows.Count).ToList());
                     }
+
                 }
 
                 @for (var groupIndex = 0; groupIndex < sectionTitles.Count; groupIndex++)
                 {
-                    <div class="survey-group-page" data-group-index="@groupIndex" data-group-title="@sectionTitles[groupIndex]" data-group-description="@sectionDescriptions[groupIndex]" style="display:none;">
+                    <div class="survey-group-page" data-group-index="@groupIndex" data-group-title="@sectionTitles[groupIndex]" data-group-description="@sectionDescriptions[groupIndex]" data-group-new-page="@sectionNewPage[groupIndex].ToString().ToLowerInvariant()" style="display:none;">
                         @{
                             var hasTitle = !string.IsNullOrWhiteSpace(sectionTitles[groupIndex]);
                             var hasDescription = !string.IsNullOrWhiteSpace(sectionDescriptions[groupIndex]);
@@ -505,6 +526,7 @@
                                                                 <input type="hidden" asp-for="Rows[i].GroupImageId2" />
                                                                 <input type="hidden" asp-for="Rows[i].GroupImageId3" />
                                                                 <input type="hidden" asp-for="Rows[i].GroupTableFormat" />
+                                                                <input type="hidden" asp-for="Rows[i].GroupNewPage" />
                                                                 <input type="hidden" asp-for="Rows[i].SubgroupId" />
                                                                 <input type="hidden" asp-for="Rows[i].SubgroupTitle" />
                                                                 <input type="hidden" asp-for="Rows[i].SubgroupNewHeader" />
@@ -577,12 +599,12 @@
                                                                         }
                                                                     </div>
                                                                     <div class="survey-table-controls-row" style="@controlsRowStyle">
-                                                                        <div class="survey-table-prev survey-table-prev-inline text-body-secondary" style="@prevInlineStyle">
-                                                                            <div class="survey-table-prev-label">Prev</div>
-                                                                            <div class="survey-table-prev-value text-truncate">@(Model.Rows[i].PreviousYearValue ?? "—")</div>
-                                                                        </div>
                                                                         @if (hasPreviousYearValue)
                                                                         {
+                                                                            <div class="survey-table-prev survey-table-prev-inline text-body-secondary" style="@prevInlineStyle">
+                                                                                <div class="survey-table-prev-label">Prev</div>
+                                                                                <div class="survey-table-prev-value text-truncate">@Model.Rows[i].PreviousYearValue</div>
+                                                                            </div>
                                                                             <button
                                                                                 type="button"
                                                                                 class="btn btn-sm btn-outline-secondary copy-prev-year-btn survey-table-copy-btn"
@@ -636,6 +658,7 @@
                                                         <input type="hidden" asp-for="Rows[i].GroupImageId2" />
                                                         <input type="hidden" asp-for="Rows[i].GroupImageId3" />
                                                         <input type="hidden" asp-for="Rows[i].GroupTableFormat" />
+                                                        <input type="hidden" asp-for="Rows[i].GroupNewPage" />
                                                         <input type="hidden" asp-for="Rows[i].SubgroupId" />
                                                         <input type="hidden" asp-for="Rows[i].SubgroupTitle" />
                                                         <input type="hidden" asp-for="Rows[i].SubgroupNewHeader" />
@@ -707,12 +730,12 @@
                                                                     <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
                                                                 }
                                                             </div>
-                                                            <div class="survey-table-prev survey-table-prev-inline text-body-secondary">
-                                                                <div class="survey-table-prev-label">Prev</div>
-                                                                <div class="survey-table-prev-value text-truncate">@(Model.Rows[i].PreviousYearValue ?? "—")</div>
-                                                            </div>
                                                             @if (hasPreviousYearValue)
                                                             {
+                                                                <div class="survey-table-prev survey-table-prev-inline text-body-secondary">
+                                                                    <div class="survey-table-prev-label">Prev</div>
+                                                                    <div class="survey-table-prev-value text-truncate">@Model.Rows[i].PreviousYearValue</div>
+                                                                </div>
                                                                 <button
                                                                     type="button"
                                                                     class="btn btn-sm btn-outline-secondary copy-prev-year-btn survey-table-copy-btn"
@@ -754,6 +777,7 @@
                                                 <input type="hidden" asp-for="Rows[i].GroupImageId2" />
                                                 <input type="hidden" asp-for="Rows[i].GroupImageId3" />
                                                 <input type="hidden" asp-for="Rows[i].GroupTableFormat" />
+                                                <input type="hidden" asp-for="Rows[i].GroupNewPage" />
                                                 <input type="hidden" asp-for="Rows[i].SubgroupId" />
                                                 <input type="hidden" asp-for="Rows[i].SubgroupTitle" />
                                                 <input type="hidden" asp-for="Rows[i].SubgroupNewHeader" />
@@ -789,7 +813,6 @@
                                 <div class="mb-3 pb-3 border-bottom">
                                     <div class="d-flex justify-content-between align-items-start mb-2">
                                         <div>
-                                            <div class="small text-muted">Question @(Model.Rows[i].OrderNumber?.ToString() ?? "-")</div>
                                             <label class="form-label fw-semibold mb-0">@Model.Rows[i].QuestionText</label>
                                         </div>
                                         <span class="badge text-bg-secondary">@Model.Rows[i].AnswerType</span>
@@ -804,6 +827,7 @@
                                     <input type="hidden" asp-for="Rows[i].GroupImageId2" />
                                     <input type="hidden" asp-for="Rows[i].GroupImageId3" />
                                     <input type="hidden" asp-for="Rows[i].GroupTableFormat" />
+                                    <input type="hidden" asp-for="Rows[i].GroupNewPage" />
                                     <input type="hidden" asp-for="Rows[i].SubgroupId" />
                                     <input type="hidden" asp-for="Rows[i].SubgroupTitle" />
                                     <input type="hidden" asp-for="Rows[i].SubgroupNewHeader" />
@@ -877,9 +901,9 @@
                                             }
                                         </div>
                                         <div class="col-md-4 text-md-end">
-                                            <div class="small text-body-secondary">prev year: @(Model.Rows[i].PreviousYearValue ?? "—")</div>
                                             @if (hasPreviousYearValue)
                                             {
+                                                <div class="small text-body-secondary">prev year: @Model.Rows[i].PreviousYearValue</div>
                                                 <button
                                                     type="button"
                                                     class="btn btn-sm btn-outline-secondary mt-1 copy-prev-year-btn"
@@ -1007,10 +1031,48 @@
             var currentSectionSubheader = document.getElementById('currentSectionSubheader');
             var currentGroupIndexInput = document.getElementById('CurrentGroupIndex');
 
-            var currentGroupIndex = parseInt((currentGroupIndexInput && currentGroupIndexInput.value) || '0', 10);
-            if (isNaN(currentGroupIndex)) {
-                currentGroupIndex = 0;
+            var requestedGroupIndex = parseInt((currentGroupIndexInput && currentGroupIndexInput.value) || '0', 10);
+            if (isNaN(requestedGroupIndex)) {
+                requestedGroupIndex = 0;
             }
+
+            var groupedPageIndexes = [];
+            var currentPageIndexes = [];
+
+            groupPages.forEach(function (groupPage, groupIndex) {
+                var startsNewPage = groupIndex === 0 || (groupPage.getAttribute('data-group-new-page') || '').toLowerCase() === 'true';
+
+                if (startsNewPage) {
+                    if (currentPageIndexes.length > 0) {
+                        groupedPageIndexes.push(currentPageIndexes);
+                    }
+
+                    currentPageIndexes = [groupIndex];
+                    return;
+                }
+
+                if (currentPageIndexes.length === 0) {
+                    currentPageIndexes = [groupIndex];
+                    return;
+                }
+
+                currentPageIndexes.push(groupIndex);
+            });
+
+            if (currentPageIndexes.length > 0) {
+                groupedPageIndexes.push(currentPageIndexes);
+            }
+
+            if (groupedPageIndexes.length === 0 && groupPages.length > 0) {
+                groupedPageIndexes = groupPages.map(function (_, idx) { return [idx]; });
+            }
+
+            var currentGroupIndex = 0;
+            groupedPageIndexes.forEach(function (pageGroupIndexes, pageIndex) {
+                if (pageGroupIndexes.includes(requestedGroupIndex)) {
+                    currentGroupIndex = pageIndex;
+                }
+            });
 
             function renderGroupNumberNav() {
                 if (!groupNumberNav) {
@@ -1019,7 +1081,7 @@
 
                 groupNumberNav.innerHTML = '';
 
-                groupPages.forEach(function (_, pageIndex) {
+                groupedPageIndexes.forEach(function (_, pageIndex) {
                     var button = document.createElement('button');
                     button.type = 'button';
                     button.textContent = (pageIndex + 1).toString();
@@ -1038,7 +1100,7 @@
             }
 
             function showGroup(index) {
-                if (groupPages.length === 0) {
+                if (groupPages.length === 0 || groupedPageIndexes.length === 0) {
                     if (currentSectionHeader) {
                         currentSectionHeader.textContent = 'Section 0 of 0';
                     }
@@ -1048,10 +1110,12 @@
                     return;
                 }
 
-                currentGroupIndex = Math.max(0, Math.min(index, groupPages.length - 1));
+                currentGroupIndex = Math.max(0, Math.min(index, groupedPageIndexes.length - 1));
+
+                var visibleGroupIndexes = groupedPageIndexes[currentGroupIndex] || [];
 
                 groupPages.forEach(function (groupPage, pageIndex) {
-                    groupPage.style.display = pageIndex === currentGroupIndex ? '' : 'none';
+                    groupPage.style.display = visibleGroupIndexes.includes(pageIndex) ? '' : 'none';
                 });
 
                 if (groupPrevButton) {
@@ -1059,27 +1123,38 @@
                 }
 
                 if (groupNextButton) {
-                    groupNextButton.disabled = currentGroupIndex >= groupPages.length - 1;
+                    groupNextButton.disabled = currentGroupIndex >= groupedPageIndexes.length - 1;
                 }
 
                 var sectionNumber = currentGroupIndex + 1;
-                var totalSections = groupPages.length;
-                var currentTitle = groupPages[currentGroupIndex].getAttribute('data-group-title') || '';
+                var totalSections = groupedPageIndexes.length;
+                var currentTitle = '';
+
+                visibleGroupIndexes.forEach(function (groupIndex) {
+                    if (currentTitle.trim().length === 0) {
+                        currentTitle = groupPages[groupIndex].getAttribute('data-group-title') || '';
+                    }
+
+                });
 
                 if (groupPaginationText) {
                     groupPaginationText.textContent = 'Section ' + sectionNumber + ' of ' + totalSections;
                 }
 
                 if (currentSectionHeader) {
-                    currentSectionHeader.textContent = 'Section ' + sectionNumber + ' of ' + totalSections;
+                    var normalizedTitleForHeader = currentTitle.trim();
+                    currentSectionHeader.textContent = normalizedTitleForHeader.length > 0
+                        ? ('Section ' + sectionNumber + ' of ' + totalSections + ' ' + normalizedTitleForHeader)
+                        : ('Section ' + sectionNumber + ' of ' + totalSections);
                 }
 
                 if (currentSectionSubheader) {
-                    currentSectionSubheader.textContent = currentTitle;
+                    currentSectionSubheader.textContent = '';
+                    currentSectionSubheader.style.display = 'none';
                 }
 
                 if (currentGroupIndexInput) {
-                    currentGroupIndexInput.value = currentGroupIndex.toString();
+                    currentGroupIndexInput.value = (visibleGroupIndexes[0] || 0).toString();
                 }
 
                 renderGroupNumberNav();
