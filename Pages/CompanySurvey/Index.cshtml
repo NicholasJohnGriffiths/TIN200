@@ -167,6 +167,14 @@
                         </td>
                         <td>@record.AnswerCount</td>
                         <td class="actions-col text-nowrap">
+                            @if (!string.IsNullOrWhiteSpace(record.SurveyLink))
+                            {
+                                <a href="@record.SurveyLink" target="_blank" rel="noopener" class="btn btn-sm btn-outline-info">Survey</a>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-info" disabled title="Survey link is not available">Survey</button>
+                            }
                             <a asp-page="/CompanySurvey/Edit" asp-route-id="@record.Id" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-sm btn-secondary">Edit</a>
                             <a asp-page="/CompanySurvey/Estimation" asp-route-companySurveyId="@record.Id" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-sm btn-outline-success">Estimatation</a>
                             <a asp-page="/CompanySurvey/Notes" asp-route-companySurveyId="@record.Id" asp-route-financialYear="@Model.SelectedFinancialYear" class="btn btn-sm btn-outline-dark">Notes</a>

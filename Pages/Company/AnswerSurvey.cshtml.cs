@@ -420,6 +420,8 @@ namespace TINWeb.Pages.Company
                 .ThenBy(q => q.Id)
                 .ToListAsync();
 
+            var questionIds = questions.Select(q => q.Id).ToList();
+
             var groupIds = questions
                 .Where(q => q.GroupId.HasValue)
                 .Select(q => q.GroupId!.Value)
@@ -431,6 +433,27 @@ namespace TINWeb.Pages.Company
                 .ToDictionaryAsync(g => g.Id);
 
             var previousYearAnswersByQuestionId = await GetPreviousYearAnswersByQuestionIdAsync(companyId, currentFinancialYear);
+
+            var subgroupAssignments = await (
+                from subgroupQuestion in _context.QuestionSubgroupQuestion
+                join subgroup in _context.QuestionSubgroup on subgroupQuestion.QuestionSubgroupId equals subgroup.Id
+                where questionIds.Contains(subgroupQuestion.QuestionId)
+                select new
+                {
+                    subgroupQuestion.QuestionId,
+                    subgroup.Id,
+                    subgroup.Title,
+                    subgroupQuestion.OrderNumber
+                })
+                .ToListAsync();
+
+            var subgroupByQuestionId = subgroupAssignments
+                .GroupBy(x => x.QuestionId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.OrderBy(x => x.OrderNumber ?? int.MaxValue)
+                        .ThenBy(x => x.Id)
+                        .First());
 
             var answers = await _context.Answer
                 .Where(a => a.CompanySurveyId == companySurveyId)
@@ -447,6 +470,7 @@ namespace TINWeb.Pages.Company
                     latestAnswerByQuestionId.TryGetValue(question.Id, out var answer);
                     previousYearAnswersByQuestionId.TryGetValue(question.Id, out var previousYearAnswer);
                     groupsById.TryGetValue(question.GroupId ?? 0, out var group);
+                    subgroupByQuestionId.TryGetValue(question.Id, out var subgroup);
 
                     return new AnswerEditRow
                     {
@@ -459,6 +483,9 @@ namespace TINWeb.Pages.Company
                         GroupImageId2 = group?.ImageId2,
                         GroupImageId3 = group?.ImageId3,
                         GroupTableFormat = group?.TableFormat ?? false,
+                        SubgroupId = subgroup?.Id,
+                        SubgroupTitle = subgroup?.Title,
+                        SubgroupOrderNumber = subgroup?.OrderNumber,
                         QuestionText = question.QuestionText,
                         AnswerType = question.AnswerType,
                         ChoiceOptions = GetChoiceOptions(question),
@@ -683,6 +710,9 @@ namespace TINWeb.Pages.Company
             public int? GroupImageId2 { get; set; }
             public int? GroupImageId3 { get; set; }
             public bool GroupTableFormat { get; set; }
+            public int? SubgroupId { get; set; }
+            public string? SubgroupTitle { get; set; }
+            public int? SubgroupOrderNumber { get; set; }
             public string? QuestionText { get; set; }
             public string? AnswerType { get; set; }
             public List<string> ChoiceOptions { get; set; } = new();

@@ -15,6 +15,8 @@ namespace TINWeb.Data
         public DbSet<CompanySurvey> CompanySurvey { get; set; } = null!;
         public DbSet<Question> Question { get; set; } = null!;
         public DbSet<QuestionGroup> QuestionGroup { get; set; } = null!;
+        public DbSet<QuestionSubgroup> QuestionSubgroup { get; set; } = null!;
+        public DbSet<QuestionSubgroupQuestion> QuestionSubgroupQuestion { get; set; } = null!;
         public DbSet<Image> Image { get; set; } = null!;
         public DbSet<Answer> Answer { get; set; } = null!;
         public DbSet<CompanySurveyNote> CompanySurveyNotes { get; set; } = null!;
@@ -323,6 +325,77 @@ namespace TINWeb.Data
                     .WithMany()
                     .HasForeignKey(e => e.ImageId3)
                     .OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<QuestionSubgroup>(entity =>
+            {
+                entity.ToTable("QuestionSubgroup");
+                entity.HasKey(e => e.Id)
+                    .HasName("PK_QuestionSubgroup");
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("Id")
+                    .ValueGeneratedOnAdd();
+
+                entity.Property(e => e.QuestionGroupId)
+                    .HasColumnName("QuestionGroupId")
+                    .HasColumnType("int")
+                    .IsRequired();
+
+                entity.Property(e => e.Title)
+                    .HasColumnName("Title")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255);
+
+                entity.HasOne<QuestionGroup>()
+                    .WithMany()
+                    .HasForeignKey(e => e.QuestionGroupId)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .HasConstraintName("FK_QuestionSubgroup_QuestionGroup");
+            });
+
+            modelBuilder.Entity<QuestionSubgroupQuestion>(entity =>
+            {
+                entity.ToTable("QuestionSubgroupQuestion");
+                entity.HasKey(e => e.Id)
+                    .HasName("PK_QuestionSubgroupQuestion");
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("Id")
+                    .ValueGeneratedOnAdd();
+
+                entity.Property(e => e.QuestionSubgroupId)
+                    .HasColumnName("QuestionSubgroupId")
+                    .HasColumnType("int")
+                    .IsRequired();
+
+                entity.Property(e => e.QuestionId)
+                    .HasColumnName("QuestionId")
+                    .HasColumnType("int")
+                    .IsRequired();
+
+                entity.Property(e => e.OrderNumber)
+                    .HasColumnName("OrderNumber")
+                    .HasColumnType("int");
+
+                entity.HasIndex(e => new { e.QuestionSubgroupId, e.QuestionId })
+                    .IsUnique()
+                    .HasDatabaseName("UQ_Subgroup_Question");
+
+                entity.HasIndex(e => e.QuestionSubgroupId)
+                    .HasDatabaseName("IX_SubgroupQuestion_SubgroupId");
+
+                entity.HasOne<QuestionSubgroup>()
+                    .WithMany()
+                    .HasForeignKey(e => e.QuestionSubgroupId)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .HasConstraintName("FK_SubgroupQuestion_Subgroup");
+
+                entity.HasOne<Question>()
+                    .WithMany()
+                    .HasForeignKey(e => e.QuestionId)
+                    .OnDelete(DeleteBehavior.Restrict)
+                    .HasConstraintName("FK_SubgroupQuestion_Question");
             });
 
             modelBuilder.Entity<Image>(entity =>

@@ -1,0 +1,166 @@
+@page "{id:int}"
+@model TINWeb.Pages.QuestionGroups.SubgroupsModel
+@{
+    ViewData["Title"] = "Question Subgroups";
+}
+
+<div class="container mt-4">
+    <h1>Question Subgroups</h1>
+    <p class="mb-3 text-muted">Group: <strong>@(Model.Group.Title ?? $"Group {Model.Group.Id}")</strong></p>
+
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <div class="alert alert-info" role="alert">@Model.StatusMessage</div>
+    }
+
+    <div class="card mb-3">
+        <div class="card-header fw-semibold">Subgroups</div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Existing Subgroups</label>
+                    <div class="list-group">
+                        @if (Model.Subgroups.Count == 0)
+                        {
+                            <div class="list-group-item text-muted">No subgroups yet.</div>
+                        }
+                        else
+                        {
+                            @foreach (var subgroup in Model.Subgroups)
+                            {
+                                var activeClass = Model.SelectedSubgroupId == subgroup.Id ? "active" : string.Empty;
+                                <a class="list-group-item list-group-item-action @activeClass"
+                                   asp-page="./Subgroups"
+                                   asp-route-id="@Model.Id"
+                                   asp-route-selectedSubgroupId="@subgroup.Id">
+                                    @(string.IsNullOrWhiteSpace(subgroup.Title) ? $"Subgroup {subgroup.Id}" : subgroup.Title)
+                                </a>
+                            }
+                        }
+                    </div>
+                </div>
+
+                <div class="col-md-8">
+                    <form method="post" asp-page-handler="CreateSubgroup" class="row g-2 mb-3">
+                        <input type="hidden" name="Id" value="@Model.Id" />
+                        <div class="col-sm-8">
+                            <input name="NewSubgroupTitle" class="form-control" placeholder="New subgroup title" />
+                        </div>
+                        <div class="col-sm-4">
+                            <button type="submit" class="btn btn-primary w-100">Create Subgroup</button>
+                        </div>
+                    </form>
+
+                    @if (Model.SelectedSubgroupId.HasValue)
+                    {
+                        <form method="post" asp-page-handler="RenameSubgroup" class="row g-2 mb-2">
+                            <input type="hidden" name="Id" value="@Model.Id" />
+                            <input type="hidden" name="SelectedSubgroupId" value="@Model.SelectedSubgroupId" />
+                            <div class="col-sm-8">
+                                <input name="EditSubgroupTitle" class="form-control" value="@Model.EditSubgroupTitle" placeholder="Subgroup title" />
+                            </div>
+                            <div class="col-sm-4 d-flex gap-2">
+                                <button type="submit" class="btn btn-outline-primary flex-fill">Rename</button>
+                            </div>
+                        </form>
+
+                        <form method="post" asp-page-handler="DeleteSubgroup" onsubmit="return confirm('Delete this subgroup?');">
+                            <input type="hidden" name="Id" value="@Model.Id" />
+                            <input type="hidden" name="SelectedSubgroupId" value="@Model.SelectedSubgroupId" />
+                            <button type="submit" class="btn btn-outline-danger">Delete Selected Subgroup</button>
+                        </form>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (Model.SelectedSubgroupId.HasValue)
+    {
+        <form method="post" asp-page-handler="SaveAssignments">
+            <input type="hidden" name="Id" value="@Model.Id" />
+            <input type="hidden" name="SelectedSubgroupId" value="@Model.SelectedSubgroupId" />
+
+            <div class="card mb-3">
+                <div class="card-header fw-semibold">Questions in Selected Subgroup</div>
+                <div class="card-body">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-md-5">
+                            <label class="form-label">In this subgroup</label>
+                            <select id="subgroupQuestionsList" name="SelectedQuestionIds" class="form-select" multiple size="12">
+                                @foreach (var item in Model.SubgroupQuestions)
+                                {
+                                    <option value="@item.Value">@item.Text</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-md-2 d-flex flex-column gap-2 align-items-center">
+                            <button type="button" class="btn btn-outline-primary" id="removeFromSubgroupButton">&gt;&gt;</button>
+                            <button type="button" class="btn btn-outline-primary" id="addToSubgroupButton">&lt;&lt;</button>
+                        </div>
+
+                        <div class="col-md-5">
+                            <label class="form-label">Available in group</label>
+                            <select id="availableQuestionsList" class="form-select" multiple size="12">
+                                @foreach (var item in Model.AvailableQuestions)
+                                {
+                                    <option value="@item.Value">@item.Text</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save Subgroup Questions</button>
+            <a asp-page="./Subgroups" asp-route-id="@Model.Id" asp-route-selectedSubgroupId="@Model.SelectedSubgroupId" class="btn btn-outline-secondary">Reload</a>
+            <a asp-page="./Edit" asp-route-id="@Model.Id" class="btn btn-secondary">Back to Question Group</a>
+        </form>
+    }
+    else
+    {
+        <div class="alert alert-warning">Create or select a subgroup to assign questions.</div>
+        <a asp-page="./Edit" asp-route-id="@Model.Id" class="btn btn-secondary">Back to Question Group</a>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            const groupedList = document.getElementById('subgroupQuestionsList');
+            const availableList = document.getElementById('availableQuestionsList');
+            const addButton = document.getElementById('addToSubgroupButton');
+            const removeButton = document.getElementById('removeFromSubgroupButton');
+
+            if (!groupedList || !availableList || !addButton || !removeButton) {
+                return;
+            }
+
+            function moveSelected(source, target) {
+                const selected = Array.from(source.options).filter(option => option.selected);
+                selected.forEach(option => {
+                    option.selected = false;
+                    target.appendChild(option);
+                });
+            }
+
+            addButton.addEventListener('click', function () {
+                moveSelected(availableList, groupedList);
+            });
+
+            removeButton.addEventListener('click', function () {
+                moveSelected(groupedList, availableList);
+            });
+
+            const form = groupedList.closest('form');
+            if (form) {
+                form.addEventListener('submit', function () {
+                    Array.from(groupedList.options).forEach(option => {
+                        option.selected = true;
+                    });
+                });
+            }
+        })();
+    </script>
+}

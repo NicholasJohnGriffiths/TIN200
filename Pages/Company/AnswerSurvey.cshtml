@@ -5,6 +5,166 @@
     Layout = "_SurveyLayout";
 }
 
+<style>
+    .survey-table-cell {
+        min-width: 150px;
+        max-width: 240px;
+        padding: 0.4rem;
+        font-size: 0.95rem;
+        vertical-align: top;
+    }
+
+    .survey-table-header-cell {
+        min-width: 150px;
+        max-width: 240px;
+        padding: 0.35rem 0.4rem;
+        vertical-align: bottom;
+    }
+
+    .survey-table-question {
+        font-size: 0.9rem;
+        font-weight: 600;
+        line-height: 1.2;
+        margin-bottom: 0;
+    }
+
+    .survey-table-inline-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-width: 0;
+    }
+
+    .survey-table-question-wrap {
+        flex: 0 0 30%;
+        min-width: 72px;
+    }
+
+    .survey-table-answer-wrap {
+        flex: 1 1 46%;
+        min-width: 96px;
+    }
+
+    .survey-table-prev-inline {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        flex: 0 0 auto;
+        min-width: 82px;
+        padding-left: 0.2rem;
+        text-align: right;
+    }
+
+    .survey-table-cell .form-control,
+    .survey-table-cell .form-select {
+        font-size: 0.9rem;
+        padding: 0.2rem 0.35rem;
+        min-height: calc(1.5em + 0.45rem + 2px);
+    }
+
+    .survey-table-compact-input {
+        max-width: 8rem;
+    }
+
+    .survey-table-cell .form-check {
+        margin-bottom: 0.15rem;
+    }
+
+    .survey-table-cell .form-check-label,
+    .survey-table-prev-label,
+    .survey-table-prev-value {
+        font-size: 0.875rem;
+        line-height: 1.2;
+    }
+
+    .survey-table-prev-label {
+        flex: 0 0 auto;
+        font-weight: 500;
+    }
+
+    .survey-table-prev-value {
+        white-space: nowrap;
+    }
+
+    .survey-table-multichoice {
+        display: flex;
+        flex-direction: column;
+        gap: 0.15rem;
+    }
+
+    .survey-table-multichoice .form-check {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.3rem;
+        min-height: 0;
+        padding-left: 0;
+        margin: 0;
+    }
+
+    .survey-table-multichoice .form-check-input {
+        float: none;
+        margin: 0.08rem 0 0;
+    }
+
+    .survey-table-multichoice .form-check-label {
+        word-break: break-word;
+    }
+
+    .survey-table-prev {
+        margin-top: 0;
+        padding-top: 0;
+        border-top: 0;
+    }
+
+    .survey-table-copy-btn {
+        font-size: 0.825rem;
+        padding: 0.1rem 0.35rem;
+        line-height: 1.2;
+        flex: 0 0 auto;
+    }
+
+    .survey-subgroup-table {
+        table-layout: fixed;
+    }
+
+    .survey-subgroup-title {
+        font-size: 1rem;
+        margin-bottom: 0.35rem;
+    }
+
+    @@media (max-width: 767.98px) {
+        .survey-table-inline-row {
+            flex-wrap: wrap;
+            align-items: flex-start;
+        }
+
+        .survey-table-question-wrap,
+        .survey-table-answer-wrap,
+        .survey-table-prev-inline {
+            flex: 1 1 100%;
+            min-width: 0;
+            text-align: left;
+        }
+
+        .survey-table-stack,
+        .survey-table-stack tbody,
+        .survey-table-stack tr,
+        .survey-table-stack td {
+            display: block;
+            width: 100%;
+        }
+
+        .survey-table-stack tr {
+            margin-bottom: 0.75rem;
+        }
+
+        .survey-table-stack td {
+            max-width: none;
+            margin-bottom: -1px;
+        }
+    }
+</style>
+
 <div class="container mt-4">
     <div class="row justify-content-center">
         <div class="col-md-10">
@@ -165,7 +325,7 @@
                                         }
                                         @if (hasDescription)
                                         {
-                                            <div class="small text-body-secondary mt-1">@sectionDescriptions[groupIndex]</div>
+                                            <div class="small text-body-secondary mt-1">@Html.Raw(sectionDescriptions[groupIndex])</div>
                                         }
                                     </div>
                                 }
@@ -187,17 +347,297 @@
 
                         @if (sectionTableFormat[groupIndex])
                         {
-                            <div class="table-responsive">
-                                <table class="table table-bordered table-sm align-middle mb-3">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th style="width:40%">Question</th>
-                                            <th>Answer</th>
-                                            <th style="width:20%">Prev Year</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach (var i in sectionRowIndexes[groupIndex])
+                            var sectionRows = sectionRowIndexes[groupIndex];
+                            var subgroupRows = sectionRows.Where(i => Model.Rows[i].SubgroupId.HasValue).ToList();
+                            var nonSubgroupRows = sectionRows.Where(i => !Model.Rows[i].SubgroupId.HasValue).ToList();
+
+                            if (subgroupRows.Count > 0)
+                            {
+                                var subgroupGroups = subgroupRows
+                                    .GroupBy(i => Model.Rows[i].SubgroupId!.Value)
+                                    .Select(g => new
+                                    {
+                                        SubgroupId = g.Key,
+                                        Title = Model.Rows[g.First()].SubgroupTitle,
+                                        MinSubgroupOrder = g.Min(i => Model.Rows[i].SubgroupOrderNumber ?? int.MaxValue),
+                                        Rows = g
+                                            .OrderBy(i => Model.Rows[i].SubgroupOrderNumber ?? int.MaxValue)
+                                            .ThenBy(i => Model.Rows[i].OrderNumber ?? int.MaxValue)
+                                            .ThenBy(i => i)
+                                            .ToList()
+                                    })
+                                    .OrderBy(g => g.MinSubgroupOrder)
+                                    .ThenBy(g => g.SubgroupId)
+                                    .ToList();
+
+                                var subgroupHeaderRows = subgroupGroups.First().Rows;
+                                var showSubgroupColumn = subgroupGroups.Count > 1;
+
+                                <div class="table-responsive mb-3">
+                                    <table class="table table-bordered table-sm align-middle mb-0 survey-table-stack survey-subgroup-table">
+                                        <thead class="table-light">
+                                            <tr>
+                                                @if (showSubgroupColumn)
+                                                {
+                                                    <th class="survey-table-header-cell" style="width: 12%;">Item</th>
+                                                }
+                                                @foreach (var headerRowIndex in subgroupHeaderRows)
+                                                {
+                                                    <th class="survey-table-header-cell">
+                                                        <div class="survey-table-question">@Model.Rows[headerRowIndex].QuestionText</div>
+                                                    </th>
+                                                }
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach (var subgroup in subgroupGroups)
+                                            {
+                                                <tr>
+                                                    @if (showSubgroupColumn)
+                                                    {
+                                                        <td class="survey-table-cell fw-semibold">@(string.IsNullOrWhiteSpace(subgroup.Title) ? $"Subgroup {subgroup.SubgroupId}" : subgroup.Title)</td>
+                                                    }
+                                                    @foreach (var i in subgroup.Rows)
+                                                    {
+                                                        var answerType = (Model.Rows[i].AnswerType ?? string.Empty).Trim();
+                                                        var hasPreviousYearValue = !string.IsNullOrWhiteSpace(Model.Rows[i].PreviousYearValue);
+                                                        var previousYearText = Model.Rows[i].PreviousYearAnswerText ?? string.Empty;
+                                                        var previousYearNumber = Model.Rows[i].PreviousYearAnswerNumber?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+                                                        var previousYearCurrency = Model.Rows[i].PreviousYearAnswerCurrency?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+                                                        <td class="survey-answer-row survey-table-cell" data-row-index="@i">
+                                                            <input type="hidden" asp-for="Rows[i].QuestionId" />
+                                                            <input type="hidden" asp-for="Rows[i].OrderNumber" />
+                                                            <input type="hidden" asp-for="Rows[i].GroupId" />
+                                                            <input type="hidden" asp-for="Rows[i].GroupTitle" />
+                                                            <input type="hidden" asp-for="Rows[i].GroupDescription" />
+                                                            <input type="hidden" asp-for="Rows[i].GroupImageId1" />
+                                                            <input type="hidden" asp-for="Rows[i].GroupImageId2" />
+                                                            <input type="hidden" asp-for="Rows[i].GroupImageId3" />
+                                                            <input type="hidden" asp-for="Rows[i].GroupTableFormat" />
+                                                            <input type="hidden" asp-for="Rows[i].SubgroupId" />
+                                                            <input type="hidden" asp-for="Rows[i].SubgroupTitle" />
+                                                            <input type="hidden" asp-for="Rows[i].SubgroupOrderNumber" />
+                                                            <input type="hidden" asp-for="Rows[i].QuestionText" />
+                                                            <input type="hidden" asp-for="Rows[i].AnswerType" />
+                                                            <div class="survey-table-inline-row">
+                                                                <div class="survey-table-answer-wrap">
+                                                                    @if (answerType.Equals("Number", StringComparison.OrdinalIgnoreCase))
+                                                                    {
+                                                                        <input asp-for="Rows[i].AnswerNumber" class="form-control form-control-sm survey-table-compact-input" placeholder="Enter number" />
+                                                                        <input type="hidden" asp-for="Rows[i].AnswerText" />
+                                                                        <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
+                                                                    }
+                                                                    else if (answerType.Equals("Currency", StringComparison.OrdinalIgnoreCase))
+                                                                    {
+                                                                        <input asp-for="Rows[i].AnswerCurrency" class="form-control form-control-sm survey-table-compact-input" placeholder="Enter currency" />
+                                                                        <input type="hidden" asp-for="Rows[i].AnswerText" />
+                                                                        <input type="hidden" asp-for="Rows[i].AnswerNumber" />
+                                                                    }
+                                                                    else if (answerType.Equals("SingleChoice", StringComparison.OrdinalIgnoreCase))
+                                                                    {
+                                                                        <select asp-for="Rows[i].AnswerText" class="form-select form-select-sm">
+                                                                            <option value="">Select an option</option>
+                                                                            @foreach (var option in Model.Rows[i].ChoiceOptions)
+                                                                            {
+                                                                                <option value="@option">@option</option>
+                                                                            }
+                                                                        </select>
+                                                                        <input type="hidden" asp-for="Rows[i].AnswerNumber" />
+                                                                        <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
+                                                                    }
+                                                                    else if (answerType.Equals("Multichoice", StringComparison.OrdinalIgnoreCase) || answerType.Equals("MultiChoice", StringComparison.OrdinalIgnoreCase))
+                                                                    {
+                                                                        if (Model.Rows[i].ChoiceOptions.Count == 0)
+                                                                        {
+                                                                            <div class="text-muted small">No options available.</div>
+                                                                        }
+                                                                        else
+                                                                        {
+                                                                            <div class="survey-table-multichoice">
+                                                                                @for (var optionIndex = 0; optionIndex < Model.Rows[i].ChoiceOptions.Count; optionIndex++)
+                                                                                {
+                                                                                    var option = Model.Rows[i].ChoiceOptions[optionIndex];
+                                                                                    var optionId = $"row_{i}_opt_{optionIndex}";
+                                                                                    var isChecked = Model.Rows[i].SelectedChoices.Contains(option, StringComparer.Ordinal);
+                                                                                    <div class="form-check">
+                                                                                        <input
+                                                                                            class="form-check-input"
+                                                                                            type="checkbox"
+                                                                                            name="Rows[@i].SelectedChoices"
+                                                                                            value="@option"
+                                                                                            id="@optionId"
+                                                                                            @(isChecked ? "checked" : null) />
+                                                                                        <label class="form-check-label small" for="@optionId">@option</label>
+                                                                                    </div>
+                                                                                }
+                                                                            </div>
+                                                                        }
+                                                                        <input type="hidden" asp-for="Rows[i].AnswerText" />
+                                                                        <input type="hidden" asp-for="Rows[i].AnswerNumber" />
+                                                                        <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <input asp-for="Rows[i].AnswerText" class="form-control form-control-sm" placeholder="Enter answer" />
+                                                                        <input type="hidden" asp-for="Rows[i].AnswerNumber" />
+                                                                        <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
+                                                                    }
+                                                                </div>
+                                                                <div class="survey-table-prev survey-table-prev-inline text-body-secondary">
+                                                                    <div class="survey-table-prev-label">Prev</div>
+                                                                    <div class="survey-table-prev-value text-truncate">@(Model.Rows[i].PreviousYearValue ?? "—")</div>
+                                                                </div>
+                                                                @if (hasPreviousYearValue)
+                                                                {
+                                                                    <button
+                                                                        type="button"
+                                                                        class="btn btn-sm btn-outline-secondary copy-prev-year-btn survey-table-copy-btn"
+                                                                        data-row-index="@i"
+                                                                        data-answer-type="@answerType"
+                                                                        data-prev-text="@previousYearText"
+                                                                        data-prev-number="@previousYearNumber"
+                                                                        data-prev-currency="@previousYearCurrency">
+                                                                        Copy
+                                                                    </button>
+                                                                }
+                                                            </div>
+                                                        </td>
+                                                    }
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+
+                            if (nonSubgroupRows.Count > 0)
+                            {
+                                var textFieldRows = nonSubgroupRows.Where(i => !(Model.Rows[i].AnswerType ?? string.Empty).Trim().Equals("Number", StringComparison.OrdinalIgnoreCase) && !(Model.Rows[i].AnswerType ?? string.Empty).Trim().Equals("Currency", StringComparison.OrdinalIgnoreCase) && !(Model.Rows[i].AnswerType ?? string.Empty).Trim().Equals("SingleChoice", StringComparison.OrdinalIgnoreCase) && !(Model.Rows[i].AnswerType ?? string.Empty).Trim().Equals("Multichoice", StringComparison.OrdinalIgnoreCase) && !(Model.Rows[i].AnswerType ?? string.Empty).Trim().Equals("MultiChoice", StringComparison.OrdinalIgnoreCase)).ToList();
+                                var compactRows = nonSubgroupRows.Except(textFieldRows).ToList();
+
+                                <div class="table-responsive">
+                                    <table class="table table-bordered table-sm align-middle mb-3 survey-table-stack">
+                                        <tbody>
+                                            @foreach (var i in compactRows)
+                                            {
+                                                var answerType = (Model.Rows[i].AnswerType ?? string.Empty).Trim();
+                                                var hasPreviousYearValue = !string.IsNullOrWhiteSpace(Model.Rows[i].PreviousYearValue);
+                                                var previousYearText = Model.Rows[i].PreviousYearAnswerText ?? string.Empty;
+                                                var previousYearNumber = Model.Rows[i].PreviousYearAnswerNumber?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+                                                var previousYearCurrency = Model.Rows[i].PreviousYearAnswerCurrency?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
+
+                                                <tr class="survey-answer-row" data-row-index="@i">
+                                                    <td class="survey-table-cell">
+                                                        <div class="survey-table-question">@Model.Rows[i].QuestionText</div>
+                                                    </td>
+                                                    <td class="survey-table-cell">
+                                                        <input type="hidden" asp-for="Rows[i].QuestionId" />
+                                                        <input type="hidden" asp-for="Rows[i].OrderNumber" />
+                                                        <input type="hidden" asp-for="Rows[i].GroupId" />
+                                                        <input type="hidden" asp-for="Rows[i].GroupTitle" />
+                                                        <input type="hidden" asp-for="Rows[i].GroupDescription" />
+                                                        <input type="hidden" asp-for="Rows[i].GroupImageId1" />
+                                                        <input type="hidden" asp-for="Rows[i].GroupImageId2" />
+                                                        <input type="hidden" asp-for="Rows[i].GroupImageId3" />
+                                                        <input type="hidden" asp-for="Rows[i].GroupTableFormat" />
+                                                        <input type="hidden" asp-for="Rows[i].SubgroupId" />
+                                                        <input type="hidden" asp-for="Rows[i].SubgroupTitle" />
+                                                        <input type="hidden" asp-for="Rows[i].SubgroupOrderNumber" />
+                                                        <input type="hidden" asp-for="Rows[i].QuestionText" />
+                                                        <input type="hidden" asp-for="Rows[i].AnswerType" />
+                                                        <div class="survey-table-inline-row">
+                                                            <div class="survey-table-answer-wrap">
+                                                                @if (answerType.Equals("Number", StringComparison.OrdinalIgnoreCase))
+                                                                {
+                                                                    <input asp-for="Rows[i].AnswerNumber" class="form-control form-control-sm survey-table-compact-input" placeholder="Enter number" />
+                                                                    <input type="hidden" asp-for="Rows[i].AnswerText" />
+                                                                    <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
+                                                                }
+                                                                else if (answerType.Equals("Currency", StringComparison.OrdinalIgnoreCase))
+                                                                {
+                                                                    <input asp-for="Rows[i].AnswerCurrency" class="form-control form-control-sm survey-table-compact-input" placeholder="Enter currency" />
+                                                                    <input type="hidden" asp-for="Rows[i].AnswerText" />
+                                                                    <input type="hidden" asp-for="Rows[i].AnswerNumber" />
+                                                                }
+                                                                else if (answerType.Equals("SingleChoice", StringComparison.OrdinalIgnoreCase))
+                                                                {
+                                                                    <select asp-for="Rows[i].AnswerText" class="form-select form-select-sm">
+                                                                        <option value="">Select an option</option>
+                                                                        @foreach (var option in Model.Rows[i].ChoiceOptions)
+                                                                        {
+                                                                            <option value="@option">@option</option>
+                                                                        }
+                                                                    </select>
+                                                                    <input type="hidden" asp-for="Rows[i].AnswerNumber" />
+                                                                    <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
+                                                                }
+                                                                else if (answerType.Equals("Multichoice", StringComparison.OrdinalIgnoreCase) || answerType.Equals("MultiChoice", StringComparison.OrdinalIgnoreCase))
+                                                                {
+                                                                    if (Model.Rows[i].ChoiceOptions.Count == 0)
+                                                                    {
+                                                                        <div class="text-muted small">No options available.</div>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <div class="survey-table-multichoice">
+                                                                            @for (var optionIndex = 0; optionIndex < Model.Rows[i].ChoiceOptions.Count; optionIndex++)
+                                                                            {
+                                                                                var option = Model.Rows[i].ChoiceOptions[optionIndex];
+                                                                                var optionId = $"row_{i}_opt_{optionIndex}";
+                                                                                var isChecked = Model.Rows[i].SelectedChoices.Contains(option, StringComparer.Ordinal);
+                                                                                <div class="form-check">
+                                                                                    <input
+                                                                                        class="form-check-input"
+                                                                                        type="checkbox"
+                                                                                        name="Rows[@i].SelectedChoices"
+                                                                                        value="@option"
+                                                                                        id="@optionId"
+                                                                                        @(isChecked ? "checked" : null) />
+                                                                                    <label class="form-check-label small" for="@optionId">@option</label>
+                                                                                </div>
+                                                                            }
+                                                                        </div>
+                                                                    }
+                                                                    <input type="hidden" asp-for="Rows[i].AnswerText" />
+                                                                    <input type="hidden" asp-for="Rows[i].AnswerNumber" />
+                                                                    <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
+                                                                }
+                                                                else
+                                                                {
+                                                                    <input asp-for="Rows[i].AnswerText" class="form-control form-control-sm" placeholder="Enter answer" />
+                                                                    <input type="hidden" asp-for="Rows[i].AnswerNumber" />
+                                                                    <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
+                                                                }
+                                                            </div>
+                                                            <div class="survey-table-prev survey-table-prev-inline text-body-secondary">
+                                                                <div class="survey-table-prev-label">Prev</div>
+                                                                <div class="survey-table-prev-value text-truncate">@(Model.Rows[i].PreviousYearValue ?? "—")</div>
+                                                            </div>
+                                                            @if (hasPreviousYearValue)
+                                                            {
+                                                                <button
+                                                                    type="button"
+                                                                    class="btn btn-sm btn-outline-secondary copy-prev-year-btn survey-table-copy-btn"
+                                                                    data-row-index="@i"
+                                                                    data-answer-type="@answerType"
+                                                                    data-prev-text="@previousYearText"
+                                                                    data-prev-number="@previousYearNumber"
+                                                                    data-prev-currency="@previousYearCurrency">
+                                                                    Copy
+                                                                </button>
+                                                            }
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                @if (textFieldRows.Count > 0)
+                                {
+                                    <div class="mt-3">
+                                        @foreach (var i in textFieldRows)
                                         {
                                             var answerType = (Model.Rows[i].AnswerType ?? string.Empty).Trim();
                                             var hasPreviousYearValue = !string.IsNullOrWhiteSpace(Model.Rows[i].PreviousYearValue);
@@ -205,108 +645,36 @@
                                             var previousYearNumber = Model.Rows[i].PreviousYearAnswerNumber?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
                                             var previousYearCurrency = Model.Rows[i].PreviousYearAnswerCurrency?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
 
-                                            <tr class="survey-answer-row" data-row-index="@i">
-                                                <td>
-                                                    <div class="fw-semibold small d-flex flex-wrap align-items-baseline gap-2">
-                                                        <span class="text-muted">Q@(Model.Rows[i].OrderNumber?.ToString() ?? "-")</span>
-                                                        <span>@Model.Rows[i].QuestionText</span>
+                                            <div class="mb-3 pb-3 border-bottom">
+                                                <label class="form-label fw-semibold mb-2">@Model.Rows[i].QuestionText</label>
+                                                <input type="hidden" asp-for="Rows[i].QuestionId" />
+                                                <input type="hidden" asp-for="Rows[i].OrderNumber" />
+                                                <input type="hidden" asp-for="Rows[i].GroupId" />
+                                                <input type="hidden" asp-for="Rows[i].GroupTitle" />
+                                                <input type="hidden" asp-for="Rows[i].GroupDescription" />
+                                                <input type="hidden" asp-for="Rows[i].GroupImageId1" />
+                                                <input type="hidden" asp-for="Rows[i].GroupImageId2" />
+                                                <input type="hidden" asp-for="Rows[i].GroupImageId3" />
+                                                <input type="hidden" asp-for="Rows[i].GroupTableFormat" />
+                                                <input type="hidden" asp-for="Rows[i].SubgroupId" />
+                                                <input type="hidden" asp-for="Rows[i].SubgroupTitle" />
+                                                <input type="hidden" asp-for="Rows[i].SubgroupOrderNumber" />
+                                                <input type="hidden" asp-for="Rows[i].QuestionText" />
+                                                <input type="hidden" asp-for="Rows[i].AnswerType" />
+                                                <input asp-for="Rows[i].AnswerText" class="form-control" placeholder="Enter answer" />
+                                                <input type="hidden" asp-for="Rows[i].AnswerNumber" />
+                                                <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
+                                                @if (hasPreviousYearValue)
+                                                {
+                                                    <div class="mt-2">
+                                                        <small class="text-body-secondary">Previous year: @Model.Rows[i].PreviousYearValue</small>
                                                     </div>
-                                                    <input type="hidden" asp-for="Rows[i].QuestionId" />
-                                                    <input type="hidden" asp-for="Rows[i].OrderNumber" />
-                                                    <input type="hidden" asp-for="Rows[i].GroupId" />
-                                                    <input type="hidden" asp-for="Rows[i].GroupTitle" />
-                                                    <input type="hidden" asp-for="Rows[i].GroupDescription" />
-                                                    <input type="hidden" asp-for="Rows[i].GroupImageId1" />
-                                                    <input type="hidden" asp-for="Rows[i].GroupImageId2" />
-                                                    <input type="hidden" asp-for="Rows[i].GroupImageId3" />
-                                                    <input type="hidden" asp-for="Rows[i].GroupTableFormat" />
-                                                    <input type="hidden" asp-for="Rows[i].QuestionText" />
-                                                    <input type="hidden" asp-for="Rows[i].AnswerType" />
-                                                </td>
-                                                <td>
-                                                    @if (answerType.Equals("Number", StringComparison.OrdinalIgnoreCase))
-                                                    {
-                                                        <input asp-for="Rows[i].AnswerNumber" class="form-control form-control-sm" placeholder="Enter number" />
-                                                        <input type="hidden" asp-for="Rows[i].AnswerText" />
-                                                        <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
-                                                    }
-                                                    else if (answerType.Equals("Currency", StringComparison.OrdinalIgnoreCase))
-                                                    {
-                                                        <input asp-for="Rows[i].AnswerCurrency" class="form-control form-control-sm" placeholder="Enter currency" />
-                                                        <input type="hidden" asp-for="Rows[i].AnswerText" />
-                                                        <input type="hidden" asp-for="Rows[i].AnswerNumber" />
-                                                    }
-                                                    else if (answerType.Equals("SingleChoice", StringComparison.OrdinalIgnoreCase))
-                                                    {
-                                                        <select asp-for="Rows[i].AnswerText" class="form-select form-select-sm">
-                                                            <option value="">Select an option</option>
-                                                            @foreach (var option in Model.Rows[i].ChoiceOptions)
-                                                            {
-                                                                <option value="@option">@option</option>
-                                                            }
-                                                        </select>
-                                                        <input type="hidden" asp-for="Rows[i].AnswerNumber" />
-                                                        <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
-                                                    }
-                                                    else if (answerType.Equals("Multichoice", StringComparison.OrdinalIgnoreCase) || answerType.Equals("MultiChoice", StringComparison.OrdinalIgnoreCase))
-                                                    {
-                                                        if (Model.Rows[i].ChoiceOptions.Count == 0)
-                                                        {
-                                                            <div class="text-muted small">No options available.</div>
-                                                        }
-                                                        else
-                                                        {
-                                                            for (var optionIndex = 0; optionIndex < Model.Rows[i].ChoiceOptions.Count; optionIndex++)
-                                                            {
-                                                                var option = Model.Rows[i].ChoiceOptions[optionIndex];
-                                                                var optionId = $"row_{i}_opt_{optionIndex}";
-                                                                var isChecked = Model.Rows[i].SelectedChoices.Contains(option, StringComparer.Ordinal);
-                                                                <div class="form-check form-check-inline">
-                                                                    <input
-                                                                        class="form-check-input"
-                                                                        type="checkbox"
-                                                                        name="Rows[@i].SelectedChoices"
-                                                                        value="@option"
-                                                                        id="@optionId"
-                                                                        @(isChecked ? "checked" : null) />
-                                                                    <label class="form-check-label small" for="@optionId">@option</label>
-                                                                </div>
-                                                            }
-                                                        }
-                                                        <input type="hidden" asp-for="Rows[i].AnswerText" />
-                                                        <input type="hidden" asp-for="Rows[i].AnswerNumber" />
-                                                        <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
-                                                    }
-                                                    else
-                                                    {
-                                                        <input asp-for="Rows[i].AnswerText" class="form-control form-control-sm" placeholder="Enter answer" />
-                                                        <input type="hidden" asp-for="Rows[i].AnswerNumber" />
-                                                        <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
-                                                    }
-                                                </td>
-                                                <td class="text-body-secondary small">
-                                                    <div class="d-flex align-items-center gap-2 w-100">
-                                                        <span class="text-truncate">@(Model.Rows[i].PreviousYearValue ?? "—")</span>
-                                                        @if (hasPreviousYearValue)
-                                                        {
-                                                            <button
-                                                                type="button"
-                                                                class="btn btn-sm btn-outline-secondary copy-prev-year-btn ms-auto"
-                                                                data-row-index="@i"
-                                                                data-answer-type="@answerType"
-                                                                data-prev-text="@previousYearText"
-                                                                data-prev-number="@previousYearNumber"
-                                                                data-prev-currency="@previousYearCurrency">
-                                                                Copy
-                                                            </button>
-                                                        }
-                                                    </div>
-                                                </td>
-                                            </tr>
+                                                }
+                                            </div>
                                         }
-                                    </tbody>
-                                </table>
-                            </div>
+                                    </div>
+                                }
+                            }
                         }
                         else
                         {
@@ -336,6 +704,9 @@
                                     <input type="hidden" asp-for="Rows[i].GroupImageId2" />
                                     <input type="hidden" asp-for="Rows[i].GroupImageId3" />
                                     <input type="hidden" asp-for="Rows[i].GroupTableFormat" />
+                                    <input type="hidden" asp-for="Rows[i].SubgroupId" />
+                                    <input type="hidden" asp-for="Rows[i].SubgroupTitle" />
+                                    <input type="hidden" asp-for="Rows[i].SubgroupOrderNumber" />
                                     <input type="hidden" asp-for="Rows[i].QuestionText" />
                                     <input type="hidden" asp-for="Rows[i].AnswerType" />
 

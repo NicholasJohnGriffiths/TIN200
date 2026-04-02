@@ -24,7 +24,7 @@
 
         <div class="form-group mb-3">
             <label asp-for="Record.Description" class="form-label"></label>
-            <textarea asp-for="Record.Description" class="form-control" rows="4"></textarea>
+            <textarea asp-for="Record.Description" id="descriptionEditor" class="form-control"></textarea>
         </div>
 
         <div class="form-group mb-3">
@@ -160,13 +160,30 @@
         </div>
 
         <button type="submit" class="btn btn-primary">Save</button>
+        <a asp-page="./Subgroups" asp-route-id="@Model.Record.Id" class="btn btn-outline-primary">Question Subgroup</a>
         <a asp-page="./Index" class="btn btn-secondary">Back to List</a>
     </form>
 </div>
 
 @section Scripts {
     @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+    <script src="https://cdn.tiny.cloud/1/3kewwfp0mgpaatcm5468igfv49fz4ummxdovtdoxhz00u6gd/tinymce/7/tinymce.min.js"></script>
     <script>
+        // Initialize TinyMCE for description field
+        tinymce.init({
+            selector: '#descriptionEditor',
+            plugins: 'link image lists table code help wordcount',
+            toolbar: 'undo redo | formatselect | bold italic | alignleft aligncenter alignright | bullist numlist | link image | code help',
+            menubar: 'file edit view insert format table help',
+            height: 400,
+            setup: function(editor) {
+                // Handle form submission - TinyMCE will automatically save to textarea
+                editor.on('change', function() {
+                    tinymce.triggerSave();
+                });
+            }
+        });
+
         (function () {
             const groupedList = document.getElementById('groupQuestionsList');
             const availableList = document.getElementById('availableQuestionsList');

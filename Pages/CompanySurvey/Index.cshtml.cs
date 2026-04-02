@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Options;
 using TINWeb.Data;
 using TINWeb.Services;
@@ -13,6 +14,7 @@ namespace TINWeb.Pages.CompanySurvey
         private readonly ApplicationDbContext _context;
         private readonly ISurveyLinkTokenService _surveyLinkTokenService;
         private readonly SurveyLinkSettings _surveyLinkSettings;
+        private readonly IWebHostEnvironment _environment;
 
         public List<CompanySurveyService.CompanySurveyListRow> Records { get; set; } = new();
         public List<int> FinancialYears { get; set; } = new();
@@ -30,12 +32,14 @@ namespace TINWeb.Pages.CompanySurvey
             CompanySurveyService service,
             ApplicationDbContext context,
             ISurveyLinkTokenService surveyLinkTokenService,
-            IOptions<SurveyLinkSettings> surveyLinkSettings)
+            IOptions<SurveyLinkSettings> surveyLinkSettings,
+            IWebHostEnvironment environment)
         {
             _service = service;
             _context = context;
             _surveyLinkTokenService = surveyLinkTokenService;
             _surveyLinkSettings = surveyLinkSettings.Value;
+            _environment = environment;
         }
 
         public async Task OnGetAsync(int? financialYear, string? sortBy, string? sortDir, string? companySearch, string? surveyEmailSentFilter)
@@ -49,6 +53,8 @@ namespace TINWeb.Pages.CompanySurvey
             SortDir = NormalizeSortDir(sortDir);
 
             Records = await _service.GetListRowsAsync(SelectedFinancialYear);
+
+            NormalizeSurveyLinksForCurrentHost();
 
             if (string.Equals(SurveyEmailSentFilter, "sent", StringComparison.OrdinalIgnoreCase))
             {
@@ -205,6 +211,12 @@ namespace TINWeb.Pages.CompanySurvey
             var token = _surveyLinkTokenService.GenerateToken(companyId);
             var relativePath = Url.Page("/Company/AnswerSurvey", pageHandler: null, values: new { id = companyId, token }, protocol: null) ?? string.Empty;
             var configuredBaseUrl = (_surveyLinkSettings.BaseUrl ?? string.Empty).Trim().TrimEnd('/');
+            var shouldForceLocalHost = _environment.IsDevelopment() || IsLocalHost(Request.Host.Host);
+
+            if (shouldForceLocalHost)
+            {
+                return $"{Request.Scheme}://{Request.Host}{relativePath}";
+            }
 
             if (!string.IsNullOrWhiteSpace(configuredBaseUrl) && Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out _))
             {
@@ -212,6 +224,43 @@ namespace TINWeb.Pages.CompanySurvey
             }
 
             return Url.Page("/Company/AnswerSurvey", pageHandler: null, values: new { id = companyId, token }, protocol: Request.Scheme) ?? string.Empty;
+        }
+
+        private void NormalizeSurveyLinksForCurrentHost()
+        {
+            if (!(_environment.IsDevelopment() || IsLocalHost(Request.Host.Host)))
+            {
+                return;
+            }
+
+            var localBaseUrl = $"{Request.Scheme}://{Request.Host}";
+            foreach (var record in Records)
+            {
+                if (string.IsNullOrWhiteSpace(record.SurveyLink))
+                {
+                    continue;
+                }
+
+                var link = record.SurveyLink.Trim();
+                if (Uri.TryCreate(link, UriKind.Absolute, out var absoluteUri))
+                {
+                    record.SurveyLink = $"{localBaseUrl}{absoluteUri.PathAndQuery}{absoluteUri.Fragment}";
+                    continue;
+                }
+
+                if (Uri.TryCreate(link, UriKind.Relative, out var relativeUri))
+                {
+                    var relativePath = relativeUri.OriginalString.StartsWith('/') ? relativeUri.OriginalString : $"/{relativeUri.OriginalString}";
+                    record.SurveyLink = $"{localBaseUrl}{relativePath}";
+                }
+            }
+        }
+
+        private static bool IsLocalHost(string host)
+        {
+            return string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(host, "127.0.0.1", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(host, "::1", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string NormalizeSurveyEmailSentFilter(string? surveyEmailSentFilter)
