@@ -14,6 +14,9 @@ namespace TINWeb.Pages.Questions
         [BindProperty]
         public Question Record { get; set; } = new();
 
+        [BindProperty]
+        public bool Active { get; set; }
+
         public List<string> AnswerTypeOptions { get; } = Enum.GetNames<QuestionAnswerType>().ToList();
         public List<SelectListItem> QuestionGroupOptions { get; set; } = new();
 
@@ -32,12 +35,15 @@ namespace TINWeb.Pages.Questions
             }
 
             Record = record;
+            Active = Record.Active ?? false;
             await LoadQuestionGroupOptionsAsync();
             return Page();
         }
 
         public async Task<IActionResult> OnPostAsync()
         {
+            Record.Active = Active;
+
             if (!Enum.TryParse<QuestionAnswerType>(Record.AnswerType, out _))
             {
                 ModelState.AddModelError("Record.AnswerType", "Answer Type must be one of: Text, Currency, Number, SingleChoice, Multichoice.");

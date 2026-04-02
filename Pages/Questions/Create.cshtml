@@ -58,6 +58,13 @@
             <span asp-validation-for="Record.AnswerType" class="text-danger"></span>
         </div>
 
+        <div class="form-group mb-3">
+            <div class="form-check">
+                <input asp-for="Active" type="checkbox" class="form-check-input" />
+                <label asp-for="Active" class="form-check-label">Active</label>
+            </div>
+        </div>
+
         <div class="row" id="multichoiceFields">
             <div class="col-md-3 mb-3"><input asp-for="Record.Multi1" class="form-control" placeholder="Multi 1" /></div>
             <div class="col-md-3 mb-3"><input asp-for="Record.Multi2" class="form-control" placeholder="Multi 2" /></div>

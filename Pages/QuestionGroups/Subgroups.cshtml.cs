@@ -31,7 +31,19 @@ namespace TINWeb.Pages.QuestionGroups
         public string? NewSubgroupTitle { get; set; }
 
         [BindProperty]
+        public bool NewSubgroupNewHeader { get; set; }
+
+        [BindProperty]
+        public int NewSubgroupQuestionRows { get; set; } = 1;
+
+        [BindProperty]
         public string? EditSubgroupTitle { get; set; }
+
+        [BindProperty]
+        public bool EditSubgroupNewHeader { get; set; }
+
+        [BindProperty]
+        public int EditSubgroupQuestionRows { get; set; } = 1;
 
         [BindProperty]
         public List<int> SelectedQuestionIds { get; set; } = new();
@@ -63,7 +75,9 @@ namespace TINWeb.Pages.QuestionGroups
                 QuestionGroupId = Id,
                 Title = string.IsNullOrWhiteSpace(NewSubgroupTitle)
                     ? $"Subgroup {DateTime.UtcNow:yyyyMMddHHmmss}"
-                    : NewSubgroupTitle.Trim()
+                    : NewSubgroupTitle.Trim(),
+                NewHeader = NewSubgroupNewHeader,
+                QuestionRows = Math.Max(1, NewSubgroupQuestionRows)
             };
 
             _context.QuestionSubgroup.Add(subgroup);
@@ -92,6 +106,8 @@ namespace TINWeb.Pages.QuestionGroups
             subgroup.Title = string.IsNullOrWhiteSpace(EditSubgroupTitle)
                 ? subgroup.Title
                 : EditSubgroupTitle.Trim();
+            subgroup.NewHeader = EditSubgroupNewHeader;
+            subgroup.QuestionRows = Math.Max(1, EditSubgroupQuestionRows);
 
             await _context.SaveChangesAsync();
 
@@ -226,6 +242,8 @@ namespace TINWeb.Pages.QuestionGroups
 
                 var selectedSubgroup = Subgroups.FirstOrDefault(s => s.Id == SelectedSubgroupId.Value);
                 EditSubgroupTitle = selectedSubgroup?.Title;
+                EditSubgroupNewHeader = selectedSubgroup?.NewHeader ?? false;
+                EditSubgroupQuestionRows = Math.Max(1, selectedSubgroup?.QuestionRows ?? 1);
             }
 
             SubgroupQuestions = groupQuestions

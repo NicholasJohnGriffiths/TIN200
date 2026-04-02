@@ -13,5 +13,9 @@ namespace TINWeb.Models
 
         [StringLength(255)]
         public string? Title { get; set; }
+
+        public bool? NewHeader { get; set; }
+
+        public int? QuestionRows { get; set; }
     }
 }

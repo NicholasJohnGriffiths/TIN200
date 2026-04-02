@@ -34,6 +34,11 @@
                                    asp-route-id="@Model.Id"
                                    asp-route-selectedSubgroupId="@subgroup.Id">
                                     @(string.IsNullOrWhiteSpace(subgroup.Title) ? $"Subgroup {subgroup.Id}" : subgroup.Title)
+                                    <span class="badge text-bg-secondary ms-2">Rows @(Math.Max(1, subgroup.QuestionRows ?? 1))</span>
+                                    @if (subgroup.NewHeader == true)
+                                    {
+                                        <span class="badge text-bg-info ms-2">New Header</span>
+                                    }
                                 </a>
                             }
                         }
@@ -46,7 +51,16 @@
                         <div class="col-sm-8">
                             <input name="NewSubgroupTitle" class="form-control" placeholder="New subgroup title" />
                         </div>
-                        <div class="col-sm-4">
+                        <div class="col-sm-2 d-flex align-items-center">
+                            <div class="form-check mb-0">
+                                <input asp-for="NewSubgroupNewHeader" class="form-check-input" />
+                                <label asp-for="NewSubgroupNewHeader" class="form-check-label">New Header</label>
+                            </div>
+                        </div>
+                        <div class="col-sm-2">
+                            <input asp-for="NewSubgroupQuestionRows" type="number" min="1" class="form-control" title="Question rows" />
+                        </div>
+                        <div class="col-sm-2">
                             <button type="submit" class="btn btn-primary w-100">Create Subgroup</button>
                         </div>
                     </form>
@@ -56,10 +70,19 @@
                         <form method="post" asp-page-handler="RenameSubgroup" class="row g-2 mb-2">
                             <input type="hidden" name="Id" value="@Model.Id" />
                             <input type="hidden" name="SelectedSubgroupId" value="@Model.SelectedSubgroupId" />
-                            <div class="col-sm-8">
+                            <div class="col-sm-6">
                                 <input name="EditSubgroupTitle" class="form-control" value="@Model.EditSubgroupTitle" placeholder="Subgroup title" />
                             </div>
-                            <div class="col-sm-4 d-flex gap-2">
+                            <div class="col-sm-2 d-flex align-items-center">
+                                <div class="form-check mb-0">
+                                    <input asp-for="EditSubgroupNewHeader" class="form-check-input" />
+                                    <label asp-for="EditSubgroupNewHeader" class="form-check-label">New Header</label>
+                                </div>
+                            </div>
+                            <div class="col-sm-2">
+                                <input asp-for="EditSubgroupQuestionRows" type="number" min="1" class="form-control" title="Question rows" />
+                            </div>
+                            <div class="col-sm-2 d-flex gap-2">
                                 <button type="submit" class="btn btn-outline-primary flex-fill">Rename</button>
                             </div>
                         </form>

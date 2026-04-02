@@ -416,6 +416,7 @@ namespace TINWeb.Pages.Company
         private async Task<List<AnswerEditRow>> LoadAnswerRowsAsync(int companyId, int companySurveyId, int currentFinancialYear)
         {
             var questions = await _context.Question
+                .Where(q => q.Active != false)
                 .OrderBy(q => q.OrderNumber)
                 .ThenBy(q => q.Id)
                 .ToListAsync();
@@ -443,6 +444,8 @@ namespace TINWeb.Pages.Company
                     subgroupQuestion.QuestionId,
                     subgroup.Id,
                     subgroup.Title,
+                    subgroup.NewHeader,
+                    subgroup.QuestionRows,
                     subgroupQuestion.OrderNumber
                 })
                 .ToListAsync();
@@ -485,6 +488,8 @@ namespace TINWeb.Pages.Company
                         GroupTableFormat = group?.TableFormat ?? false,
                         SubgroupId = subgroup?.Id,
                         SubgroupTitle = subgroup?.Title,
+                        SubgroupNewHeader = subgroup?.NewHeader,
+                        SubgroupQuestionRows = subgroup?.QuestionRows,
                         SubgroupOrderNumber = subgroup?.OrderNumber,
                         QuestionText = question.QuestionText,
                         AnswerType = question.AnswerType,
@@ -712,6 +717,8 @@ namespace TINWeb.Pages.Company
             public bool GroupTableFormat { get; set; }
             public int? SubgroupId { get; set; }
             public string? SubgroupTitle { get; set; }
+            public bool? SubgroupNewHeader { get; set; }
+            public int? SubgroupQuestionRows { get; set; }
             public int? SubgroupOrderNumber { get; set; }
             public string? QuestionText { get; set; }
             public string? AnswerType { get; set; }

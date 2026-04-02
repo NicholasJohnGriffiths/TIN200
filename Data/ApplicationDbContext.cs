@@ -272,6 +272,10 @@ namespace TINWeb.Data
                     .HasColumnName("AnswerType")
                     .HasColumnType("nvarchar(50)");
 
+                entity.Property(e => e.Active)
+                    .HasColumnName("Active")
+                    .HasColumnType("bit");
+
                 entity.HasOne<QuestionGroup>()
                     .WithMany()
                     .HasForeignKey(e => e.GroupId)
@@ -346,6 +350,14 @@ namespace TINWeb.Data
                     .HasColumnName("Title")
                     .HasColumnType("varchar(255)")
                     .HasMaxLength(255);
+
+                entity.Property(e => e.NewHeader)
+                    .HasColumnName("NewHeader")
+                    .HasColumnType("bit");
+
+                entity.Property(e => e.QuestionRows)
+                    .HasColumnName("QuestionRows")
+                    .HasColumnType("int");
 
                 entity.HasOne<QuestionGroup>()
                     .WithMany()

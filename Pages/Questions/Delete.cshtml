@@ -14,6 +14,7 @@
         <dt class="col-sm-3">Order</dt><dd class="col-sm-9">@Model.Record.OrderNumber</dd>
         <dt class="col-sm-3">Title</dt><dd class="col-sm-9">@Model.Record.Title</dd>
         <dt class="col-sm-3">Question</dt><dd class="col-sm-9">@Model.Record.QuestionText</dd>
+        <dt class="col-sm-3">Active</dt><dd class="col-sm-9">@(Model.Record.Active == false ? "No" : "Yes")</dd>
     </dl>
 
     <form method="post">
