@@ -17,6 +17,53 @@
             sortDir = Model.GetNextSortDirection(column)
         },
         null) ?? "#";
+
+    DateTimeOffset? GetSurveyLinkExpiryUtc(string? surveyLink)
+    {
+        if (string.IsNullOrWhiteSpace(surveyLink) || !Uri.TryCreate(surveyLink.Trim(), UriKind.Absolute, out var linkUri))
+        {
+            return null;
+        }
+
+        var token = linkUri.Segments.LastOrDefault()?.Trim('/');
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return null;
+        }
+
+        try
+        {
+            var base64 = token.Replace('-', '+').Replace('_', '/');
+            switch (base64.Length % 4)
+            {
+                case 2:
+                    base64 += "==";
+                    break;
+                case 3:
+                    base64 += "=";
+                    break;
+            }
+
+            var decoded = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(base64));
+            var parts = decoded.Split(':');
+            if (parts.Length != 3 || !long.TryParse(parts[1], out var expiresUnix))
+            {
+                return null;
+            }
+
+            return DateTimeOffset.FromUnixTimeSeconds(expiresUnix);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    bool IsSurveyLinkExpired(string? surveyLink)
+    {
+        var expiryUtc = GetSurveyLinkExpiryUtc(surveyLink);
+        return expiryUtc.HasValue && expiryUtc.Value <= DateTimeOffset.UtcNow;
+    }
 }
 
 <div class="container-fluid mt-4">
@@ -42,7 +89,8 @@
                 <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
                 <input type="hidden" name="surveyEmailSentFilter" value="@Model.SurveyEmailSentFilter" />
                 <div class="form-check align-self-center">
-                    <input class="form-check-input" type="checkbox" name="overwriteExisting" id="overwriteExisting" />
+                    <input class="form-check-input" type="checkbox" name="overwriteExisting" id="overwriteExisting" value="true" />
+                    <input type="hidden" name="overwriteExisting" value="false" />
                     <label class="form-check-label" for="overwriteExisting">Overwrite Existing Survey Links</label>
                 </div>
                 <button class="btn btn-warning" type="button" id="previewBtn">Preview Populate Survey Links</button>
@@ -138,7 +186,18 @@
                         <td style="min-width: 300px; max-width: 360px;">
                             @if (!string.IsNullOrWhiteSpace(record.SurveyLink))
                             {
+                                var linkExpiryUtc = GetSurveyLinkExpiryUtc(record.SurveyLink);
+                                var isExpired = IsSurveyLinkExpired(record.SurveyLink);
+
                                 <a href="@record.SurveyLink" target="_blank" class="survey-link-two-line d-inline-block" title="@record.SurveyLink">@record.SurveyLink</a>
+
+                                @if (linkExpiryUtc.HasValue)
+                                {
+                                    <div class="small mt-1">
+                                        <span class="badge @(isExpired ? "bg-danger" : "bg-success")">@(isExpired ? "Expired" : "Valid")</span>
+                                        <span class="ms-2 text-muted">Expires: @linkExpiryUtc.Value.ToString("dd/MM/yyyy HH:mm 'UTC'")</span>
+                                    </div>
+                                }
                             }
                         </td>
                         <td>@(record.Saved ? "Yes" : "No")</td>
