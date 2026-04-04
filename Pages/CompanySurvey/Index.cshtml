@@ -138,18 +138,7 @@
                         <td style="min-width: 300px; max-width: 360px;">
                             @if (!string.IsNullOrWhiteSpace(record.SurveyLink))
                             {
-                                var linkExpiryUtc = Model.GetSurveyLinkExpiryUtc(record.SurveyLink);
-                                var isExpired = Model.IsSurveyLinkExpired(record.SurveyLink);
-
                                 <a href="@record.SurveyLink" target="_blank" class="survey-link-two-line d-inline-block" title="@record.SurveyLink">@record.SurveyLink</a>
-
-                                @if (linkExpiryUtc.HasValue)
-                                {
-                                    <div class="small mt-1">
-                                        <span class="badge @(isExpired ? "bg-danger" : "bg-success")">@(isExpired ? "Expired" : "Valid")</span>
-                                        <span class="ms-2 text-muted">@linkExpiryUtc.Value.ToString("dd/MM/yyyy HH:mm 'UTC'")</span>
-                                    </div>
-                                }
                             }
                         </td>
                         <td>@(record.Saved ? "Yes" : "No")</td>

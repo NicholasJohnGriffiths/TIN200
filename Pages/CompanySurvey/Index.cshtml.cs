@@ -245,31 +245,6 @@ namespace TINWeb.Pages.CompanySurvey
             return Url.Page("/Company/AnswerSurvey", pageHandler: null, values: new { id = companyId, token }, protocol: Request.Scheme) ?? string.Empty;
         }
 
-        public DateTimeOffset? GetSurveyLinkExpiryUtc(string? surveyLink)
-        {
-            var token = ExtractTokenFromSurveyLink(surveyLink);
-            return string.IsNullOrWhiteSpace(token)
-                ? null
-                : _surveyLinkTokenService.GetTokenExpiryUtc(token);
-        }
-
-        public bool IsSurveyLinkExpired(string? surveyLink)
-        {
-            var expiryUtc = GetSurveyLinkExpiryUtc(surveyLink);
-            return expiryUtc.HasValue && expiryUtc.Value <= DateTimeOffset.UtcNow;
-        }
-
-        private static string? ExtractTokenFromSurveyLink(string? surveyLink)
-        {
-            if (string.IsNullOrWhiteSpace(surveyLink) || !Uri.TryCreate(surveyLink.Trim(), UriKind.Absolute, out var linkUri))
-            {
-                return null;
-            }
-
-            var token = linkUri.Segments.LastOrDefault()?.Trim('/');
-            return string.IsNullOrWhiteSpace(token) ? null : Uri.UnescapeDataString(token);
-        }
-
         private void NormalizeSurveyLinksForCurrentHost()
         {
             if (!(_environment.IsDevelopment() || IsLocalHost(Request.Host.Host)))
