@@ -61,6 +61,10 @@
                         <td>@(record.Active == false ? "No" : "Yes")</td>
                         <td class="actions-col">
                             <div class="d-inline-flex gap-1 flex-nowrap">
+                                <form method="post" asp-page-handler="MoveTop" class="d-inline">
+                                    <input type="hidden" name="id" value="@record.Id" />
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary" disabled="@(i == 0)">Top</button>
+                                </form>
                                 <form method="post" asp-page-handler="MoveUp" class="d-inline">
                                     <input type="hidden" name="id" value="@record.Id" />
                                     <button type="submit" class="btn btn-sm btn-outline-secondary" disabled="@(i == 0)">Up</button>
@@ -68,6 +72,10 @@
                                 <form method="post" asp-page-handler="MoveDown" class="d-inline">
                                     <input type="hidden" name="id" value="@record.Id" />
                                     <button type="submit" class="btn btn-sm btn-outline-secondary" disabled="@(i == Model.Records.Count - 1)">Down</button>
+                                </form>
+                                <form method="post" asp-page-handler="MoveBottom" class="d-inline">
+                                    <input type="hidden" name="id" value="@record.Id" />
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary" disabled="@(i == Model.Records.Count - 1)">Bottom</button>
                                 </form>
                                 <a asp-page="./Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
                                 <a asp-page="./Edit" asp-route-id="@record.Id" class="btn btn-sm btn-warning">Edit</a>
@@ -102,7 +110,7 @@
 
     .actions-col {
         white-space: nowrap;
-        min-width: 200px;
+        min-width: 320px;
     }
 
     .focused-question-row {

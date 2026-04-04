@@ -95,6 +95,13 @@ namespace TINWeb.Pages.Questions
             return File(bytes, "text/csv", fileName);
         }
 
+        public async Task<IActionResult> OnPostMoveTopAsync(int id)
+        {
+            await _service.MoveToTopAsync(id);
+            StatusMessage = "Question moved to the top.";
+            return RedirectToPage(new { focusId = id });
+        }
+
         public async Task<IActionResult> OnPostMoveUpAsync(int id)
         {
             await _service.MoveUpAsync(id);
@@ -106,6 +113,13 @@ namespace TINWeb.Pages.Questions
         {
             await _service.MoveDownAsync(id);
             StatusMessage = "Question moved down.";
+            return RedirectToPage(new { focusId = id });
+        }
+
+        public async Task<IActionResult> OnPostMoveBottomAsync(int id)
+        {
+            await _service.MoveToBottomAsync(id);
+            StatusMessage = "Question moved to the bottom.";
             return RedirectToPage(new { focusId = id });
         }
 

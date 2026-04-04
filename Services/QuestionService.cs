@@ -148,6 +148,27 @@ namespace TINWeb.Services
             await _context.SaveChangesAsync();
         }
 
+        public async Task MoveToTopAsync(int id)
+        {
+            var orderedQuestions = await GetNormalizedOrderedQuestionsAsync();
+
+            var currentIndex = orderedQuestions.FindIndex(q => q.Id == id);
+            if (currentIndex <= 0)
+            {
+                return;
+            }
+
+            var currentQuestion = orderedQuestions[currentIndex];
+
+            for (var index = 0; index < currentIndex; index++)
+            {
+                orderedQuestions[index].OrderNumber = (orderedQuestions[index].OrderNumber ?? (index + 1)) + 1;
+            }
+
+            currentQuestion.OrderNumber = 1;
+            await _context.SaveChangesAsync();
+        }
+
         public async Task MoveUpAsync(int id)
         {
             var orderedQuestions = await GetNormalizedOrderedQuestionsAsync();
@@ -185,6 +206,27 @@ namespace TINWeb.Services
             nextQuestion.OrderNumber = currentQuestion.OrderNumber;
             currentQuestion.OrderNumber = nextOrder;
 
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task MoveToBottomAsync(int id)
+        {
+            var orderedQuestions = await GetNormalizedOrderedQuestionsAsync();
+
+            var currentIndex = orderedQuestions.FindIndex(q => q.Id == id);
+            if (currentIndex < 0 || currentIndex >= orderedQuestions.Count - 1)
+            {
+                return;
+            }
+
+            var currentQuestion = orderedQuestions[currentIndex];
+
+            for (var index = currentIndex + 1; index < orderedQuestions.Count; index++)
+            {
+                orderedQuestions[index].OrderNumber = (orderedQuestions[index].OrderNumber ?? (index + 1)) - 1;
+            }
+
+            currentQuestion.OrderNumber = orderedQuestions.Count;
             await _context.SaveChangesAsync();
         }
 

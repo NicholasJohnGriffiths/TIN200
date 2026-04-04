@@ -85,21 +85,16 @@ namespace TINWeb.Pages.CompanySurvey
 
         public async Task<IActionResult> OnPostPreviewPopulateSurveyLinksAsync(int? financialYear, bool overwriteExisting)
         {
-            // Get current survey
-            var currentSurvey = await _context.Survey
-                .Where(s => s.CurrentSurvey)
-                .OrderByDescending(s => s.FinancialYear)
-                .ThenByDescending(s => s.Id)
-                .FirstOrDefaultAsync();
+            var targetSurvey = await GetTargetSurveyAsync(financialYear);
 
-            if (currentSurvey == null)
+            if (targetSurvey == null)
             {
-                return new JsonResult(new { success = false, message = "No current survey found." });
+                return new JsonResult(new { success = false, message = "No survey was found for the selected financial year." });
             }
 
-            // Get all CompanySurvey records for the current survey with company names
+            // Get all CompanySurvey records for the selected survey with company names
             var companySurveys = await _context.CompanySurvey
-                .Where(cs => cs.SurveyId == currentSurvey.Id)
+                .Where(cs => cs.SurveyId == targetSurvey.Id)
                 .Join(_context.Tin200,
                     cs => cs.CompanyId,
                     t => t.Id,
@@ -160,36 +155,40 @@ namespace TINWeb.Pages.CompanySurvey
 
         public async Task<IActionResult> OnPostPopulateSurveyLinksAsync(int? financialYear, bool overwriteExisting, string? companySearch, string? surveyEmailSentFilter)
         {
-            // Get current survey
-            var currentSurvey = await _context.Survey
-                .Where(s => s.CurrentSurvey)
-                .OrderByDescending(s => s.FinancialYear)
-                .ThenByDescending(s => s.Id)
-                .FirstOrDefaultAsync();
+            var targetSurvey = await GetTargetSurveyAsync(financialYear);
 
-            if (currentSurvey == null)
+            if (targetSurvey == null)
             {
-                StatusMessage = "Error: No current survey found.";
+                StatusMessage = "Error: No survey was found for the selected financial year.";
                 return RedirectToPage(new { financialYear, companySearch, surveyEmailSentFilter });
             }
 
-            // Get all CompanySurvey records for the current survey
+            // Get all CompanySurvey records for the selected survey
             var companySurveys = await _context.CompanySurvey
-                .Where(cs => cs.SurveyId == currentSurvey.Id)
+                .Where(cs => cs.SurveyId == targetSurvey.Id)
                 .ToListAsync();
 
-            int updatedCount = 0;
+            int createdCount = 0;
+            int overwrittenCount = 0;
             int skippedCount = 0;
 
             foreach (var companySurvey in companySurveys)
             {
-                // Only update if SurveyLink is empty/null, or if overwrite is enabled
-                if (string.IsNullOrWhiteSpace(companySurvey.SurveyLink) || overwriteExisting)
+                var hasExistingLink = !string.IsNullOrWhiteSpace(companySurvey.SurveyLink);
+
+                if (!hasExistingLink || overwriteExisting)
                 {
-                    var surveyUrl = BuildSurveyUrl(companySurvey.CompanyId);
-                    companySurvey.SurveyLink = surveyUrl;
+                    companySurvey.SurveyLink = BuildSurveyUrl(companySurvey.CompanyId);
                     _context.CompanySurvey.Update(companySurvey);
-                    updatedCount++;
+
+                    if (hasExistingLink)
+                    {
+                        overwrittenCount++;
+                    }
+                    else
+                    {
+                        createdCount++;
+                    }
                 }
                 else
                 {
@@ -197,13 +196,33 @@ namespace TINWeb.Pages.CompanySurvey
                 }
             }
 
-            if (updatedCount > 0)
+            if (createdCount > 0 || overwrittenCount > 0)
             {
                 await _context.SaveChangesAsync();
             }
 
-            StatusMessage = $"Survey links populated. Updated: {updatedCount}, Skipped (existing): {skippedCount}.";
+            StatusMessage = $"Survey links updated for {targetSurvey.FinancialYear}. Created: {createdCount}, Overwritten: {overwrittenCount}, Skipped: {skippedCount}.";
             return RedirectToPage(new { financialYear, companySearch, surveyEmailSentFilter });
+        }
+
+        private async Task<Models.Survey?> GetTargetSurveyAsync(int? financialYear)
+        {
+            var query = _context.Survey.AsQueryable();
+
+            if (financialYear.HasValue)
+            {
+                query = query.Where(s => s.FinancialYear == financialYear.Value);
+            }
+            else
+            {
+                query = query.Where(s => s.CurrentSurvey);
+            }
+
+            return await query
+                .OrderByDescending(s => s.CurrentSurvey)
+                .ThenByDescending(s => s.FinancialYear)
+                .ThenByDescending(s => s.Id)
+                .FirstOrDefaultAsync();
         }
 
         private string BuildSurveyUrl(int companyId)
