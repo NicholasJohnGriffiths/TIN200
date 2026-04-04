@@ -63,6 +63,8 @@ namespace TINWeb.Models
         [StringLength(50)]
         public string? AnswerType { get; set; }
 
+        public int? DecimalPoints { get; set; }
+
         public bool? Active { get; set; }
 
         public bool? IncludeInEstimation { get; set; }

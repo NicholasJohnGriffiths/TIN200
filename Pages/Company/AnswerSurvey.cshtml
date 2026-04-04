@@ -541,6 +541,7 @@
                                                                 <input type="hidden" asp-for="Rows[i].SubgroupOrderNumber" />
                                                                 <input type="hidden" asp-for="Rows[i].QuestionText" />
                                                                 <input type="hidden" asp-for="Rows[i].AnswerType" />
+                                                                <input type="hidden" asp-for="Rows[i].DecimalPoints" />
                                                                 <div class="survey-table-inline-row" style="@inlineRowStyle">
                                                                     <div class="survey-table-answer-wrap">
                                                                         @if (answerType.Equals("Number", StringComparison.OrdinalIgnoreCase))
@@ -674,6 +675,7 @@
                                                         <input type="hidden" asp-for="Rows[i].SubgroupOrderNumber" />
                                                         <input type="hidden" asp-for="Rows[i].QuestionText" />
                                                         <input type="hidden" asp-for="Rows[i].AnswerType" />
+                                                        <input type="hidden" asp-for="Rows[i].DecimalPoints" />
                                                         <div class="survey-table-inline-row">
                                                             <div class="survey-table-answer-wrap">
                                                                 @if (answerType.Equals("Number", StringComparison.OrdinalIgnoreCase))
@@ -794,6 +796,7 @@
                                                 <input type="hidden" asp-for="Rows[i].SubgroupOrderNumber" />
                                                 <input type="hidden" asp-for="Rows[i].QuestionText" />
                                                 <input type="hidden" asp-for="Rows[i].AnswerType" />
+                                                <input type="hidden" asp-for="Rows[i].DecimalPoints" />
                                                 <input asp-for="Rows[i].AnswerText" class="form-control" placeholder="Enter answer" />
                                                 <input type="hidden" asp-for="Rows[i].AnswerNumber" />
                                                 <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
@@ -845,6 +848,7 @@
                                     <input type="hidden" asp-for="Rows[i].SubgroupOrderNumber" />
                                     <input type="hidden" asp-for="Rows[i].QuestionText" />
                                     <input type="hidden" asp-for="Rows[i].AnswerType" />
+                                    <input type="hidden" asp-for="Rows[i].DecimalPoints" />
 
                                     <div class="row g-3 align-items-start survey-answer-row" data-row-index="@i">
                                         <div class="col-md-8">

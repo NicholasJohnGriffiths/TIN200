@@ -243,7 +243,19 @@ namespace TINWeb.Pages.Company
                 var answerType = question.AnswerType?.Trim();
                 var allowedOptions = GetChoiceOptions(question);
 
-                if (answerType != null && answerType.Equals("SingleChoice", StringComparison.OrdinalIgnoreCase))
+                if (answerType != null && answerType.Equals("Number", StringComparison.OrdinalIgnoreCase))
+                {
+                    row.AnswerNumber = ScaleNumberForStorage(row.AnswerNumber, row.DecimalPoints);
+                    row.AnswerText = null;
+                    row.AnswerCurrency = null;
+                }
+                else if (answerType != null && answerType.Equals("Currency", StringComparison.OrdinalIgnoreCase))
+                {
+                    row.AnswerCurrency = ScaleCurrencyForStorage(row.AnswerCurrency, row.DecimalPoints);
+                    row.AnswerText = null;
+                    row.AnswerNumber = null;
+                }
+                else if (answerType != null && answerType.Equals("SingleChoice", StringComparison.OrdinalIgnoreCase))
                 {
                     row.AnswerText = allowedOptions.Contains(row.AnswerText ?? string.Empty, StringComparer.Ordinal)
                         ? row.AnswerText
@@ -531,15 +543,16 @@ namespace TINWeb.Pages.Company
                         SubgroupOrderNumber = subgroup?.OrderNumber,
                         QuestionText = question.QuestionText,
                         AnswerType = question.AnswerType,
+                        DecimalPoints = question.DecimalPoints,
                         ChoiceOptions = GetChoiceOptions(question),
                         SelectedChoices = ParseMultiChoiceAnswer(answer?.AnswerText),
-                        PreviousYearValue = FormatAnswerPreview(previousYearAnswer, question.AnswerType),
+                        PreviousYearValue = FormatAnswerPreview(previousYearAnswer, question.AnswerType, question.DecimalPoints),
                         PreviousYearAnswerText = previousYearAnswer?.AnswerText,
-                        PreviousYearAnswerNumber = previousYearAnswer?.AnswerNumber,
-                        PreviousYearAnswerCurrency = previousYearAnswer?.AnswerCurrency,
+                        PreviousYearAnswerNumber = ScaleNumberForDisplay(previousYearAnswer?.AnswerNumber, question.DecimalPoints),
+                        PreviousYearAnswerCurrency = ScaleCurrencyForDisplay(previousYearAnswer?.AnswerCurrency, question.DecimalPoints),
                         AnswerText = answer?.AnswerText,
-                        AnswerNumber = answer?.AnswerNumber,
-                        AnswerCurrency = answer?.AnswerCurrency
+                        AnswerNumber = ScaleNumberForDisplay(answer?.AnswerNumber, question.DecimalPoints),
+                        AnswerCurrency = ScaleCurrencyForDisplay(answer?.AnswerCurrency, question.DecimalPoints)
                     };
                 })
                 .ToList();
@@ -573,7 +586,7 @@ namespace TINWeb.Pages.Company
                 .ToDictionary(x => x.answer.QuestionId, x => x.answer);
         }
 
-        private static string? FormatAnswerPreview(Answer? answer, string? answerType)
+        private static string? FormatAnswerPreview(Answer? answer, string? answerType, int? decimalPoints)
         {
             if (answer == null)
             {
@@ -584,12 +597,14 @@ namespace TINWeb.Pages.Company
 
             if (normalizedType != null && normalizedType.Equals("Currency", StringComparison.OrdinalIgnoreCase) && answer.AnswerCurrency.HasValue)
             {
-                return answer.AnswerCurrency.Value.ToString("N2");
+                var displayValue = ScaleCurrencyForDisplay(answer.AnswerCurrency.Value, decimalPoints);
+                return displayValue?.ToString($"N{GetDisplayPrecision(decimalPoints)}");
             }
 
             if (normalizedType != null && normalizedType.Equals("Number", StringComparison.OrdinalIgnoreCase) && answer.AnswerNumber.HasValue)
             {
-                return answer.AnswerNumber.Value.ToString("N2");
+                var displayValue = ScaleNumberForDisplay(answer.AnswerNumber.Value, decimalPoints);
+                return displayValue?.ToString($"N{GetDisplayPrecision(decimalPoints)}");
             }
 
             if (!string.IsNullOrWhiteSpace(answer.AnswerText))
@@ -599,15 +614,85 @@ namespace TINWeb.Pages.Company
 
             if (answer.AnswerCurrency.HasValue)
             {
-                return answer.AnswerCurrency.Value.ToString("N2");
+                var displayValue = ScaleCurrencyForDisplay(answer.AnswerCurrency.Value, decimalPoints);
+                return displayValue?.ToString($"N{GetDisplayPrecision(decimalPoints)}");
             }
 
             if (answer.AnswerNumber.HasValue)
             {
-                return answer.AnswerNumber.Value.ToString("N2");
+                var displayValue = ScaleNumberForDisplay(answer.AnswerNumber.Value, decimalPoints);
+                return displayValue?.ToString($"N{GetDisplayPrecision(decimalPoints)}");
             }
 
             return null;
+        }
+
+        private static double? ScaleNumberForDisplay(double? value, int? decimalPoints)
+        {
+            if (!value.HasValue)
+            {
+                return null;
+            }
+
+            var scaleFactor = (double)GetScaleFactor(decimalPoints);
+            var scaled = value.Value / scaleFactor;
+            return Math.Round(scaled, GetDisplayPrecision(decimalPoints), MidpointRounding.AwayFromZero);
+        }
+
+        private static decimal? ScaleCurrencyForDisplay(decimal? value, int? decimalPoints)
+        {
+            if (!value.HasValue)
+            {
+                return null;
+            }
+
+            var scaleFactor = GetScaleFactor(decimalPoints);
+            var scaled = value.Value / scaleFactor;
+            return Math.Round(scaled, GetDisplayPrecision(decimalPoints), MidpointRounding.AwayFromZero);
+        }
+
+        private static double? ScaleNumberForStorage(double? value, int? decimalPoints)
+        {
+            if (!value.HasValue)
+            {
+                return null;
+            }
+
+            var scaleFactor = (double)GetScaleFactor(decimalPoints);
+            return value.Value * scaleFactor;
+        }
+
+        private static decimal? ScaleCurrencyForStorage(decimal? value, int? decimalPoints)
+        {
+            if (!value.HasValue)
+            {
+                return null;
+            }
+
+            var scaleFactor = GetScaleFactor(decimalPoints);
+            return value.Value * scaleFactor;
+        }
+
+        private static decimal GetScaleFactor(int? decimalPoints)
+        {
+            if (!decimalPoints.HasValue || decimalPoints.Value >= 0)
+            {
+                return 1m;
+            }
+
+            var factor = 1m;
+            for (var i = 0; i < -decimalPoints.Value; i++)
+            {
+                factor *= 10m;
+            }
+
+            return factor;
+        }
+
+        private static int GetDisplayPrecision(int? decimalPoints)
+        {
+            var precision = decimalPoints ?? 2;
+            return Math.Max(0, Math.Min(precision, 6));
         }
 
         private static List<string> GetChoiceOptions(Question question)
@@ -762,6 +847,7 @@ namespace TINWeb.Pages.Company
             public int? SubgroupOrderNumber { get; set; }
             public string? QuestionText { get; set; }
             public string? AnswerType { get; set; }
+            public int? DecimalPoints { get; set; }
             public List<string> ChoiceOptions { get; set; } = new();
             public List<string> SelectedChoices { get; set; } = new();
             public string? PreviousYearValue { get; set; }

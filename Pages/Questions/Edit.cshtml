@@ -60,6 +60,12 @@
         </div>
 
         <div class="form-group mb-3">
+            <label asp-for="Record.DecimalPoints" class="form-label">Decimal Points</label>
+            <input asp-for="Record.DecimalPoints" class="form-control" type="number" />
+            <small class="form-text text-muted">Use `0` for whole numbers, positive values for decimal places, and `-3` to display in thousands.</small>
+        </div>
+
+        <div class="form-group mb-3">
             <div class="form-check">
                 <input asp-for="Active" type="checkbox" class="form-check-input" />
                 <label asp-for="Active" class="form-check-label">Active</label>
