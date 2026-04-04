@@ -293,20 +293,34 @@ namespace TINWeb.Pages.Company
                 }
             }
 
+            var isSubmitAction = string.Equals(FormAction, "submit", StringComparison.OrdinalIgnoreCase);
+
             if (companySurvey != null)
             {
                 companySurvey.Saved = true;
                 companySurvey.SavedDate = DateTime.Now;
-                if (string.Equals(FormAction, "submit", StringComparison.OrdinalIgnoreCase))
+                if (isSubmitAction)
                 {
                     companySurvey.Submitted = true;
                     companySurvey.SubmittedDate = DateTime.Now;
                 }
+
+                var noteText = isSubmitAction
+                    ? "Survey receiver clicked Submit Final on the public survey page."
+                    : "Survey receiver clicked Save for Later on the public survey page.";
+
+                _context.CompanySurveyNotes.Add(new CompanySurveyNote
+                {
+                    CompanySurveyId = companySurvey.Id,
+                    NoteDateTime = DateTime.Now,
+                    User = "Survey Receiver",
+                    Notes = noteText
+                });
             }
 
             await _context.SaveChangesAsync();
 
-            Submitted = string.Equals(FormAction, "submit", StringComparison.OrdinalIgnoreCase);
+            Submitted = isSubmitAction;
             Saved = !Submitted;
 
             Rows = await LoadAnswerRowsAsync(company.Id, companySurveyId, survey.FinancialYear);
@@ -509,6 +523,7 @@ namespace TINWeb.Pages.Company
                         GroupImageId3 = group?.ImageId3,
                         GroupTableFormat = group?.TableFormat ?? false,
                         GroupNewPage = group?.NewPage ?? false,
+                        GroupDisplayTitleDesc = group?.DisplayTitleDesc ?? false,
                         SubgroupId = subgroup?.Id,
                         SubgroupTitle = subgroup?.Title,
                         SubgroupNewHeader = subgroup?.NewHeader,
@@ -739,6 +754,7 @@ namespace TINWeb.Pages.Company
             public int? GroupImageId3 { get; set; }
             public bool GroupTableFormat { get; set; }
             public bool GroupNewPage { get; set; }
+            public bool GroupDisplayTitleDesc { get; set; }
             public int? SubgroupId { get; set; }
             public string? SubgroupTitle { get; set; }
             public bool? SubgroupNewHeader { get; set; }

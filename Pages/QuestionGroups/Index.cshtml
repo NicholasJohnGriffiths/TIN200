@@ -22,6 +22,7 @@
                     <th>Order</th>
                     <th>Title</th>
                     <th>Description</th>
+                    <th>Display Title/Desc</th>
                     <th>Table Format</th>
                     <th>New Page</th>
                     <th>Image1</th>
@@ -51,6 +52,7 @@
                         </td>
                         <td>@record.Title</td>
                         <td>@record.Description</td>
+                        <td>@(record.DisplayTitleDesc ? "Yes" : "")</td>
                         <td>@(record.TableFormat ? "Yes" : "")</td>
                         <td>@(record.NewPage ? "Yes" : "")</td>
                         <td>

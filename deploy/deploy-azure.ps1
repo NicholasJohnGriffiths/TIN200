@@ -27,7 +27,7 @@ param(
     [string]$SurveyLinkSecretKey = "",
 
     [Parameter(Mandatory = $false)]
-    [int]$SurveyLinkExpiryHours = 72,
+    [int]$SurveyLinkExpiryHours = 2160,
 
     [Parameter(Mandatory = $false)]
     [string]$SurveySupportEmail = "",

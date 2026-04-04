@@ -296,6 +296,7 @@
                     var sectionImageId3 = new List<int?>();
                     var sectionTableFormat = new List<bool>();
                     var sectionNewPage = new List<bool>();
+                    var sectionDisplayTitleDesc = new List<bool>();
                     var sectionRowIndexes = new List<List<int>>();
 
                     foreach (var group in Model.SurveyQuestionGroups)
@@ -311,6 +312,7 @@
                         sectionImageId3.Add(group.ImageId3);
                         sectionTableFormat.Add(group.TableFormat);
                         sectionNewPage.Add(group.NewPage);
+                        sectionDisplayTitleDesc.Add(group.DisplayTitleDesc);
                         sectionRowIndexes.Add(new List<int>());
                     }
 
@@ -332,6 +334,7 @@
                             sectionImageId3.Add(row.GroupImageId3);
                             sectionTableFormat.Add(row.GroupTableFormat);
                             sectionNewPage.Add(row.GroupNewPage);
+                            sectionDisplayTitleDesc.Add(row.GroupDisplayTitleDesc);
                             sectionRowIndexes.Add(new List<int>());
                         }
 
@@ -357,6 +360,7 @@
                         sectionImageId3.Add(null);
                         sectionTableFormat.Add(false);
                         sectionNewPage.Add(true);
+                        sectionDisplayTitleDesc.Add(false);
                         sectionRowIndexes.Add(Enumerable.Range(0, Model.Rows.Count).ToList());
                     }
 
@@ -364,10 +368,12 @@
 
                 @for (var groupIndex = 0; groupIndex < sectionTitles.Count; groupIndex++)
                 {
-                    <div class="survey-group-page" data-group-index="@groupIndex" data-group-title="@sectionTitles[groupIndex]" data-group-description="@sectionDescriptions[groupIndex]" data-group-new-page="@sectionNewPage[groupIndex].ToString().ToLowerInvariant()" style="display:none;">
+                    <div class="survey-group-page" data-group-index="@groupIndex" data-group-title="@(sectionDisplayTitleDesc[groupIndex] ? sectionTitles[groupIndex] : string.Empty)" data-group-description="@(sectionDisplayTitleDesc[groupIndex] ? sectionDescriptions[groupIndex] : string.Empty)" data-group-new-page="@sectionNewPage[groupIndex].ToString().ToLowerInvariant()" style="display:none;">
                         @{
-                            var hasTitle = !string.IsNullOrWhiteSpace(sectionTitles[groupIndex]);
-                            var hasDescription = !string.IsNullOrWhiteSpace(sectionDescriptions[groupIndex]);
+                            var titleForDisplay = sectionDisplayTitleDesc[groupIndex] ? sectionTitles[groupIndex] : string.Empty;
+                            var descriptionForDisplay = sectionDisplayTitleDesc[groupIndex] ? sectionDescriptions[groupIndex] : string.Empty;
+                            var hasTitle = !string.IsNullOrWhiteSpace(titleForDisplay);
+                            var hasDescription = !string.IsNullOrWhiteSpace(descriptionForDisplay);
                             var groupImageIds = new List<int>();
                             var groupId = sectionGroupIds[groupIndex];
 
@@ -398,11 +404,11 @@
                                     <div class="card-header py-2">
                                         @if (hasTitle)
                                         {
-                                            <div class="fw-semibold">@sectionTitles[groupIndex]</div>
+                                            <div class="fw-semibold">@titleForDisplay</div>
                                         }
                                         @if (hasDescription)
                                         {
-                                            <div class="small text-body-secondary mt-1">@Html.Raw(sectionDescriptions[groupIndex])</div>
+                                            <div class="small text-body-secondary mt-1">@Html.Raw(descriptionForDisplay)</div>
                                         }
                                     </div>
                                 }
@@ -527,6 +533,7 @@
                                                                 <input type="hidden" asp-for="Rows[i].GroupImageId3" />
                                                                 <input type="hidden" asp-for="Rows[i].GroupTableFormat" />
                                                                 <input type="hidden" asp-for="Rows[i].GroupNewPage" />
+                                                                <input type="hidden" asp-for="Rows[i].GroupDisplayTitleDesc" />
                                                                 <input type="hidden" asp-for="Rows[i].SubgroupId" />
                                                                 <input type="hidden" asp-for="Rows[i].SubgroupTitle" />
                                                                 <input type="hidden" asp-for="Rows[i].SubgroupNewHeader" />
@@ -659,6 +666,7 @@
                                                         <input type="hidden" asp-for="Rows[i].GroupImageId3" />
                                                         <input type="hidden" asp-for="Rows[i].GroupTableFormat" />
                                                         <input type="hidden" asp-for="Rows[i].GroupNewPage" />
+                                                        <input type="hidden" asp-for="Rows[i].GroupDisplayTitleDesc" />
                                                         <input type="hidden" asp-for="Rows[i].SubgroupId" />
                                                         <input type="hidden" asp-for="Rows[i].SubgroupTitle" />
                                                         <input type="hidden" asp-for="Rows[i].SubgroupNewHeader" />
@@ -778,6 +786,7 @@
                                                 <input type="hidden" asp-for="Rows[i].GroupImageId3" />
                                                 <input type="hidden" asp-for="Rows[i].GroupTableFormat" />
                                                 <input type="hidden" asp-for="Rows[i].GroupNewPage" />
+                                                <input type="hidden" asp-for="Rows[i].GroupDisplayTitleDesc" />
                                                 <input type="hidden" asp-for="Rows[i].SubgroupId" />
                                                 <input type="hidden" asp-for="Rows[i].SubgroupTitle" />
                                                 <input type="hidden" asp-for="Rows[i].SubgroupNewHeader" />
@@ -828,6 +837,7 @@
                                     <input type="hidden" asp-for="Rows[i].GroupImageId3" />
                                     <input type="hidden" asp-for="Rows[i].GroupTableFormat" />
                                     <input type="hidden" asp-for="Rows[i].GroupNewPage" />
+                                    <input type="hidden" asp-for="Rows[i].GroupDisplayTitleDesc" />
                                     <input type="hidden" asp-for="Rows[i].SubgroupId" />
                                     <input type="hidden" asp-for="Rows[i].SubgroupTitle" />
                                     <input type="hidden" asp-for="Rows[i].SubgroupNewHeader" />

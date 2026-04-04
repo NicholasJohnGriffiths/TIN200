@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using TINWeb.Data;
 using TINWeb.Services;
 
@@ -10,6 +11,8 @@ namespace TINWeb.Pages.CompanySurvey
     {
         private readonly CompanySurveyService _service;
         private readonly ApplicationDbContext _context;
+        private readonly ISurveyLinkTokenService _surveyLinkTokenService;
+        private readonly SurveyLinkSettings _surveyLinkSettings;
 
         [BindProperty]
         public Models.CompanySurvey Record { get; set; } = new();
@@ -17,12 +20,25 @@ namespace TINWeb.Pages.CompanySurvey
         [BindProperty(SupportsGet = true)]
         public int? FinancialYear { get; set; }
 
-        public string? CompanyName { get; set; }
+        [TempData]
+        public string? StatusMessage { get; set; }
 
-        public EditModel(CompanySurveyService service, ApplicationDbContext context)
+        public string? CompanyName { get; set; }
+        public int LinkExpiryHours => _surveyLinkSettings.ExpiryHours;
+        public int LinkExpiryDays => Math.Max(1, (int)Math.Ceiling(_surveyLinkSettings.ExpiryHours / 24d));
+        public DateTimeOffset? SurveyLinkExpiryUtc => GetSurveyLinkExpiryUtc(Record.SurveyLink);
+        public bool IsSurveyLinkExpired => SurveyLinkExpiryUtc.HasValue && SurveyLinkExpiryUtc.Value <= DateTimeOffset.UtcNow;
+
+        public EditModel(
+            CompanySurveyService service,
+            ApplicationDbContext context,
+            ISurveyLinkTokenService surveyLinkTokenService,
+            IOptions<SurveyLinkSettings> surveyLinkOptions)
         {
             _service = service;
             _context = context;
+            _surveyLinkTokenService = surveyLinkTokenService;
+            _surveyLinkSettings = surveyLinkOptions.Value;
         }
 
         public async Task<IActionResult> OnGetAsync(int? id, int? financialYear)
@@ -43,10 +59,7 @@ namespace TINWeb.Pages.CompanySurvey
             Record = record;
             Record.Locked ??= false;
             Record.Estimate ??= false;
-            CompanyName = await _context.Tin200
-                .Where(c => c.Id == record.CompanyId)
-                .Select(c => c.CompanyName)
-                .FirstOrDefaultAsync();
+            await LoadCompanyNameAsync(record.CompanyId);
             return Page();
         }
 
@@ -54,6 +67,7 @@ namespace TINWeb.Pages.CompanySurvey
         {
             if (!ModelState.IsValid)
             {
+                await LoadCompanyNameAsync(Record.CompanyId);
                 return Page();
             }
 
@@ -66,6 +80,97 @@ namespace TINWeb.Pages.CompanySurvey
             Record.Estimate ??= false;
             await _service.UpdateAsync(Record);
             return RedirectToPage("./Index", null, new { financialYear = FinancialYear }, $"record-{Record.Id}");
+        }
+
+        public async Task<IActionResult> OnPostRegenerateLinkAsync()
+        {
+            var existing = await _service.GetByIdAsync(Record.Id);
+            if (existing == null)
+            {
+                return NotFound();
+            }
+
+            try
+            {
+                existing.SurveyLink = BuildSurveyUrl(existing.CompanyId);
+                await _service.UpdateAsync(existing);
+                await AddCompanySurveyNoteAsync(
+                    existing.Id,
+                    User.Identity?.Name ?? "Admin",
+                    "Survey link manually regenerated from the Company Survey edit page.");
+
+                var expiryUtc = GetSurveyLinkExpiryUtc(existing.SurveyLink);
+                var expiryText = expiryUtc.HasValue
+                    ? $" New link expires {expiryUtc.Value:dd/MM/yyyy HH:mm} UTC."
+                    : string.Empty;
+
+                StatusMessage = $"Survey link regenerated. Token validity is currently {LinkExpiryHours} hours (~{LinkExpiryDays} days).{expiryText}";
+                return RedirectToPage(new { id = existing.Id, financialYear = FinancialYear });
+            }
+            catch (InvalidOperationException ex)
+            {
+                Record = existing;
+                Record.Locked ??= false;
+                Record.Estimate ??= false;
+                await LoadCompanyNameAsync(existing.CompanyId);
+                ModelState.AddModelError(string.Empty, ex.Message);
+                return Page();
+            }
+        }
+
+        private async Task AddCompanySurveyNoteAsync(int companySurveyId, string user, string notes)
+        {
+            var note = new Models.CompanySurveyNote
+            {
+                CompanySurveyId = companySurveyId,
+                NoteDateTime = DateTime.Now,
+                User = user,
+                Notes = notes
+            };
+
+            _context.CompanySurveyNotes.Add(note);
+            await _context.SaveChangesAsync();
+        }
+
+        private DateTimeOffset? GetSurveyLinkExpiryUtc(string? surveyLink)
+        {
+            var token = ExtractTokenFromSurveyLink(surveyLink);
+            return string.IsNullOrWhiteSpace(token)
+                ? null
+                : _surveyLinkTokenService.GetTokenExpiryUtc(token);
+        }
+
+        private static string? ExtractTokenFromSurveyLink(string? surveyLink)
+        {
+            if (string.IsNullOrWhiteSpace(surveyLink) || !Uri.TryCreate(surveyLink.Trim(), UriKind.Absolute, out var linkUri))
+            {
+                return null;
+            }
+
+            var token = linkUri.Segments.LastOrDefault()?.Trim('/');
+            return string.IsNullOrWhiteSpace(token) ? null : Uri.UnescapeDataString(token);
+        }
+
+        private async Task LoadCompanyNameAsync(int companyId)
+        {
+            CompanyName = await _context.Tin200
+                .Where(c => c.Id == companyId)
+                .Select(c => c.CompanyName)
+                .FirstOrDefaultAsync();
+        }
+
+        private string BuildSurveyUrl(int companyId)
+        {
+            var token = _surveyLinkTokenService.GenerateToken(companyId);
+            var relativePath = Url.Page("/Company/AnswerSurvey", pageHandler: null, values: new { id = companyId, token }, protocol: null) ?? string.Empty;
+            var configuredBaseUrl = (_surveyLinkSettings.BaseUrl ?? string.Empty).Trim().TrimEnd('/');
+
+            if (!string.IsNullOrWhiteSpace(configuredBaseUrl) && Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out _))
+            {
+                return $"{configuredBaseUrl}{relativePath}";
+            }
+
+            return Url.Page("/Company/AnswerSurvey", pageHandler: null, values: new { id = companyId, token }, protocol: Request.Scheme) ?? string.Empty;
         }
     }
 }

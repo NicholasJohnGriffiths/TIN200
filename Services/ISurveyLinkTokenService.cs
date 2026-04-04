@@ -4,5 +4,6 @@ namespace TINWeb.Services
     {
         string GenerateToken(int clientId);
         bool IsTokenValid(int clientId, string token);
+        DateTimeOffset? GetTokenExpiryUtc(string token);
     }
 }

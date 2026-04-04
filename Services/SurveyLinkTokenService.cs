@@ -71,6 +71,39 @@ namespace TINWeb.Services
                 Encoding.UTF8.GetBytes(expectedSignature));
         }
 
+        public DateTimeOffset? GetTokenExpiryUtc(string token)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return null;
+            }
+
+            string decoded;
+            try
+            {
+                decoded = FromBase64Url(token);
+            }
+            catch
+            {
+                return null;
+            }
+
+            var parts = decoded.Split(':');
+            if (parts.Length != 3 || !long.TryParse(parts[1], out var expiresUnix))
+            {
+                return null;
+            }
+
+            try
+            {
+                return DateTimeOffset.FromUnixTimeSeconds(expiresUnix);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         private string ComputeSignature(string payload)
         {
             var keyBytes = Encoding.UTF8.GetBytes(_settings.SecretKey);

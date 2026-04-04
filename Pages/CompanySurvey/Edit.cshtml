@@ -8,6 +8,11 @@
     <h1>Edit Company Survey</h1>
     <hr />
 
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <div class="alert alert-success" role="alert">@Model.StatusMessage</div>
+    }
+
     <form method="post">
         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
         <input type="hidden" asp-for="Record.Id" />
@@ -69,7 +74,21 @@
         <div class="form-group mb-3">
             <label asp-for="Record.SurveyLink" class="form-label"></label>
             <input asp-for="Record.SurveyLink" class="form-control" readonly />
-            <small class="text-muted">Generated when survey is sent via email</small>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+                <button type="submit" asp-page-handler="RegenerateLink" formnovalidate class="btn btn-outline-primary">Regenerate Survey Link</button>
+                @if (!string.IsNullOrWhiteSpace(Model.Record.SurveyLink))
+                {
+                    <a href="@Model.Record.SurveyLink" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary">Open Link</a>
+                }
+            </div>
+            @if (Model.SurveyLinkExpiryUtc.HasValue)
+            {
+                <div class="small mt-2">
+                    <span class="badge @(Model.IsSurveyLinkExpired ? "bg-danger" : "bg-success")">@(Model.IsSurveyLinkExpired ? "Expired" : "Valid")</span>
+                    <span class="ms-2 text-muted">Expires: @Model.SurveyLinkExpiryUtc.Value.ToString("dd/MM/yyyy HH:mm 'UTC'")</span>
+                </div>
+            }
+            <small class="text-muted d-block mt-1">Links are currently configured to remain valid for @Model.LinkExpiryDays day(s) (@Model.LinkExpiryHours hours). If a newer link shows as invalid, the token signing secret may have changed.</small>
         </div>
 
         <button type="submit" class="btn btn-primary">Save</button>

@@ -32,7 +32,7 @@ Set-Location .\deploy
   -SqlAdminUser "tinadmin" `
   -SqlAdminPassword "<STRONG_PASSWORD>" `
   -SurveyLinkSecretKey "<STABLE_STRONG_SECRET>" `
-  -SurveyLinkExpiryHours 72 `
+  -SurveyLinkExpiryHours 2160 `
   -SurveySupportEmail "support@yourcompany.com" `
   -AllowMyIp
 ```

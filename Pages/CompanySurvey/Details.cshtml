@@ -28,7 +28,23 @@
         <dd class="col-sm-9">@Model.Record.Requested</dd>
 
         <dt class="col-sm-3">Survey Link</dt>
-        <dd class="col-sm-9">@if (!string.IsNullOrWhiteSpace(Model.Record.SurveyLink)) { <a href="@Model.Record.SurveyLink" target="_blank">@Model.Record.SurveyLink</a> } else { <span class="text-muted">Not generated</span> }</dd>
+        <dd class="col-sm-9">
+            @if (!string.IsNullOrWhiteSpace(Model.Record.SurveyLink))
+            {
+                <a href="@Model.Record.SurveyLink" target="_blank">@Model.Record.SurveyLink</a>
+                @if (Model.SurveyLinkExpiryUtc.HasValue)
+                {
+                    <div class="small mt-2">
+                        <span class="badge @(Model.IsSurveyLinkExpired ? "bg-danger" : "bg-success")">@(Model.IsSurveyLinkExpired ? "Expired" : "Valid")</span>
+                        <span class="ms-2 text-muted">Expires: @Model.SurveyLinkExpiryUtc.Value.ToString("dd/MM/yyyy HH:mm 'UTC'")</span>
+                    </div>
+                }
+            }
+            else
+            {
+                <span class="text-muted">Not generated</span>
+            }
+        </dd>
 
     <a asp-page="./Edit" asp-route-id="@Model.Record.Id" class="btn btn-warning">Edit</a>
     <a asp-page="./Index" class="btn btn-secondary">Back to List</a>

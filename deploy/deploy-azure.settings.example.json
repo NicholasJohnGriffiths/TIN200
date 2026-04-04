@@ -8,6 +8,6 @@
   "SqlAdminUser": "tinadmin",
   "SqlAdminPassword": "",
   "SurveyLinkSecretKey": "",
-  "SurveyLinkExpiryHours": 72,
+  "SurveyLinkExpiryHours": 2160,
   "SurveySupportEmail": ""
 }

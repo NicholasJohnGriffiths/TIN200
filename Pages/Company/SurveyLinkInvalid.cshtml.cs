@@ -54,11 +54,18 @@ namespace TINWeb.Pages.Company
 
             if (currentSurvey != null)
             {
+                var requestReason = string.IsNullOrWhiteSpace(reason) ? "unknown" : reason.Trim();
+
                 var companySurvey = await _context.CompanySurvey
                     .FirstOrDefaultAsync(cs => cs.CompanyId == id.Value && cs.SurveyId == currentSurvey.Id);
 
                 if ((companySurvey?.Locked).GetValueOrDefault())
                 {
+                    await AddCompanySurveyNoteAsync(
+                        companySurvey!.Id,
+                        "Survey Receiver",
+                        $"Survey receiver requested a new survey link from the invalid/expired link page, but the survey is locked. Reason: {requestReason}.");
+
                     return RedirectToPage(new { id, reason = "survey-locked", requested = false });
                 }
 
@@ -87,9 +94,28 @@ namespace TINWeb.Pages.Company
                 }
 
                 await _context.SaveChangesAsync();
+
+                await AddCompanySurveyNoteAsync(
+                    companySurvey.Id,
+                    "Survey Receiver",
+                    $"Survey receiver requested a new survey link from the invalid/expired link page. Reason: {requestReason}.");
             }
 
             return RedirectToPage(new { id, reason, requested = true });
+        }
+
+        private async Task AddCompanySurveyNoteAsync(int companySurveyId, string user, string notes)
+        {
+            var note = new CompanySurveyNote
+            {
+                CompanySurveyId = companySurveyId,
+                NoteDateTime = DateTime.Now,
+                User = user,
+                Notes = notes
+            };
+
+            _context.CompanySurveyNotes.Add(note);
+            await _context.SaveChangesAsync();
         }
 
         private void BuildRequestEmailUrl()

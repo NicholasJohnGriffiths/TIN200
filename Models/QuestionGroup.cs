@@ -26,5 +26,8 @@ namespace TINWeb.Models
         public bool TableFormat { get; set; }
 
         public bool NewPage { get; set; }
+
+        [Display(Name = "Display title and description")]
+        public bool DisplayTitleDesc { get; set; }
     }
 }
