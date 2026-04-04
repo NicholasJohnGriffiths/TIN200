@@ -1,0 +1,92 @@
+@page
+@model TINWeb.Pages.Tasks.IndexModel
+@using TINWeb.Models
+@{
+    ViewData["Title"] = "Tasks";
+
+    string GetRowClass(TaskItem record) => (record.Status ?? TaskItemStatus.Active) switch
+    {
+        TaskItemStatus.Active => "table-danger",
+        TaskItemStatus.Pending => "table-warning",
+        TaskItemStatus.Completed => "table-success",
+        _ => string.Empty
+    };
+
+    string GetBadgeClass(TaskItem record) => (record.Status ?? TaskItemStatus.Active) switch
+    {
+        TaskItemStatus.Active => "bg-danger",
+        TaskItemStatus.Pending => "bg-warning text-dark",
+        TaskItemStatus.Completed => "bg-success",
+        _ => "bg-secondary"
+    };
+}
+
+<div class="container mt-4">
+    <div class="row mb-3">
+        <div class="col-md-8">
+            <h1>Tasks</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <a asp-page="./Create" class="btn btn-primary">Add Task</a>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <div class="alert alert-success">@Model.StatusMessage</div>
+    }
+
+    <div class="mb-3 d-flex flex-wrap gap-2">
+        <a asp-page="./Index" asp-route-status="Active" class="btn @(Model.IsSelectedStatus(TaskItemStatus.Active) ? "btn-danger" : "btn-outline-danger")">Active</a>
+        <a asp-page="./Index" asp-route-status="Pending" class="btn @(Model.IsSelectedStatus(TaskItemStatus.Pending) ? "btn-warning text-dark" : "btn-outline-warning")">Pending</a>
+        <a asp-page="./Index" asp-route-status="Completed" class="btn @(Model.IsSelectedStatus(TaskItemStatus.Completed) ? "btn-success" : "btn-outline-success")">Completed</a>
+        <a asp-page="./Index" asp-route-status="all" class="btn @(Model.CurrentFilterLabel == "All" ? "btn-secondary" : "btn-outline-secondary")">All</a>
+    </div>
+
+    <p class="text-muted small">Showing <strong>@Model.CurrentFilterLabel</strong> tasks ordered by created date/time.</p>
+
+    @if (Model.Records.Any())
+    {
+        <table class="table table-hover company-table align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Created</th>
+                    <th>Title</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th>Created By</th>
+                    <th>Completed</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var record in Model.Records)
+                {
+                    <tr class="@GetRowClass(record)">
+                        <td>@record.CreatedDatetime?.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>@record.Title</td>
+                        <td style="max-width: 420px; white-space: normal;">@record.Description</td>
+                        <td><span class="badge @GetBadgeClass(record)">@((record.Status ?? TaskItemStatus.Active).ToString())</span></td>
+                        <td>@record.CreatedBy</td>
+                        <td>
+                            @if (record.CompletedDatetime.HasValue || !string.IsNullOrWhiteSpace(record.CompletedBy))
+                            {
+                                <div>@record.CompletedDatetime?.ToString("dd/MM/yyyy HH:mm")</div>
+                                <div class="small text-muted">@record.CompletedBy</div>
+                            }
+                        </td>
+                        <td style="white-space: nowrap;">
+                            <a asp-page="./Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
+                            <a asp-page="./Edit" asp-route-id="@record.Id" class="btn btn-sm btn-warning">Edit</a>
+                            <a asp-page="./Delete" asp-route-id="@record.Id" class="btn btn-sm btn-danger">Delete</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <div class="alert alert-info">No tasks found for the selected filter.</div>
+    }
+</div>

@@ -20,6 +20,7 @@ namespace TINWeb.Data
         public DbSet<Image> Image { get; set; } = null!;
         public DbSet<Answer> Answer { get; set; } = null!;
         public DbSet<CompanySurveyNote> CompanySurveyNotes { get; set; } = null!;
+        public DbSet<TaskItem> TaskItems { get; set; } = null!;
         public DbSet<CompanyFinancialAnalytics> CompanyFinancialAnalytics { get; set; } = null!;
         public DbSet<FinancialYearComparison> FinancialYearComparison { get; set; } = null!;
         public DbSet<RevenueSummaryBySize> RevenueSummaryBySize { get; set; } = null!;
@@ -412,6 +413,47 @@ namespace TINWeb.Data
                     .HasForeignKey(e => e.QuestionId)
                     .OnDelete(DeleteBehavior.Restrict)
                     .HasConstraintName("FK_SubgroupQuestion_Question");
+            });
+
+            modelBuilder.Entity<TaskItem>(entity =>
+            {
+                entity.ToTable("Task");
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("Id")
+                    .ValueGeneratedOnAdd();
+
+                entity.Property(e => e.CreatedBy)
+                    .HasColumnName("CreatedBy")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255);
+
+                entity.Property(e => e.CreatedDatetime)
+                    .HasColumnName("CreatedDatetime")
+                    .HasColumnType("datetime");
+
+                entity.Property(e => e.Status)
+                    .HasColumnName("Status")
+                    .HasColumnType("int");
+
+                entity.Property(e => e.Title)
+                    .HasColumnName("Title")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255);
+
+                entity.Property(e => e.Description)
+                    .HasColumnName("Description")
+                    .HasColumnType("nvarchar(max)");
+
+                entity.Property(e => e.CompletedBy)
+                    .HasColumnName("CompletedBy")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255);
+
+                entity.Property(e => e.CompletedDatetime)
+                    .HasColumnName("CompletedDatetime")
+                    .HasColumnType("datetime");
             });
 
             modelBuilder.Entity<Image>(entity =>

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TINWeb.Data;
 using TINWeb.Models;
+using TINWeb.Services;
 
 namespace TINWeb.Pages.Company
 {
@@ -10,11 +11,13 @@ namespace TINWeb.Pages.Company
     {
         private readonly IConfiguration _configuration;
         private readonly ApplicationDbContext _context;
+        private readonly TaskService _taskService;
 
-        public SurveyLinkInvalidModel(IConfiguration configuration, ApplicationDbContext context)
+        public SurveyLinkInvalidModel(IConfiguration configuration, ApplicationDbContext context, TaskService taskService)
         {
             _configuration = configuration;
             _context = context;
+            _taskService = taskService;
         }
 
         public string RequestNewLinkUrl { get; private set; } = string.Empty;
@@ -55,6 +58,10 @@ namespace TINWeb.Pages.Company
             if (currentSurvey != null)
             {
                 var requestReason = string.IsNullOrWhiteSpace(reason) ? "unknown" : reason.Trim();
+                var companyName = await _context.Tin200
+                    .Where(c => c.Id == id.Value)
+                    .Select(c => c.CompanyName)
+                    .FirstOrDefaultAsync() ?? $"Company {id.Value}";
 
                 var companySurvey = await _context.CompanySurvey
                     .FirstOrDefaultAsync(cs => cs.CompanyId == id.Value && cs.SurveyId == currentSurvey.Id);
@@ -65,6 +72,13 @@ namespace TINWeb.Pages.Company
                         companySurvey!.Id,
                         "Survey Receiver",
                         $"Survey receiver requested a new survey link from the invalid/expired link page, but the survey is locked. Reason: {requestReason}.");
+
+                    await _taskService.CreateSurveyLinkRequestedTaskAsync(
+                        id.Value,
+                        companyName,
+                        currentSurvey.FinancialYear,
+                        $"Locked survey - {requestReason}",
+                        "Survey Receiver");
 
                     return RedirectToPage(new { id, reason = "survey-locked", requested = false });
                 }
@@ -99,6 +113,13 @@ namespace TINWeb.Pages.Company
                     companySurvey.Id,
                     "Survey Receiver",
                     $"Survey receiver requested a new survey link from the invalid/expired link page. Reason: {requestReason}.");
+
+                await _taskService.CreateSurveyLinkRequestedTaskAsync(
+                    id.Value,
+                    companyName,
+                    currentSurvey.FinancialYear,
+                    requestReason,
+                    "Survey Receiver");
             }
 
             return RedirectToPage(new { id, reason, requested = true });

@@ -1,0 +1,44 @@
+@page "{id:int}"
+@model TINWeb.Pages.Tasks.DetailsModel
+@using TINWeb.Models
+@{
+    ViewData["Title"] = "Task Details";
+    var badgeClass = (Model.Record.Status ?? TaskItemStatus.Active) switch
+    {
+        TaskItemStatus.Active => "bg-danger",
+        TaskItemStatus.Pending => "bg-warning text-dark",
+        TaskItemStatus.Completed => "bg-success",
+        _ => "bg-secondary"
+    };
+}
+
+<div class="container mt-4">
+    <h1>Task Details</h1>
+    <hr />
+
+    <dl class="row">
+        <dt class="col-sm-3">Title</dt>
+        <dd class="col-sm-9">@Model.Record.Title</dd>
+
+        <dt class="col-sm-3">Description</dt>
+        <dd class="col-sm-9" style="white-space: pre-wrap;">@Model.Record.Description</dd>
+
+        <dt class="col-sm-3">Status</dt>
+        <dd class="col-sm-9"><span class="badge @badgeClass">@((Model.Record.Status ?? TaskItemStatus.Active).ToString())</span></dd>
+
+        <dt class="col-sm-3">Created by</dt>
+        <dd class="col-sm-9">@Model.Record.CreatedBy</dd>
+
+        <dt class="col-sm-3">Created</dt>
+        <dd class="col-sm-9">@Model.Record.CreatedDatetime?.ToString("dd/MM/yyyy HH:mm")</dd>
+
+        <dt class="col-sm-3">Completed by</dt>
+        <dd class="col-sm-9">@Model.Record.CompletedBy</dd>
+
+        <dt class="col-sm-3">Completed</dt>
+        <dd class="col-sm-9">@Model.Record.CompletedDatetime?.ToString("dd/MM/yyyy HH:mm")</dd>
+    </dl>
+
+    <a asp-page="./Edit" asp-route-id="@Model.Record.Id" class="btn btn-warning">Edit</a>
+    <a asp-page="./Index" class="btn btn-secondary">Back to List</a>
+</div>

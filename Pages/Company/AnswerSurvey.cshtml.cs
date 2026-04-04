@@ -16,12 +16,14 @@ namespace TINWeb.Pages.Company
         private readonly ApplicationDbContext _context;
         private readonly ISurveyLinkTokenService _surveyLinkTokenService;
         private readonly IImageStorageService _imageStorageService;
+        private readonly TaskService _taskService;
 
-        public AnswerSurveyModel(ApplicationDbContext context, ISurveyLinkTokenService surveyLinkTokenService, IImageStorageService imageStorageService)
+        public AnswerSurveyModel(ApplicationDbContext context, ISurveyLinkTokenService surveyLinkTokenService, IImageStorageService imageStorageService, TaskService taskService)
         {
             _context = context;
             _surveyLinkTokenService = surveyLinkTokenService;
             _imageStorageService = imageStorageService;
+            _taskService = taskService;
         }
 
         public Tin200 Company { get; set; } = new();
@@ -331,6 +333,15 @@ namespace TINWeb.Pages.Company
             }
 
             await _context.SaveChangesAsync();
+
+            if (isSubmitAction)
+            {
+                await _taskService.CreateSurveySubmittedTaskAsync(
+                    company.Id,
+                    company.CompanyName ?? $"Company {company.Id}",
+                    survey.FinancialYear,
+                    "Survey Receiver");
+            }
 
             Submitted = isSubmitAction;
             Saved = !Submitted;

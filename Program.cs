@@ -50,6 +50,7 @@ builder.Services.AddScoped<CompanySurveyService>();
 builder.Services.AddScoped<AnswerService>();
 builder.Services.AddScoped<QuestionService>();
 builder.Services.AddScoped<QuestionGroupService>();
+builder.Services.AddScoped<TaskService>();
 builder.Services.AddScoped<IImageStorageService, ImageStorageService>();
 builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("SmtpSettings"));
 builder.Services.Configure<AzureCommunicationEmailSettings>(builder.Configuration.GetSection("AzureCommunicationEmail"));

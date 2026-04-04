@@ -1,0 +1,57 @@
+@page
+@model TINWeb.Pages.Tasks.CreateModel
+@{
+    ViewData["Title"] = "Create Task";
+}
+
+<div class="container mt-4">
+    <h1>Create Task</h1>
+    <hr />
+
+    <form method="post">
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+        <div class="form-group mb-3">
+            <label asp-for="Record.Title" class="form-label"></label>
+            <input asp-for="Record.Title" class="form-control" />
+        </div>
+
+        <div class="form-group mb-3">
+            <label asp-for="Record.Description" class="form-label"></label>
+            <textarea asp-for="Record.Description" class="form-control" rows="5"></textarea>
+        </div>
+
+        <div class="row">
+            <div class="col-md-4 form-group mb-3">
+                <label asp-for="Record.Status" class="form-label"></label>
+                <select asp-for="Record.Status" asp-items="Model.StatusOptions" class="form-select"></select>
+            </div>
+            <div class="col-md-4 form-group mb-3">
+                <label asp-for="Record.CreatedBy" class="form-label"></label>
+                <input asp-for="Record.CreatedBy" class="form-control" />
+            </div>
+            <div class="col-md-4 form-group mb-3">
+                <label asp-for="Record.CreatedDatetime" class="form-label"></label>
+                <input asp-for="Record.CreatedDatetime" class="form-control" type="datetime-local" />
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 form-group mb-3">
+                <label asp-for="Record.CompletedBy" class="form-label"></label>
+                <input asp-for="Record.CompletedBy" class="form-control" />
+            </div>
+            <div class="col-md-6 form-group mb-3">
+                <label asp-for="Record.CompletedDatetime" class="form-label"></label>
+                <input asp-for="Record.CompletedDatetime" class="form-control" type="datetime-local" />
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Create</button>
+        <a asp-page="./Index" class="btn btn-secondary">Back to List</a>
+    </form>
+</div>
+
+@section Scripts {
+    @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+}
