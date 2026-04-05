@@ -23,6 +23,9 @@ namespace TINWeb.Pages.CompanySurvey
         [TempData]
         public string? StatusMessage { get; set; }
 
+        [BindProperty]
+        public DateTime? SelectedLinkExpiryDateUtc { get; set; }
+
         public string? CompanyName { get; set; }
         public int LinkExpiryHours => _surveyLinkSettings.ExpiryHours;
         public int LinkExpiryDays => Math.Max(1, (int)Math.Ceiling(_surveyLinkSettings.ExpiryHours / 24d));
@@ -59,6 +62,7 @@ namespace TINWeb.Pages.CompanySurvey
             Record = record;
             Record.Locked ??= false;
             Record.Estimate ??= false;
+            SelectedLinkExpiryDateUtc = SurveyLinkExpiryUtc?.UtcDateTime.Date ?? GetDefaultLinkExpiryDateUtc();
             await LoadCompanyNameAsync(record.CompanyId);
             return Page();
         }
@@ -90,9 +94,19 @@ namespace TINWeb.Pages.CompanySurvey
                 return NotFound();
             }
 
+            if (!TryGetSelectedExpiryAtUtc(SelectedLinkExpiryDateUtc, out var selectedExpiryAtUtc, out var expiryValidationMessage))
+            {
+                Record = existing;
+                Record.Locked ??= false;
+                Record.Estimate ??= false;
+                await LoadCompanyNameAsync(existing.CompanyId);
+                ModelState.AddModelError(nameof(SelectedLinkExpiryDateUtc), expiryValidationMessage ?? "Invalid expiry date.");
+                return Page();
+            }
+
             try
             {
-                existing.SurveyLink = BuildSurveyUrl(existing.CompanyId);
+                existing.SurveyLink = BuildSurveyUrl(existing.CompanyId, selectedExpiryAtUtc);
                 await _service.UpdateAsync(existing);
                 await AddCompanySurveyNoteAsync(
                     existing.Id,
@@ -116,6 +130,32 @@ namespace TINWeb.Pages.CompanySurvey
                 ModelState.AddModelError(string.Empty, ex.Message);
                 return Page();
             }
+        }
+
+        private DateTime GetDefaultLinkExpiryDateUtc()
+        {
+            return DateTime.UtcNow.AddHours(_surveyLinkSettings.ExpiryHours).Date;
+        }
+
+        private static bool TryGetSelectedExpiryAtUtc(DateTime? selectedLinkExpiryDateUtc, out DateTimeOffset? expiresAtUtc, out string? validationMessage)
+        {
+            expiresAtUtc = null;
+            validationMessage = null;
+
+            if (!selectedLinkExpiryDateUtc.HasValue)
+            {
+                return true;
+            }
+
+            var selectedDate = selectedLinkExpiryDateUtc.Value.Date;
+            if (selectedDate < DateTime.UtcNow.Date)
+            {
+                validationMessage = "Expiry date must be today or later.";
+                return false;
+            }
+
+            expiresAtUtc = new DateTimeOffset(selectedDate.AddDays(1).AddTicks(-1), TimeSpan.Zero);
+            return true;
         }
 
         private async Task AddCompanySurveyNoteAsync(int companySurveyId, string user, string notes)
@@ -159,9 +199,9 @@ namespace TINWeb.Pages.CompanySurvey
                 .FirstOrDefaultAsync();
         }
 
-        private string BuildSurveyUrl(int companyId)
+        private string BuildSurveyUrl(int companyId, DateTimeOffset? customExpiryUtc = null)
         {
-            var token = _surveyLinkTokenService.GenerateToken(companyId);
+            var token = _surveyLinkTokenService.GenerateToken(companyId, customExpiryUtc);
             var relativePath = Url.Page("/Company/AnswerSurvey", pageHandler: null, values: new { id = companyId, token }, protocol: null) ?? string.Empty;
             var configuredBaseUrl = (_surveyLinkSettings.BaseUrl ?? string.Empty).Trim().TrimEnd('/');
 

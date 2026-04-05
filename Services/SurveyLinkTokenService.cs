@@ -13,14 +13,15 @@ namespace TINWeb.Services
             _settings = settings.Value;
         }
 
-        public string GenerateToken(int clientId)
+        public string GenerateToken(int clientId, DateTimeOffset? expiresAtUtc = null)
         {
             if (string.IsNullOrWhiteSpace(_settings.SecretKey))
             {
                 throw new InvalidOperationException("SurveyLinkSettings:SecretKey is not configured.");
             }
 
-            var expiresUnix = DateTimeOffset.UtcNow.AddHours(_settings.ExpiryHours).ToUnixTimeSeconds();
+            var effectiveExpiryUtc = expiresAtUtc?.ToUniversalTime() ?? DateTimeOffset.UtcNow.AddHours(_settings.ExpiryHours);
+            var expiresUnix = effectiveExpiryUtc.ToUnixTimeSeconds();
             var payload = $"{clientId}:{expiresUnix}";
             var signature = ComputeSignature(payload);
             return ToBase64Url($"{payload}:{signature}");

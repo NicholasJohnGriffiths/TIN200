@@ -25,6 +25,12 @@ namespace TINWeb.Pages.CompanySurvey
         public string SortBy { get; set; } = "CompanyName";
         public string SortDir { get; set; } = "asc";
 
+        [BindProperty]
+        public DateTime? SelectedLinkExpiryDateUtc { get; set; }
+
+        public int LinkExpiryHours => _surveyLinkSettings.ExpiryHours;
+        public int LinkExpiryDays => Math.Max(1, (int)Math.Ceiling(_surveyLinkSettings.ExpiryHours / 24d));
+
         [TempData]
         public string? StatusMessage { get; set; }
 
@@ -42,7 +48,7 @@ namespace TINWeb.Pages.CompanySurvey
             _environment = environment;
         }
 
-        public async Task OnGetAsync(int? financialYear, string? sortBy, string? sortDir, string? companySearch, string? surveyEmailSentFilter)
+        public async Task OnGetAsync(int? financialYear, string? sortBy, string? sortDir, string? companySearch, string? surveyEmailSentFilter, DateTime? selectedLinkExpiryDateUtc)
         {
             FinancialYears = await _service.GetAvailableFinancialYearsAsync();
 
@@ -51,6 +57,7 @@ namespace TINWeb.Pages.CompanySurvey
             SurveyEmailSentFilter = NormalizeSurveyEmailSentFilter(surveyEmailSentFilter);
             SortBy = NormalizeSortBy(sortBy);
             SortDir = NormalizeSortDir(sortDir);
+            SelectedLinkExpiryDateUtc = selectedLinkExpiryDateUtc?.Date ?? GetDefaultLinkExpiryDateUtc();
 
             Records = await _service.GetListRowsAsync(SelectedFinancialYear);
 
@@ -85,6 +92,11 @@ namespace TINWeb.Pages.CompanySurvey
 
         public async Task<IActionResult> OnPostPreviewPopulateSurveyLinksAsync(int? financialYear, bool overwriteExisting)
         {
+            if (!TryGetSelectedExpiryAtUtc(SelectedLinkExpiryDateUtc, out var selectedExpiryAtUtc, out var expiryValidationMessage))
+            {
+                return new JsonResult(new { success = false, message = expiryValidationMessage });
+            }
+
             var targetSurvey = await GetTargetSurveyAsync(financialYear);
 
             if (targetSurvey == null)
@@ -149,18 +161,27 @@ namespace TINWeb.Pages.CompanySurvey
                 overwriteExisting,
                 previewRows = previewRows.Take(20).ToList(),
                 totalPreviewShown = Math.Min(20, previewRows.Count),
-                moreRows = previewRows.Count > 20 ? previewRows.Count - 20 : 0
+                moreRows = previewRows.Count > 20 ? previewRows.Count - 20 : 0,
+                expiryDisplay = selectedExpiryAtUtc?.ToString("dd/MM/yyyy '23:59 UTC'")
             });
         }
 
         public async Task<IActionResult> OnPostPopulateSurveyLinksAsync(int? financialYear, bool overwriteExisting, string? companySearch, string? surveyEmailSentFilter)
         {
+            var redirectValues = new { financialYear, companySearch, surveyEmailSentFilter, selectedLinkExpiryDateUtc = SelectedLinkExpiryDateUtc?.ToString("yyyy-MM-dd") };
+
+            if (!TryGetSelectedExpiryAtUtc(SelectedLinkExpiryDateUtc, out var selectedExpiryAtUtc, out var expiryValidationMessage))
+            {
+                StatusMessage = $"Error: {expiryValidationMessage}";
+                return RedirectToPage(redirectValues);
+            }
+
             var targetSurvey = await GetTargetSurveyAsync(financialYear);
 
             if (targetSurvey == null)
             {
                 StatusMessage = "Error: No survey was found for the selected financial year.";
-                return RedirectToPage(new { financialYear, companySearch, surveyEmailSentFilter });
+                return RedirectToPage(redirectValues);
             }
 
             // Get all CompanySurvey records for the selected survey
@@ -178,7 +199,7 @@ namespace TINWeb.Pages.CompanySurvey
 
                 if (!hasExistingLink || overwriteExisting)
                 {
-                    companySurvey.SurveyLink = BuildSurveyUrl(companySurvey.CompanyId);
+                    companySurvey.SurveyLink = BuildSurveyUrl(companySurvey.CompanyId, selectedExpiryAtUtc);
                     _context.CompanySurvey.Update(companySurvey);
 
                     if (hasExistingLink)
@@ -201,8 +222,38 @@ namespace TINWeb.Pages.CompanySurvey
                 await _context.SaveChangesAsync();
             }
 
-            StatusMessage = $"Survey links updated for {targetSurvey.FinancialYear}. Created: {createdCount}, Overwritten: {overwrittenCount}, Skipped: {skippedCount}.";
-            return RedirectToPage(new { financialYear, companySearch, surveyEmailSentFilter });
+            var expiryMessage = selectedExpiryAtUtc.HasValue
+                ? $" Selected expiry date: {selectedExpiryAtUtc.Value:dd/MM/yyyy HH:mm} UTC."
+                : string.Empty;
+
+            StatusMessage = $"Survey links updated for {targetSurvey.FinancialYear}. Created: {createdCount}, Overwritten: {overwrittenCount}, Skipped: {skippedCount}.{expiryMessage}";
+            return RedirectToPage(redirectValues);
+        }
+
+        private DateTime GetDefaultLinkExpiryDateUtc()
+        {
+            return DateTime.UtcNow.AddHours(_surveyLinkSettings.ExpiryHours).Date;
+        }
+
+        private static bool TryGetSelectedExpiryAtUtc(DateTime? selectedLinkExpiryDateUtc, out DateTimeOffset? expiresAtUtc, out string? validationMessage)
+        {
+            expiresAtUtc = null;
+            validationMessage = null;
+
+            if (!selectedLinkExpiryDateUtc.HasValue)
+            {
+                return true;
+            }
+
+            var selectedDate = selectedLinkExpiryDateUtc.Value.Date;
+            if (selectedDate < DateTime.UtcNow.Date)
+            {
+                validationMessage = "Expiry date must be today or later.";
+                return false;
+            }
+
+            expiresAtUtc = new DateTimeOffset(selectedDate.AddDays(1).AddTicks(-1), TimeSpan.Zero);
+            return true;
         }
 
         private async Task<Models.Survey?> GetTargetSurveyAsync(int? financialYear)
@@ -225,9 +276,9 @@ namespace TINWeb.Pages.CompanySurvey
                 .FirstOrDefaultAsync();
         }
 
-        private string BuildSurveyUrl(int companyId)
+        private string BuildSurveyUrl(int companyId, DateTimeOffset? customExpiryUtc = null)
         {
-            var token = _surveyLinkTokenService.GenerateToken(companyId);
+            var token = _surveyLinkTokenService.GenerateToken(companyId, customExpiryUtc);
             var relativePath = Url.Page("/Company/AnswerSurvey", pageHandler: null, values: new { id = companyId, token }, protocol: null) ?? string.Empty;
             var configuredBaseUrl = (_surveyLinkSettings.BaseUrl ?? string.Empty).Trim().TrimEnd('/');
             var shouldForceLocalHost = _environment.IsDevelopment() || IsLocalHost(Request.Host.Host);

@@ -74,6 +74,14 @@
         <div class="form-group mb-3">
             <label asp-for="Record.SurveyLink" class="form-label"></label>
             <input asp-for="Record.SurveyLink" class="form-control" readonly />
+            <div class="row g-2 mt-2 align-items-end">
+                <div class="col-sm-6 col-md-4">
+                    <label for="SelectedLinkExpiryDateUtc" class="form-label">Survey Link Expiry Date</label>
+                    <input asp-for="SelectedLinkExpiryDateUtc" type="date" asp-format="{0:yyyy-MM-dd}" class="form-control" />
+                    <span asp-validation-for="SelectedLinkExpiryDateUtc" class="text-danger"></span>
+                    <small class="text-muted">Links expire at 23:59 UTC on the selected date.</small>
+                </div>
+            </div>
             <div class="d-flex flex-wrap gap-2 mt-2">
                 <button type="submit" asp-page-handler="RegenerateLink" formnovalidate class="btn btn-outline-primary">Regenerate Survey Link</button>
                 @if (!string.IsNullOrWhiteSpace(Model.Record.SurveyLink))

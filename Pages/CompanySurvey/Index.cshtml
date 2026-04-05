@@ -13,6 +13,7 @@
             financialYear = Model.SelectedFinancialYear,
             companySearch = Model.CompanySearch,
             surveyEmailSentFilter = Model.SurveyEmailSentFilter,
+            selectedLinkExpiryDateUtc = Model.SelectedLinkExpiryDateUtc?.ToString("yyyy-MM-dd"),
             sortBy = column,
             sortDir = Model.GetNextSortDirection(column)
         },
@@ -84,10 +85,15 @@
 
     <div class="row mb-3">
         <div class="col-12">
-            <form id="populateSurveyLinksForm" method="post" asp-page-handler="PopulateSurveyLinks" class="d-flex gap-2">
+            <form id="populateSurveyLinksForm" method="post" asp-page-handler="PopulateSurveyLinks" class="d-flex flex-wrap align-items-end gap-2">
                 <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
                 <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
                 <input type="hidden" name="surveyEmailSentFilter" value="@Model.SurveyEmailSentFilter" />
+                <div>
+                    <label for="SelectedLinkExpiryDateUtc" class="form-label mb-1">Survey Link Expiry Date</label>
+                    <input asp-for="SelectedLinkExpiryDateUtc" type="date" asp-format="{0:yyyy-MM-dd}" class="form-control" style="min-width: 180px;" />
+                    <small class="text-muted">Links expire at 23:59 UTC on the selected date.</small>
+                </div>
                 <div class="form-check align-self-center">
                     <input class="form-check-input" type="checkbox" name="overwriteExisting" id="overwriteExisting" value="true" />
                     <input type="hidden" name="overwriteExisting" value="false" />
@@ -318,6 +324,9 @@
                 summaryHtml += `<br/>Will update: <strong class="text-success">${data.willUpdate}</strong> records`;
                 if (data.willSkip > 0) {
                     summaryHtml += `<br/>Will skip: <strong class="text-muted">${data.willSkip}</strong> records (already have links)`;
+                }
+                if (data.expiryDisplay) {
+                    summaryHtml += `<br/>Selected expiry: <strong>${data.expiryDisplay}</strong>`;
                 }
                 previewSummary.innerHTML = summaryHtml;
 
