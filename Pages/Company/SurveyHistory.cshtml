@@ -49,7 +49,7 @@
                 <table class="table table-striped table-hover align-middle survey-history-table">
                     <thead class="table-dark">
                         <tr>
-                            <th style="min-width: 120px;">Group</th>
+                            <th style="min-width: 120px;">Question Title</th>
                             <th style="min-width: 90px;">Order</th>
                             <th style="min-width: 420px;">Question</th>
                             @foreach (var year in Model.History.Years)
@@ -68,6 +68,9 @@
                             var groupName = string.IsNullOrWhiteSpace(row.GroupTitle)
                                 ? "Ungrouped"
                                 : row.GroupTitle.Trim();
+                            var questionTitle = string.IsNullOrWhiteSpace(row.QuestionTitle)
+                                ? (string.IsNullOrWhiteSpace(row.QuestionText) ? "Untitled" : row.QuestionText.Trim())
+                                : row.QuestionTitle.Trim();
 
                             if (!string.Equals(currentGroup, groupName, StringComparison.Ordinal))
                             {
@@ -78,7 +81,7 @@
                             }
 
                             <tr>
-                                <td>@groupName</td>
+                                <td>@questionTitle</td>
                                 <td>@(row.QuestionOrderNumber?.ToString() ?? string.Empty)</td>
                                 <td>@(row.QuestionText ?? string.Empty)</td>
                                 @foreach (var year in Model.History.Years)

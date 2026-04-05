@@ -236,6 +236,7 @@ namespace TINWeb.Services
                     question.Id,
                     question.OrderNumber,
                     GroupTitle = questionGroup != null ? questionGroup.Title : question.GroupTitle,
+                    QuestionTitle = question.Title ?? question.QuestionText,
                     question.QuestionText
                 }
             ).ToListAsync();
@@ -254,6 +255,7 @@ namespace TINWeb.Services
                     QuestionId = question.Id,
                     QuestionOrderNumber = question.OrderNumber,
                     GroupTitle = question.GroupTitle,
+                    QuestionTitle = question.QuestionTitle,
                     QuestionText = question.QuestionText,
                     AnswersByYear = years.ToDictionary(
                         year => year,
@@ -1952,6 +1954,7 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             public int QuestionId { get; set; }
             public int? QuestionOrderNumber { get; set; }
             public string? GroupTitle { get; set; }
+            public string? QuestionTitle { get; set; }
             public string? QuestionText { get; set; }
             public Dictionary<int, string> AnswersByYear { get; set; } = new();
         }
