@@ -26,19 +26,23 @@ namespace TINWeb.Pages.Tasks
 
         public void OnGet()
         {
+            Record.CreatedBy = User.Identity?.Name ?? "Admin";
+            Record.StatusChangeDatetime = DateTime.Now;
             LoadOptions();
         }
 
         public async Task<IActionResult> OnPostAsync()
         {
             LoadOptions();
+            Record.CreatedBy = User.Identity?.Name ?? "Admin";
+            Record.StatusChangeDatetime ??= DateTime.Now;
 
             if (!ModelState.IsValid)
             {
                 return Page();
             }
 
-            await _service.CreateAsync(Record);
+            await _service.CreateAsync(Record, User.Identity?.Name ?? "Admin");
             return RedirectToPage("./Index", new { status = Record.Status?.ToString() ?? "Active" });
         }
 

@@ -23,25 +23,37 @@
         </div>
 
         <div class="row">
-            <div class="col-md-4 form-group mb-3">
+            <div class="col-md-3 form-group mb-3">
                 <label asp-for="Record.Status" class="form-label"></label>
                 <select asp-for="Record.Status" asp-items="Model.StatusOptions" class="form-select"></select>
             </div>
-            <div class="col-md-4 form-group mb-3">
+            <div class="col-md-3 form-group mb-3">
                 <label asp-for="Record.CreatedBy" class="form-label"></label>
-                <input asp-for="Record.CreatedBy" class="form-control" />
+                <input asp-for="Record.CreatedBy" class="form-control" readonly />
             </div>
-            <div class="col-md-4 form-group mb-3">
+            <div class="col-md-3 form-group mb-3">
                 <label asp-for="Record.CreatedDatetime" class="form-label"></label>
                 <input asp-for="Record.CreatedDatetime" class="form-control" type="datetime-local" />
+            </div>
+            <div class="col-md-3 form-group mb-3">
+                <label asp-for="Record.StatusChangeDatetime" class="form-label"></label>
+                <input asp-for="Record.StatusChangeDatetime" class="form-control" type="datetime-local" readonly />
             </div>
         </div>
 
         <div class="row">
             <div class="col-md-6 form-group mb-3">
-                <label asp-for="Record.CompletedBy" class="form-label"></label>
-                <input asp-for="Record.CompletedBy" class="form-control" />
+                <label asp-for="Record.SetBackToActiveDate" class="form-label"></label>
+                <input asp-for="Record.SetBackToActiveDate" class="form-control" type="date" />
+                <small class="text-muted">If the task is pending, it will automatically return to Active on this date.</small>
             </div>
+            <div class="col-md-6 form-group mb-3">
+                <label asp-for="Record.CompletedBy" class="form-label"></label>
+                <input asp-for="Record.CompletedBy" class="form-control" readonly />
+            </div>
+        </div>
+
+        <div class="row">
             <div class="col-md-6 form-group mb-3">
                 <label asp-for="Record.CompletedDatetime" class="form-label"></label>
                 <input asp-for="Record.CompletedDatetime" class="form-control" type="datetime-local" />

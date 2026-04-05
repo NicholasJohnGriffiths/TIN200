@@ -31,6 +31,13 @@ namespace TINWeb.Models
         [Display(Name = "Description")]
         public string? Description { get; set; }
 
+        [Display(Name = "Set back to active date")]
+        [DataType(DataType.Date)]
+        public DateTime? SetBackToActiveDate { get; set; }
+
+        [Display(Name = "Status changed date/time")]
+        public DateTime? StatusChangeDatetime { get; set; }
+
         [Display(Name = "Completed by")]
         [StringLength(255)]
         public string? CompletedBy { get; set; }

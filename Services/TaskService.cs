@@ -15,6 +15,8 @@ namespace TINWeb.Services
 
         public async Task<List<TaskItem>> GetAllAsync(TaskItemStatus? statusFilter = null)
         {
+            await ApplyPendingTasksDueForReactivationAsync();
+
             var query = _context.TaskItems.AsQueryable();
 
             if (statusFilter.HasValue)
@@ -30,18 +32,19 @@ namespace TINWeb.Services
 
         public async Task<TaskItem?> GetByIdAsync(int id)
         {
+            await ApplyPendingTasksDueForReactivationAsync();
             return await _context.TaskItems.FirstOrDefaultAsync(t => t.Id == id);
         }
 
-        public async Task<TaskItem> CreateAsync(TaskItem record)
+        public async Task<TaskItem> CreateAsync(TaskItem record, string? actingUser = null)
         {
-            NormalizeRecord(record);
+            NormalizeRecord(record, actingUser, statusChanged: true);
             _context.TaskItems.Add(record);
             await _context.SaveChangesAsync();
             return record;
         }
 
-        public async Task<TaskItem> UpdateAsync(TaskItem record)
+        public async Task<TaskItem> UpdateAsync(TaskItem record, string? actingUser = null)
         {
             var existing = await _context.TaskItems.FirstOrDefaultAsync(t => t.Id == record.Id);
             if (existing == null)
@@ -49,20 +52,24 @@ namespace TINWeb.Services
                 throw new InvalidOperationException($"Task with ID {record.Id} was not found.");
             }
 
+            var previousStatus = existing.Status ?? TaskItemStatus.Active;
+            var newStatus = record.Status ?? TaskItemStatus.Active;
+
             existing.CreatedBy = record.CreatedBy;
             existing.CreatedDatetime = record.CreatedDatetime;
-            existing.Status = record.Status ?? TaskItemStatus.Active;
+            existing.Status = newStatus;
             existing.Title = record.Title;
             existing.Description = record.Description;
+            existing.SetBackToActiveDate = record.SetBackToActiveDate?.Date;
             existing.CompletedBy = record.CompletedBy;
             existing.CompletedDatetime = record.CompletedDatetime;
 
-            NormalizeRecord(existing);
+            NormalizeRecord(existing, actingUser, statusChanged: previousStatus != newStatus);
             await _context.SaveChangesAsync();
             return existing;
         }
 
-        public async Task ArchiveAsync(int id)
+        public async Task ArchiveAsync(int id, string? actingUser = null)
         {
             var record = await _context.TaskItems.FirstOrDefaultAsync(t => t.Id == id);
             if (record == null)
@@ -71,12 +78,31 @@ namespace TINWeb.Services
             }
 
             record.Status = TaskItemStatus.Archived;
+            NormalizeRecord(record, actingUser, statusChanged: true);
             await _context.SaveChangesAsync();
         }
 
-        public async Task DeleteAsync(int id)
+        public async Task UpdateStatusAsync(int id, TaskItemStatus newStatus, string? actingUser = null)
         {
-            await ArchiveAsync(id);
+            var record = await _context.TaskItems.FirstOrDefaultAsync(t => t.Id == id);
+            if (record == null)
+            {
+                return;
+            }
+
+            if ((record.Status ?? TaskItemStatus.Active) == newStatus)
+            {
+                return;
+            }
+
+            record.Status = newStatus;
+            NormalizeRecord(record, actingUser, statusChanged: true);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task DeleteAsync(int id, string? actingUser = null)
+        {
+            await ArchiveAsync(id, actingUser);
         }
 
         public async Task<bool> ExistsAsync(int id)
@@ -108,14 +134,67 @@ namespace TINWeb.Services
             });
         }
 
-        private static void NormalizeRecord(TaskItem record)
+        private async Task ApplyPendingTasksDueForReactivationAsync()
+        {
+            var today = DateTime.Today;
+            var dueTasks = await _context.TaskItems
+                .Where(t => (t.Status ?? TaskItemStatus.Active) == TaskItemStatus.Pending
+                    && t.SetBackToActiveDate.HasValue
+                    && t.SetBackToActiveDate.Value.Date <= today)
+                .ToListAsync();
+
+            if (!dueTasks.Any())
+            {
+                return;
+            }
+
+            foreach (var task in dueTasks)
+            {
+                task.Status = TaskItemStatus.Active;
+                NormalizeRecord(task, statusChanged: true);
+            }
+
+            await _context.SaveChangesAsync();
+        }
+
+        private static void NormalizeRecord(TaskItem record, string? actingUser = null, bool statusChanged = false)
         {
             record.Status ??= TaskItemStatus.Active;
             record.CreatedDatetime ??= DateTime.Now;
+            record.SetBackToActiveDate = record.SetBackToActiveDate?.Date;
 
-            if (record.Status == TaskItemStatus.Completed && !record.CompletedDatetime.HasValue)
+            if (string.IsNullOrWhiteSpace(record.CreatedBy))
             {
-                record.CompletedDatetime = DateTime.Now;
+                record.CreatedBy = string.IsNullOrWhiteSpace(actingUser) ? "Admin" : actingUser;
+            }
+
+            if (statusChanged || !record.StatusChangeDatetime.HasValue)
+            {
+                record.StatusChangeDatetime = DateTime.Now;
+            }
+
+            if (record.Status == TaskItemStatus.Completed)
+            {
+                if (!record.CompletedDatetime.HasValue)
+                {
+                    record.CompletedDatetime = DateTime.Now;
+                }
+
+                if (string.IsNullOrWhiteSpace(record.CompletedBy) && !string.IsNullOrWhiteSpace(actingUser))
+                {
+                    record.CompletedBy = actingUser;
+                }
+
+                record.SetBackToActiveDate = null;
+                return;
+            }
+
+            record.CompletedBy = null;
+            record.CompletedDatetime = null;
+
+            if (record.Status != TaskItemStatus.Pending)
+            {
+                record.SetBackToActiveDate = null;
             }
         }
     }

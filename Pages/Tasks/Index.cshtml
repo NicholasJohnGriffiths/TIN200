@@ -58,6 +58,8 @@
                     <th>Description</th>
                     <th>Status</th>
                     <th>Created By</th>
+                    <th>Status Changed</th>
+                    <th>Set Back Active</th>
                     <th>Completed</th>
                     <th>Actions</th>
                 </tr>
@@ -71,6 +73,8 @@
                         <td style="max-width: 420px; white-space: normal;">@record.Description</td>
                         <td><span class="badge @GetBadgeClass(record)">@((record.Status ?? TaskItemStatus.Active).ToString())</span></td>
                         <td>@record.CreatedBy</td>
+                        <td>@record.StatusChangeDatetime?.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>@record.SetBackToActiveDate?.ToString("dd/MM/yyyy")</td>
                         <td>
                             @if (record.CompletedDatetime.HasValue || !string.IsNullOrWhiteSpace(record.CompletedBy))
                             {
@@ -81,6 +85,33 @@
                         <td style="white-space: nowrap;">
                             <a asp-page="./Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
                             <a asp-page="./Edit" asp-route-id="@record.Id" class="btn btn-sm btn-warning">Edit</a>
+                            @if ((record.Status ?? TaskItemStatus.Active) != TaskItemStatus.Active && (record.Status ?? TaskItemStatus.Active) != TaskItemStatus.Archived)
+                            {
+                                <form method="post" asp-page-handler="ChangeStatus" class="d-inline">
+                                    <input type="hidden" name="id" value="@record.Id" />
+                                    <input type="hidden" name="newStatus" value="@TaskItemStatus.Active" />
+                                    <input type="hidden" name="status" value="@Model.StatusFilter" />
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">Active</button>
+                                </form>
+                            }
+                            @if ((record.Status ?? TaskItemStatus.Active) != TaskItemStatus.Pending && (record.Status ?? TaskItemStatus.Active) != TaskItemStatus.Archived)
+                            {
+                                <form method="post" asp-page-handler="ChangeStatus" class="d-inline">
+                                    <input type="hidden" name="id" value="@record.Id" />
+                                    <input type="hidden" name="newStatus" value="@TaskItemStatus.Pending" />
+                                    <input type="hidden" name="status" value="@Model.StatusFilter" />
+                                    <button type="submit" class="btn btn-sm btn-outline-warning">Pending</button>
+                                </form>
+                            }
+                            @if ((record.Status ?? TaskItemStatus.Active) != TaskItemStatus.Completed && (record.Status ?? TaskItemStatus.Active) != TaskItemStatus.Archived)
+                            {
+                                <form method="post" asp-page-handler="ChangeStatus" class="d-inline">
+                                    <input type="hidden" name="id" value="@record.Id" />
+                                    <input type="hidden" name="newStatus" value="@TaskItemStatus.Completed" />
+                                    <input type="hidden" name="status" value="@Model.StatusFilter" />
+                                    <button type="submit" class="btn btn-sm btn-outline-success">Completed</button>
+                                </form>
+                            }
                             <a asp-page="./Delete" asp-route-id="@record.Id" class="btn btn-sm btn-danger">Archive</a>
                         </td>
                     </tr>

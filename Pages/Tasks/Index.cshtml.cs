@@ -31,6 +31,13 @@ namespace TINWeb.Pages.Tasks
             Records = await _service.GetAllAsync(GetSelectedStatus());
         }
 
+        public async Task<IActionResult> OnPostChangeStatusAsync(int id, TaskItemStatus newStatus)
+        {
+            await _service.UpdateStatusAsync(id, newStatus, User.Identity?.Name ?? "Admin");
+            StatusMessage = $"Task status updated to {newStatus}.";
+            return RedirectToPage("./Index", new { status = StatusFilter ?? "Active" });
+        }
+
         private TaskItemStatus? GetSelectedStatus()
         {
             if (string.IsNullOrWhiteSpace(StatusFilter))

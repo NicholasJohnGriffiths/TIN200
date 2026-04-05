@@ -29,6 +29,8 @@ namespace TINWeb.Pages.Tasks
                 return NotFound();
             }
 
+            record.CreatedBy ??= User.Identity?.Name ?? "Admin";
+            record.StatusChangeDatetime ??= record.CreatedDatetime ?? DateTime.Now;
             Record = record;
             return Page();
         }
@@ -36,13 +38,14 @@ namespace TINWeb.Pages.Tasks
         public async Task<IActionResult> OnPostAsync()
         {
             LoadOptions();
+            Record.CreatedBy = User.Identity?.Name ?? "Admin";
 
             if (!ModelState.IsValid)
             {
                 return Page();
             }
 
-            await _service.UpdateAsync(Record);
+            await _service.UpdateAsync(Record, User.Identity?.Name ?? "Admin");
             return RedirectToPage("./Index", new { status = Record.Status?.ToString() ?? "Active" });
         }
 

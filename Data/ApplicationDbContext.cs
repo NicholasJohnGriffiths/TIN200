@@ -446,6 +446,14 @@ namespace TINWeb.Data
                     .HasColumnName("Description")
                     .HasColumnType("nvarchar(max)");
 
+                entity.Property(e => e.SetBackToActiveDate)
+                    .HasColumnName("SetBackToActiveDate")
+                    .HasColumnType("date");
+
+                entity.Property(e => e.StatusChangeDatetime)
+                    .HasColumnName("StatusChangeDatetime")
+                    .HasColumnType("datetime");
+
                 entity.Property(e => e.CompletedBy)
                     .HasColumnName("CompletedBy")
                     .HasColumnType("varchar(255)")
