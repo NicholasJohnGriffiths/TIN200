@@ -57,6 +57,9 @@ namespace TINWeb.Pages.Company
         [TempData]
         public string? BulkLastRunAt { get; set; }
 
+        public int LinkExpiryHours => _surveyLinkSettings.ExpiryHours;
+        public int LinkExpiryDays => Math.Max(1, (int)Math.Ceiling(_surveyLinkSettings.ExpiryHours / 24d));
+
         public async Task<IActionResult> OnGetAsync(int? id)
         {
             await LoadAvailableClientsAsync();
@@ -202,6 +205,25 @@ namespace TINWeb.Pages.Company
             return Url.Page("/Company/AnswerSurvey", pageHandler: null, values: new { id, token }, protocol: Request.Scheme) ?? string.Empty;
         }
 
+        private DateTimeOffset? GetSurveyLinkExpiryUtc(string? surveyLink)
+        {
+            var token = ExtractTokenFromSurveyLink(surveyLink);
+            return string.IsNullOrWhiteSpace(token)
+                ? null
+                : _surveyLinkTokenService.GetTokenExpiryUtc(token);
+        }
+
+        private static string? ExtractTokenFromSurveyLink(string? surveyLink)
+        {
+            if (string.IsNullOrWhiteSpace(surveyLink) || !Uri.TryCreate(surveyLink.Trim(), UriKind.Absolute, out var linkUri))
+            {
+                return null;
+            }
+
+            var token = linkUri.Segments.LastOrDefault()?.Trim('/');
+            return string.IsNullOrWhiteSpace(token) ? null : Uri.UnescapeDataString(token);
+        }
+
         private async Task LoadAvailableClientsAsync()
         {
             var clients = await _companyService.GetAllCompaniesAsync();
@@ -214,6 +236,8 @@ namespace TINWeb.Pages.Company
                 .Select(c =>
                 {
                     surveyEmailStatusByCompanyId.TryGetValue(c.Id, out var status);
+                    var surveyLink = status?.SurveyLink;
+                    var surveyLinkExpiryUtc = GetSurveyLinkExpiryUtc(surveyLink);
 
                     return new SurveyClientRow
                     {
@@ -224,7 +248,10 @@ namespace TINWeb.Pages.Company
                         SurveyEmailSent = status?.SurveyEmailSent ?? false,
                         SurveyEmailSentLastDate = status?.SurveyEmailSentLastDate,
                         Unsubscribed = status?.Unsubscribed ?? false,
-                        UnsubscribedDate = status?.UnsubscribedDate
+                        UnsubscribedDate = status?.UnsubscribedDate,
+                        SurveyLink = surveyLink,
+                        SurveyLinkExpiryUtc = surveyLinkExpiryUtc,
+                        IsSurveyLinkExpired = surveyLinkExpiryUtc.HasValue && surveyLinkExpiryUtc.Value <= DateTimeOffset.UtcNow
                     };
                 })
                 .ToList();
@@ -252,6 +279,7 @@ namespace TINWeb.Pages.Company
                     .Select(cs => new
                     {
                         cs.CompanyId,
+                        cs.SurveyLink,
                         cs.SurveyEmailSent,
                         cs.SurveyEmailSentLastDate,
                         cs.Unsubscribed,
@@ -262,6 +290,7 @@ namespace TINWeb.Pages.Company
                     x => x.CompanyId,
                     x => new SurveyEmailStatus
                     {
+                        SurveyLink = x.SurveyLink,
                         SurveyEmailSent = x.SurveyEmailSent ?? false,
                         SurveyEmailSentLastDate = x.SurveyEmailSentLastDate,
                         Unsubscribed = x.Unsubscribed ?? false,
@@ -301,10 +330,14 @@ namespace TINWeb.Pages.Company
             public DateTime? SurveyEmailSentLastDate { get; set; }
             public bool Unsubscribed { get; set; }
             public DateTime? UnsubscribedDate { get; set; }
+            public string? SurveyLink { get; set; }
+            public DateTimeOffset? SurveyLinkExpiryUtc { get; set; }
+            public bool IsSurveyLinkExpired { get; set; }
         }
 
         private class SurveyEmailStatus
         {
+            public string? SurveyLink { get; set; }
             public bool SurveyEmailSent { get; set; }
             public DateTime? SurveyEmailSentLastDate { get; set; }
             public bool Unsubscribed { get; set; }
