@@ -9,6 +9,7 @@
         TaskItemStatus.Active => "table-danger",
         TaskItemStatus.Pending => "table-warning",
         TaskItemStatus.Completed => "table-success",
+        TaskItemStatus.Archived => "table-secondary",
         _ => string.Empty
     };
 
@@ -17,6 +18,7 @@
         TaskItemStatus.Active => "bg-danger",
         TaskItemStatus.Pending => "bg-warning text-dark",
         TaskItemStatus.Completed => "bg-success",
+        TaskItemStatus.Archived => "bg-secondary",
         _ => "bg-secondary"
     };
 }
@@ -40,7 +42,8 @@
         <a asp-page="./Index" asp-route-status="Active" class="btn @(Model.IsSelectedStatus(TaskItemStatus.Active) ? "btn-danger" : "btn-outline-danger")">Active</a>
         <a asp-page="./Index" asp-route-status="Pending" class="btn @(Model.IsSelectedStatus(TaskItemStatus.Pending) ? "btn-warning text-dark" : "btn-outline-warning")">Pending</a>
         <a asp-page="./Index" asp-route-status="Completed" class="btn @(Model.IsSelectedStatus(TaskItemStatus.Completed) ? "btn-success" : "btn-outline-success")">Completed</a>
-        <a asp-page="./Index" asp-route-status="all" class="btn @(Model.CurrentFilterLabel == "All" ? "btn-secondary" : "btn-outline-secondary")">All</a>
+        <a asp-page="./Index" asp-route-status="Archived" class="btn @(Model.IsSelectedStatus(TaskItemStatus.Archived) ? "btn-secondary" : "btn-outline-secondary")">Archived</a>
+        <a asp-page="./Index" asp-route-status="all" class="btn @(Model.CurrentFilterLabel == "All" ? "btn-dark" : "btn-outline-dark")">All</a>
     </div>
 
     <p class="text-muted small">Showing <strong>@Model.CurrentFilterLabel</strong> tasks ordered by created date/time.</p>
@@ -78,7 +81,7 @@
                         <td style="white-space: nowrap;">
                             <a asp-page="./Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
                             <a asp-page="./Edit" asp-route-id="@record.Id" class="btn btn-sm btn-warning">Edit</a>
-                            <a asp-page="./Delete" asp-route-id="@record.Id" class="btn btn-sm btn-danger">Delete</a>
+                            <a asp-page="./Delete" asp-route-id="@record.Id" class="btn btn-sm btn-danger">Archive</a>
                         </td>
                     </tr>
                 }

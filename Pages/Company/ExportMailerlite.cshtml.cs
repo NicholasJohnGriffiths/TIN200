@@ -24,7 +24,7 @@ namespace TINWeb.Pages.Company
 
             if (!showTestCompanies)
             {
-                records = records.Where(x => !x.Test).ToList();
+                records = records.Where(x => x.Test != true).ToList();
             }
 
             if (!string.IsNullOrWhiteSpace(companySearch))

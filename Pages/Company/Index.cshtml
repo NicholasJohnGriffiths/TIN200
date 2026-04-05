@@ -293,7 +293,7 @@
                             <td>@(record.Fye2023.HasValue ? record.Fye2023.Value.ToString("C0") : "")</td>
                             <td>@record.FinancialYear</td>
                             <td>@record.LastTIN200Year</td>
-                            <td>@(record.Test ? "Yes" : "No")</td>
+                            <td>@(record.Test == true ? "Yes" : "No")</td>
                             <td class="actions-col">
                                 <a asp-page="./Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
                                 <a asp-page="./Edit" asp-route-id="@record.Id" asp-route-lastTin200Year="@Model.SelectedLastTin200Year" class="btn btn-sm btn-warning">Edit</a>

@@ -172,7 +172,7 @@ namespace TINWeb.Pages.Company
 
             if (!ShowTestCompanies)
             {
-                Records = Records.Where(x => !x.Test).ToList();
+                Records = Records.Where(x => x.Test != true).ToList();
             }
 
             if (!string.IsNullOrWhiteSpace(CompanySearch))

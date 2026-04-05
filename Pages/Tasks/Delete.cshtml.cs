@@ -12,6 +12,9 @@ namespace TINWeb.Pages.Tasks
         [BindProperty]
         public TaskItem Record { get; set; } = new();
 
+        [TempData]
+        public string? StatusMessage { get; set; }
+
         public DeleteModel(TaskService service)
         {
             _service = service;
@@ -31,8 +34,9 @@ namespace TINWeb.Pages.Tasks
 
         public async Task<IActionResult> OnPostAsync(int id)
         {
-            await _service.DeleteAsync(id);
-            return RedirectToPage("./Index", new { status = "all" });
+            await _service.ArchiveAsync(id);
+            StatusMessage = "Task archived.";
+            return RedirectToPage("./Index", new { status = "Archived" });
         }
     }
 }

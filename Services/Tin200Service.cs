@@ -53,7 +53,7 @@ namespace TINWeb.Services
         public async Task<List<Tin200>> GetTestCompaniesAsync(string? search = null)
         {
             var query = _context.Tin200
-                .Where(x => x.Test)
+                .Where(x => x.Test == true)
                 .AsQueryable();
 
             var normalizedSearch = (search ?? string.Empty).Trim();

@@ -62,7 +62,7 @@ namespace TINWeb.Services
             return existing;
         }
 
-        public async Task DeleteAsync(int id)
+        public async Task ArchiveAsync(int id)
         {
             var record = await _context.TaskItems.FirstOrDefaultAsync(t => t.Id == id);
             if (record == null)
@@ -70,8 +70,13 @@ namespace TINWeb.Services
                 return;
             }
 
-            _context.TaskItems.Remove(record);
+            record.Status = TaskItemStatus.Archived;
             await _context.SaveChangesAsync();
+        }
+
+        public async Task DeleteAsync(int id)
+        {
+            await ArchiveAsync(id);
         }
 
         public async Task<bool> ExistsAsync(int id)

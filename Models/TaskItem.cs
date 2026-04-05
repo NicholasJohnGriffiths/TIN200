@@ -6,7 +6,8 @@ namespace TINWeb.Models
     {
         Active = 0,
         Pending = 1,
-        Completed = 2
+        Completed = 2,
+        Archived = 3
     }
 
     public class TaskItem
