@@ -114,11 +114,10 @@ namespace TINWeb.Pages.CompanySurvey
                     "Survey link manually regenerated from the Company Survey edit page.");
 
                 var expiryUtc = GetSurveyLinkExpiryUtc(existing.SurveyLink);
-                var expiryText = expiryUtc.HasValue
-                    ? $" New link expires {expiryUtc.Value:dd/MM/yyyy HH:mm} UTC."
-                    : string.Empty;
+                StatusMessage = expiryUtc.HasValue
+                    ? $"Survey link regenerated successfully. The new link expires on {expiryUtc.Value:dd/MM/yyyy HH:mm} UTC."
+                    : "Survey link regenerated successfully.";
 
-                StatusMessage = $"Survey link regenerated. Token validity is currently {LinkExpiryHours} hours (~{LinkExpiryDays} days).{expiryText}";
                 return RedirectToPage(new { id = existing.Id, financialYear = FinancialYear });
             }
             catch (InvalidOperationException ex)
