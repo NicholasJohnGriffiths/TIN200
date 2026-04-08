@@ -134,6 +134,61 @@ namespace TINWeb.Services
             });
         }
 
+        public async Task<TaskItem> CreateSurveyEmailBounceTaskAsync(
+            int companyId,
+            string companyName,
+            int financialYear,
+            string recipientEmail,
+            string status,
+            string? reason,
+            string? eventId = null,
+            string? createdBy = null)
+        {
+            var title = $"Survey email bounced - {companyName}";
+            TaskItem? existingTask;
+
+            if (!string.IsNullOrWhiteSpace(eventId))
+            {
+                existingTask = await _context.TaskItems.FirstOrDefaultAsync(t =>
+                    (t.Status ?? TaskItemStatus.Active) == TaskItemStatus.Active
+                    && t.Title == title
+                    && t.Description != null
+                    && t.Description.Contains($"Event ID {eventId}"));
+            }
+            else
+            {
+                existingTask = await _context.TaskItems.FirstOrDefaultAsync(t =>
+                    (t.Status ?? TaskItemStatus.Active) == TaskItemStatus.Active
+                    && t.Title == title
+                    && t.Description != null
+                    && t.Description.Contains(recipientEmail));
+            }
+
+            if (existingTask != null)
+            {
+                return existingTask;
+            }
+
+            var safeReason = string.IsNullOrWhiteSpace(reason)
+                ? "No additional delivery details were provided."
+                : reason.Trim();
+
+            var description = $"The survey email to {recipientEmail} for {companyName} (Company ID {companyId}) bounced back for survey year {financialYear}. Status: {status}. Reason: {safeReason}.";
+            if (!string.IsNullOrWhiteSpace(eventId))
+            {
+                description += $" Event ID {eventId}.";
+            }
+
+            return await CreateAsync(new TaskItem
+            {
+                CreatedBy = string.IsNullOrWhiteSpace(createdBy) ? "System" : createdBy,
+                CreatedDatetime = DateTime.Now,
+                Status = TaskItemStatus.Active,
+                Title = title,
+                Description = description
+            });
+        }
+
         private async Task ApplyPendingTasksDueForReactivationAsync()
         {
             var today = DateTime.Today;

@@ -20,22 +20,17 @@ namespace TINWeb.Services
 
         public async Task SendSurveyLinkAsync(string recipientEmail, string surveyUrl, string? companyName, int clientId)
         {
-            if (string.IsNullOrWhiteSpace(_emailSettings.ConnectionString)
-                || string.IsNullOrWhiteSpace(_emailSettings.FromEmail))
-            {
-                throw new InvalidOperationException("Azure Communication Email settings are not configured. Please configure AzureCommunicationEmail in appsettings or environment settings.");
-            }
+            EnsureEmailConfigured();
 
             var recipientName = string.IsNullOrWhiteSpace(companyName) ? "there" : companyName.Trim();
             var supportEmail = "tin100@tinetwork.com";
             var subject = "TIN200 survey request: please review your company details";
-            
-            // Generate unsubscribe link
+
             var unsubscribeToken = GenerateUnsubscribeToken(clientId);
             var baseUrl = _surveyLinkSettings.BaseUrl ?? string.Empty;
             baseUrl = baseUrl.Trim().TrimEnd('/');
             var unsubscribeUrl = $"{baseUrl}/Company/Unsubscribe?id={clientId}&token={Uri.EscapeDataString(unsubscribeToken)}";
-            
+
             var plainTextBody = $@"Hello {recipientName},
 
 You have been invited to review and update your company details for TIN200.
@@ -61,6 +56,70 @@ TIN200 Team";
 <p><small><a href=""{WebUtility.HtmlEncode(unsubscribeUrl)}"" style=""color: #999; font-size: 12px;"">Unsubscribe from future surveys</a></small></p>
 <p>Regards,<br/>TIN200 Team</p>";
 
+            await SendEmailAsync(new[] { recipientEmail }, subject, plainTextBody, htmlBody);
+        }
+
+        public async Task SendBounceNotificationAsync(
+            string adminEmail,
+            string companyName,
+            int surveyYear,
+            string bouncedRecipientEmail,
+            string status,
+            string? reason,
+            string? messageId,
+            string? eventId)
+        {
+            EnsureEmailConfigured();
+
+            var safeCompanyName = string.IsNullOrWhiteSpace(companyName) ? "Unknown company" : companyName.Trim();
+            var safeReason = string.IsNullOrWhiteSpace(reason)
+                ? "No additional delivery details were provided."
+                : reason.Trim();
+
+            var subject = $"TIN200 survey email bounced - {safeCompanyName}";
+
+            var plainTextBody = $@"A TIN200 survey email has bounced back.
+
+Company: {safeCompanyName}
+Survey year: {surveyYear}
+Recipient: {bouncedRecipientEmail}
+Status: {status}
+Reason: {safeReason}
+{(string.IsNullOrWhiteSpace(messageId) ? string.Empty : $"Message ID: {messageId}\r\n")}{(string.IsNullOrWhiteSpace(eventId) ? string.Empty : $"Event ID: {eventId}\r\n")}
+Please review the contact email for this company before resending the survey.";
+
+            var htmlBody = $@"<p>A <strong>TIN200</strong> survey email has bounced back.</p>
+<ul>
+    <li><strong>Company:</strong> {WebUtility.HtmlEncode(safeCompanyName)}</li>
+    <li><strong>Survey year:</strong> {surveyYear}</li>
+    <li><strong>Recipient:</strong> {WebUtility.HtmlEncode(bouncedRecipientEmail)}</li>
+    <li><strong>Status:</strong> {WebUtility.HtmlEncode(status)}</li>
+    <li><strong>Reason:</strong> {WebUtility.HtmlEncode(safeReason)}</li>
+    {(string.IsNullOrWhiteSpace(messageId) ? string.Empty : $"<li><strong>Message ID:</strong> {WebUtility.HtmlEncode(messageId)}</li>")}
+    {(string.IsNullOrWhiteSpace(eventId) ? string.Empty : $"<li><strong>Event ID:</strong> {WebUtility.HtmlEncode(eventId)}</li>")}
+</ul>
+<p>Please review the contact email for this company before resending the survey.</p>";
+
+            await SendEmailAsync(new[] { adminEmail }, subject, plainTextBody, htmlBody);
+        }
+
+        private void EnsureEmailConfigured()
+        {
+            if (string.IsNullOrWhiteSpace(_emailSettings.ConnectionString)
+                || string.IsNullOrWhiteSpace(_emailSettings.FromEmail))
+            {
+                throw new InvalidOperationException("Azure Communication Email settings are not configured. Please configure AzureCommunicationEmail in appsettings or environment settings.");
+            }
+        }
+
+        private async Task SendEmailAsync(IEnumerable<string> recipientEmails, string subject, string plainTextBody, string htmlBody)
+        {
+            var recipients = ParseRecipientEmails(recipientEmails).ToList();
+            if (recipients.Count == 0)
+            {
+                throw new InvalidOperationException("No valid recipient email addresses were provided.");
+            }
+
             var emailClient = new EmailClient(_emailSettings.ConnectionString);
 
             var emailMessage = new EmailMessage(
@@ -70,10 +129,7 @@ TIN200 Team";
                     PlainText = plainTextBody,
                     Html = htmlBody
                 },
-                recipients: new EmailRecipients(new List<EmailAddress>
-                {
-                    new(recipientEmail)
-                }));
+                recipients: new EmailRecipients(recipients.Select(email => new EmailAddress(email)).ToList()));
 
             EmailSendOperation operation;
             try
@@ -99,9 +155,18 @@ TIN200 Team";
             }
         }
 
+        private static IEnumerable<string> ParseRecipientEmails(IEnumerable<string> recipientEmails)
+        {
+            return recipientEmails
+                .Where(email => !string.IsNullOrWhiteSpace(email))
+                .SelectMany(email => email.Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries))
+                .Select(email => email.Trim())
+                .Where(email => !string.IsNullOrWhiteSpace(email))
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+        }
+
         private string GenerateUnsubscribeToken(int clientId)
         {
-            // Use HMAC-based token for unsubscribe verification
             using (var hmac = new System.Security.Cryptography.HMACSHA256(System.Text.Encoding.UTF8.GetBytes("unsubscribe-token-key")))
             {
                 var hash = hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes($"{clientId}:{DateTime.UtcNow:yyyyMMdd}"));

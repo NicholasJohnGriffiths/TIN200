@@ -1,8 +1,10 @@
-Microsoft Visual Studio Solution File, Format Version 12.00
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TINWeb", "TINWeb.csproj", "{1D9A5209-489F-0D7C-2B86-FB4071E414C3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TINWeb.Functions", "TINWeb.Functions\TINWeb.Functions.csproj", "{1150B2FB-72CB-4848-BEBE-4AA6BFA3D5FE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -14,6 +16,10 @@ Global
 		{1D9A5209-489F-0D7C-2B86-FB4071E414C3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1D9A5209-489F-0D7C-2B86-FB4071E414C3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1D9A5209-489F-0D7C-2B86-FB4071E414C3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1150B2FB-72CB-4848-BEBE-4AA6BFA3D5FE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1150B2FB-72CB-4848-BEBE-4AA6BFA3D5FE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1150B2FB-72CB-4848-BEBE-4AA6BFA3D5FE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1150B2FB-72CB-4848-BEBE-4AA6BFA3D5FE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

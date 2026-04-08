@@ -1,26 +1,29 @@
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.EntityFrameworkCore;
+using TINWeb.Data;
 
 namespace TINWeb.Pages;
 
 [AllowAnonymous]
 public class LoginModel : PageModel
 {
-    private static readonly Dictionary<string, string> AllowedUsers = new(StringComparer.OrdinalIgnoreCase)
+    private readonly ApplicationDbContext _context;
+
+    public LoginModel(ApplicationDbContext context)
     {
-        ["nick@griffinsolutions.co.nz"] = "Lesley01*",
-        ["lisa.klyn@tinetwork.com"] = "02032026",
-        ["narjis.adnan@tinetwork.com"] = "10032026"
-    };
+        _context = context;
+    }
 
     [BindProperty]
     [Required]
-    [EmailAddress]
+    [Display(Name = "Email or username")]
     public string Email { get; set; } = string.Empty;
 
     [BindProperty]
@@ -48,16 +51,32 @@ public class LoginModel : PageModel
             return Page();
         }
 
-        if (!AllowedUsers.TryGetValue(Email, out var expectedPassword) || expectedPassword != Password)
+        var loginIdentifier = Email.Trim();
+        var normalizedLogin = loginIdentifier.ToLower();
+
+        var user = await _context.AppUsers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u =>
+                u.Email.ToLower() == normalizedLogin
+                || u.UserName.ToLower() == normalizedLogin);
+
+        if (user == null || user.Password != Password)
         {
-            ModelState.AddModelError(string.Empty, "Invalid email or password.");
+            ModelState.AddModelError(string.Empty, "Invalid email/username or password.");
             return Page();
         }
 
+        var displayName = string.IsNullOrWhiteSpace(user.Name) ? user.UserName : user.Name;
+        var email = string.IsNullOrWhiteSpace(user.Email) ? user.UserName : user.Email;
+
         var claims = new List<Claim>
         {
-            new(ClaimTypes.Name, Email),
-            new(ClaimTypes.Email, Email)
+            new(ClaimTypes.NameIdentifier, user.Id.ToString(CultureInfo.InvariantCulture)),
+            new(ClaimTypes.Name, displayName),
+            new(ClaimTypes.Email, email),
+            new(ClaimTypes.Role, user.UserType.ToString(CultureInfo.InvariantCulture)),
+            new("UserName", user.UserName),
+            new("UserType", user.UserType.ToString(CultureInfo.InvariantCulture))
         };
 
         var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);

@@ -56,6 +56,16 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-page="/Tasks/Index">Tasks</a>
                         </li>
+                        @if (User.IsInRole("1"))
+                        {
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle text-dark" href="#" id="adminMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">Admin</a>
+                                <ul class="dropdown-menu" aria-labelledby="adminMenu">
+                                    <li><a class="dropdown-item" asp-area="" asp-page="/AppUsers/Index">App Users</a></li>
+                                    <li><a class="dropdown-item" asp-area="" asp-page="/Config/Index">Config</a></li>
+                                </ul>
+                            </li>
+                        }
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle text-dark" href="#" id="testingMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">Testing</a>
                             <ul class="dropdown-menu" aria-labelledby="testingMenu">

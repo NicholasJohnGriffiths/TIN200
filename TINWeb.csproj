@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>1aa57641-2247-4da0-926f-3178ae314d71</UserSecretsId>
+    <DefaultItemExcludes>$(DefaultItemExcludes);TINWeb.Functions\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>

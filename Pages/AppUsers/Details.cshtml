@@ -1,0 +1,31 @@
+@page "{id:int}"
+@model TINWeb.Pages.AppUsers.DetailsModel
+@{
+    ViewData["Title"] = "App User Details";
+}
+
+<div class="container mt-4">
+    <h1>App User Details</h1>
+
+    <dl class="row mt-3">
+        <dt class="col-sm-3">Name</dt>
+        <dd class="col-sm-9">@Model.Record.Name</dd>
+
+        <dt class="col-sm-3">Email</dt>
+        <dd class="col-sm-9">@Model.Record.Email</dd>
+
+        <dt class="col-sm-3">Username</dt>
+        <dd class="col-sm-9">@Model.Record.UserName</dd>
+
+        <dt class="col-sm-3">Password</dt>
+        <dd class="col-sm-9">@Model.Record.Password</dd>
+
+        <dt class="col-sm-3">User Type</dt>
+        <dd class="col-sm-9">@(Model.Record.UserType == 1 ? "Admin" : $"UserType {Model.Record.UserType}")</dd>
+    </dl>
+
+    <div class="d-flex gap-2">
+        <a asp-page="./Edit" asp-route-id="@Model.Record.Id" class="btn btn-warning">Edit</a>
+        <a asp-page="./Index" class="btn btn-secondary">Back</a>
+    </div>
+</div>

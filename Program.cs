@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http.Features;
@@ -10,6 +11,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages(options =>
 {
     options.Conventions.AuthorizeFolder("/");
+    options.Conventions.AuthorizeFolder("/AppUsers", "AdminOnly");
+    options.Conventions.AuthorizeFolder("/Config", "AdminOnly");
     options.Conventions.AllowAnonymousToPage("/Login");
     options.Conventions.AllowAnonymousToPage("/Error");
     options.Conventions.AllowAnonymousToPage("/Company/SurveyUpdate");
@@ -39,6 +42,11 @@ builder.Services
         options.SlidingExpiration = true;
     });
 
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("1"));
+});
+
 // Add DbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -51,6 +59,7 @@ builder.Services.AddScoped<AnswerService>();
 builder.Services.AddScoped<QuestionService>();
 builder.Services.AddScoped<QuestionGroupService>();
 builder.Services.AddScoped<TaskService>();
+builder.Services.AddScoped<SurveyEmailBounceService>();
 builder.Services.AddScoped<IImageStorageService, ImageStorageService>();
 builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("SmtpSettings"));
 builder.Services.Configure<AzureCommunicationEmailSettings>(builder.Configuration.GetSection("AzureCommunicationEmail"));
@@ -91,6 +100,20 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapHealthChecks("/health");
+
+app.MapPost("/api/webhooks/email-events", async (HttpContext httpContext, SurveyEmailBounceService bounceService) =>
+{
+    using var payload = await JsonDocument.ParseAsync(httpContext.Request.Body);
+
+    var validationResponse = bounceService.TryBuildSubscriptionValidationResponse(payload);
+    if (validationResponse != null)
+    {
+        return Results.Ok(validationResponse);
+    }
+
+    var processedCount = await bounceService.ProcessEventGridEventsAsync(payload);
+    return Results.Ok(new { processed = processedCount });
+});
 
 app.MapRazorPages();
 

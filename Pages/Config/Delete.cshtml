@@ -1,0 +1,24 @@
+@page "{id:int}"
+@model TINWeb.Pages.Config.DeleteModel
+@{
+    ViewData["Title"] = "Delete Config";
+}
+
+<div class="container mt-4">
+    <h1>Delete Config</h1>
+    <div class="alert alert-warning mt-3">Are you sure you want to delete the config row?</div>
+
+    <dl class="row mt-3">
+        <dt class="col-sm-3">Id</dt>
+        <dd class="col-sm-9">@Model.Record.Id</dd>
+
+        <dt class="col-sm-3">Admin Email</dt>
+        <dd class="col-sm-9">@Model.Record.AdminEmail</dd>
+    </dl>
+
+    <form method="post" class="d-flex gap-2">
+        <input type="hidden" asp-for="Record.Id" />
+        <button type="submit" class="btn btn-danger">Delete</button>
+        <a asp-page="./Index" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>

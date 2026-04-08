@@ -21,6 +21,8 @@ namespace TINWeb.Data
         public DbSet<Answer> Answer { get; set; } = null!;
         public DbSet<CompanySurveyNote> CompanySurveyNotes { get; set; } = null!;
         public DbSet<TaskItem> TaskItems { get; set; } = null!;
+        public DbSet<AppUser> AppUsers { get; set; } = null!;
+        public DbSet<AppConfig> AppConfig { get; set; } = null!;
         public DbSet<CompanyFinancialAnalytics> CompanyFinancialAnalytics { get; set; } = null!;
         public DbSet<FinancialYearComparison> FinancialYearComparison { get; set; } = null!;
         public DbSet<RevenueSummaryBySize> RevenueSummaryBySize { get; set; } = null!;
@@ -586,6 +588,61 @@ namespace TINWeb.Data
                     .HasForeignKey(e => e.CompanySurveyId)
                     .OnDelete(DeleteBehavior.Cascade)
                     .HasConstraintName("FK_CompanySurveyNotes_CompanySurvey");
+            });
+
+            modelBuilder.Entity<AppUser>(entity =>
+            {
+                entity.ToTable("AppUser");
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("Id")
+                    .ValueGeneratedOnAdd();
+
+                entity.Property(e => e.Name)
+                    .HasColumnName("Name")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255)
+                    .IsRequired();
+
+                entity.Property(e => e.Email)
+                    .HasColumnName("Email")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255)
+                    .IsRequired();
+
+                entity.Property(e => e.UserName)
+                    .HasColumnName("UserName")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255)
+                    .IsRequired();
+
+                entity.Property(e => e.Password)
+                    .HasColumnName("Password")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255)
+                    .IsRequired();
+
+                entity.Property(e => e.UserType)
+                    .HasColumnName("UserType")
+                    .HasColumnType("int")
+                    .IsRequired();
+            });
+
+            modelBuilder.Entity<AppConfig>(entity =>
+            {
+                entity.ToTable("Config");
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("Id")
+                    .ValueGeneratedNever();
+
+                entity.Property(e => e.AdminEmail)
+                    .HasColumnName("AdminEmail")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255)
+                    .IsRequired();
             });
 
             // Configure view models - no key required for views

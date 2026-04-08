@@ -1,0 +1,52 @@
+@page
+@model TINWeb.Pages.Config.IndexModel
+@{
+    ViewData["Title"] = "Config";
+}
+
+<div class="container mt-4">
+    <div class="row mb-3">
+        <div class="col-md-8">
+            <h1>Config</h1>
+        </div>
+        <div class="col-md-4 text-end">
+            <a asp-page="./Create" class="btn btn-primary">Add Config</a>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <div class="alert alert-success">@Model.StatusMessage</div>
+    }
+
+    @if (Model.Records.Any())
+    {
+        <table class="table table-striped table-hover company-table align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Id</th>
+                    <th>Admin Email</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var record in Model.Records)
+            {
+                <tr>
+                    <td>@record.Id</td>
+                    <td>@record.AdminEmail</td>
+                    <td style="white-space: nowrap;">
+                        <a asp-page="./Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
+                        <a asp-page="./Edit" asp-route-id="@record.Id" class="btn btn-sm btn-warning">Edit</a>
+                        <a asp-page="./Delete" asp-route-id="@record.Id" class="btn btn-sm btn-danger">Delete</a>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <div class="alert alert-info">No config row found. Create the single config record with `Id = 1`.</div>
+    }
+</div>
