@@ -25,6 +25,18 @@
         </div>
 
         <div class="form-group mb-3">
+            <label asp-for="Record.Title" class="form-label"></label>
+            <input asp-for="Record.Title" class="form-control" />
+            <span asp-validation-for="Record.Title" class="text-danger"></span>
+        </div>
+
+        <div class="form-group mb-3">
+            <label asp-for="Record.Description" class="form-label"></label>
+            <textarea asp-for="Record.Description" class="form-control" rows="3"></textarea>
+            <span asp-validation-for="Record.Description" class="text-danger"></span>
+        </div>
+
+        <div class="form-group mb-3">
             <label asp-for="Record.HeaderImageId" class="form-label"></label>
             <select asp-for="Record.HeaderImageId" asp-items="Model.HeaderImageOptions" class="form-select"></select>
             <span asp-validation-for="Record.HeaderImageId" class="text-danger"></span>

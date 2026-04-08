@@ -130,6 +130,13 @@ namespace TINWeb.Data
                     .HasColumnType("bit")
                     .IsRequired();
 
+                entity.Property(e => e.Title)
+                    .HasColumnName("Title")
+                    .HasMaxLength(255);
+
+                entity.Property(e => e.Description)
+                    .HasColumnName("Description");
+
                 entity.Property(e => e.HeaderImageId)
                     .HasColumnName("HeaderImageId")
                     .HasColumnType("int");
@@ -158,13 +165,6 @@ namespace TINWeb.Data
                     .HasColumnName("SurveyId")
                     .HasColumnType("int")
                     .IsRequired();
-
-                entity.Property(e => e.Title)
-                    .HasColumnName("Title")
-                    .HasMaxLength(255);
-
-                entity.Property(e => e.Description)
-                    .HasColumnName("Description");
 
                 entity.Property(e => e.Saved)
                     .HasColumnName("Saved")

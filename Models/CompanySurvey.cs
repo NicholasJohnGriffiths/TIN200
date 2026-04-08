@@ -17,14 +17,6 @@ namespace TINWeb.Models
         [Required]
         public int SurveyId { get; set; }
 
-        [Display(Name = "Title")]
-        [StringLength(255)]
-        public string? Title { get; set; }
-
-        [Display(Name = "Description")]
-        [DataType(DataType.MultilineText)]
-        public string? Description { get; set; }
-
         [Required]
         public bool Saved { get; set; }
 

@@ -18,6 +18,8 @@ namespace TINWeb.Pages.Survey
 
         public void OnGet()
         {
+            Record.Title = "Survey Answers";
+            Record.Description = "Please complete the survey answers for the current survey year.";
         }
 
         public async Task<IActionResult> OnPostAsync()

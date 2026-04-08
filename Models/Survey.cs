@@ -17,6 +17,14 @@ namespace TINWeb.Models
         [Required]
         public bool CurrentSurvey { get; set; }
 
+        [Display(Name = "Title")]
+        [StringLength(255)]
+        public string? Title { get; set; }
+
+        [Display(Name = "Description")]
+        [DataType(DataType.MultilineText)]
+        public string? Description { get; set; }
+
         [Display(Name = "Header Image")]
         public int? HeaderImageId { get; set; }
     }
