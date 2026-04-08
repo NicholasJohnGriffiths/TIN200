@@ -244,8 +244,8 @@
                     <img src="@Model.SurveyHeaderImageUrl" alt="Survey Header" class="img-fluid" />
                 }
             </div>
-            <h1>@Model.SurveyPageTitle</h1>
-            <p class="text-muted fst-italic" style="white-space: pre-line;">@Model.SurveyPageDescription</p>
+            <h1>@Model.ResolveFinancialYearDisplayText(Model.SurveyPageTitle)</h1>
+            <p class="text-muted fst-italic" style="white-space: pre-line;">@Model.ResolveFinancialYearDisplayText(Model.SurveyPageDescription)</p>
             <hr />
 
             @if (Model.Submitted)
@@ -317,8 +317,8 @@
                         var sectionKey = $"group-{group.Id}";
                         sectionIndexByKey[sectionKey] = sectionTitles.Count;
 
-                        sectionTitles.Add((group.Title ?? string.Empty).Trim());
-                        sectionDescriptions.Add((group.Description ?? string.Empty).Trim());
+                        sectionTitles.Add(Model.ResolveFinancialYearDisplayText((group.Title ?? string.Empty).Trim()));
+                        sectionDescriptions.Add(Model.ResolveFinancialYearDisplayText((group.Description ?? string.Empty).Trim()));
                         sectionGroupIds.Add(group.Id);
                         sectionImageId1.Add(group.ImageId1);
                         sectionImageId2.Add(group.ImageId2);
@@ -339,8 +339,8 @@
                             sectionIndex = sectionTitles.Count;
                             sectionIndexByKey[sectionKey] = sectionIndex;
 
-                            sectionTitles.Add((row.GroupTitle ?? string.Empty).Trim());
-                            sectionDescriptions.Add((row.GroupDescription ?? string.Empty).Trim());
+                            sectionTitles.Add(Model.ResolveFinancialYearDisplayText((row.GroupTitle ?? string.Empty).Trim()));
+                            sectionDescriptions.Add(Model.ResolveFinancialYearDisplayText((row.GroupDescription ?? string.Empty).Trim()));
                             sectionGroupIds.Add(row.GroupId);
                             sectionImageId1.Add(row.GroupImageId1);
                             sectionImageId2.Add(row.GroupImageId2);
@@ -454,7 +454,7 @@
                                     .Select(g => new
                                     {
                                         SubgroupId = g.Key,
-                                        Title = Model.Rows[g.First()].SubgroupTitle,
+                                        Title = Model.ResolveFinancialYearDisplayText(Model.Rows[g.First()].SubgroupTitle),
                                         UseAsHeader = Model.Rows[g.First()].SubgroupNewHeader == true,
                                         QuestionRows = Math.Max(1, Model.Rows[g.First()].SubgroupQuestionRows ?? 1),
                                         MinSubgroupOrder = g.Min(i => Model.Rows[i].SubgroupOrderNumber ?? int.MaxValue),
@@ -510,7 +510,7 @@
                                                     @foreach (var headerRowIndex in subgroupHeaderRows)
                                                     {
                                                         <th class="survey-table-header-cell">
-                                                            <div class="survey-table-question">@Html.Raw(Model.Rows[headerRowIndex].QuestionText ?? string.Empty)</div>
+                                                            <div class="survey-table-question">@Html.Raw(Model.ResolveFinancialYearDisplayText(Model.Rows[headerRowIndex].QuestionText ?? string.Empty))</div>
                                                         </th>
                                                     }
                                                 </tr>
@@ -559,13 +559,13 @@
                                                                     <div class="survey-table-answer-wrap">
                                                                         @if (answerType.Equals("Number", StringComparison.OrdinalIgnoreCase))
                                                                         {
-                                                                            <input asp-for="Rows[i].AnswerNumber" class="form-control form-control-sm survey-table-compact-input" placeholder="Enter number" />
+                                                                            <input asp-for="Rows[i].AnswerNumber" class="form-control form-control-sm survey-table-compact-input" placeholder="Enter Number" />
                                                                             <input type="hidden" asp-for="Rows[i].AnswerText" />
                                                                             <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
                                                                         }
                                                                         else if (answerType.Equals("Currency", StringComparison.OrdinalIgnoreCase))
                                                                         {
-                                                                            <input asp-for="Rows[i].AnswerCurrency" class="form-control form-control-sm survey-table-compact-input" placeholder="Enter currency" />
+                                                                            <input asp-for="Rows[i].AnswerCurrency" class="form-control form-control-sm survey-table-compact-input" placeholder="Enter Number" />
                                                                             <input type="hidden" asp-for="Rows[i].AnswerText" />
                                                                             <input type="hidden" asp-for="Rows[i].AnswerNumber" />
                                                                         }
@@ -575,7 +575,7 @@
                                                                                 <option value="">Select an option</option>
                                                                                 @foreach (var option in Model.Rows[i].ChoiceOptions)
                                                                                 {
-                                                                                    <option value="@option">@option</option>
+                                                                                    <option value="@option">@Model.ResolveFinancialYearDisplayText(option)</option>
                                                                                 }
                                                                             </select>
                                                                             <input type="hidden" asp-for="Rows[i].AnswerNumber" />
@@ -603,7 +603,7 @@
                                                                                                 value="@option"
                                                                                                 id="@optionId"
                                                                                                 @(isChecked ? "checked" : null) />
-                                                                                            <label class="form-check-label small" for="@optionId">@option</label>
+                                                                                            <label class="form-check-label small" for="@optionId">@Model.ResolveFinancialYearDisplayText(option)</label>
                                                                                         </div>
                                                                                     }
                                                                                 </div>
@@ -633,7 +633,7 @@
                                                                                                 value="@option"
                                                                                                 id="@optionId"
                                                                                                 @(isChecked ? "checked" : null) />
-                                                                                            <label class="form-check-label small" for="@optionId">@option</label>
+                                                                                            <label class="form-check-label small" for="@optionId">@Model.ResolveFinancialYearDisplayText(option)</label>
                                                                                         </div>
                                                                                     }
                                                                                 </div>
@@ -697,7 +697,7 @@
 
                                                 <tr class="survey-answer-row" data-row-index="@i">
                                                     <td class="survey-table-cell">
-                                                        <div class="survey-table-question">@Html.Raw(Model.Rows[i].QuestionText ?? string.Empty)</div>
+                                                        <div class="survey-table-question">@Html.Raw(Model.ResolveFinancialYearDisplayText(Model.Rows[i].QuestionText ?? string.Empty))</div>
                                                     </td>
                                                     <td class="survey-table-cell">
                                                         <input type="hidden" asp-for="Rows[i].QuestionId" />
@@ -723,13 +723,13 @@
                                                             <div class="survey-table-answer-wrap">
                                                                 @if (answerType.Equals("Number", StringComparison.OrdinalIgnoreCase))
                                                                 {
-                                                                    <input asp-for="Rows[i].AnswerNumber" class="form-control form-control-sm survey-table-compact-input" placeholder="Enter number" />
+                                                                    <input asp-for="Rows[i].AnswerNumber" class="form-control form-control-sm survey-table-compact-input" placeholder="Enter Number" />
                                                                     <input type="hidden" asp-for="Rows[i].AnswerText" />
                                                                     <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
                                                                 }
                                                                 else if (answerType.Equals("Currency", StringComparison.OrdinalIgnoreCase))
                                                                 {
-                                                                    <input asp-for="Rows[i].AnswerCurrency" class="form-control form-control-sm survey-table-compact-input" placeholder="Enter currency" />
+                                                                    <input asp-for="Rows[i].AnswerCurrency" class="form-control form-control-sm survey-table-compact-input" placeholder="Enter Number" />
                                                                     <input type="hidden" asp-for="Rows[i].AnswerText" />
                                                                     <input type="hidden" asp-for="Rows[i].AnswerNumber" />
                                                                 }
@@ -739,7 +739,7 @@
                                                                         <option value="">Select an option</option>
                                                                         @foreach (var option in Model.Rows[i].ChoiceOptions)
                                                                         {
-                                                                            <option value="@option">@option</option>
+                                                                            <option value="@option">@Model.ResolveFinancialYearDisplayText(option)</option>
                                                                         }
                                                                     </select>
                                                                     <input type="hidden" asp-for="Rows[i].AnswerNumber" />
@@ -767,7 +767,7 @@
                                                                                         value="@option"
                                                                                         id="@optionId"
                                                                                         @(isChecked ? "checked" : null) />
-                                                                                    <label class="form-check-label small" for="@optionId">@option</label>
+                                                                                    <label class="form-check-label small" for="@optionId">@Model.ResolveFinancialYearDisplayText(option)</label>
                                                                                 </div>
                                                                             }
                                                                         </div>
@@ -797,7 +797,7 @@
                                                                                         value="@option"
                                                                                         id="@optionId"
                                                                                         @(isChecked ? "checked" : null) />
-                                                                                    <label class="form-check-label small" for="@optionId">@option</label>
+                                                                                    <label class="form-check-label small" for="@optionId">@Model.ResolveFinancialYearDisplayText(option)</label>
                                                                                 </div>
                                                                             }
                                                                         </div>
@@ -850,7 +850,7 @@
                                             var previousYearCurrency = Model.Rows[i].PreviousYearAnswerCurrency?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
 
                                             <div class="mb-3 pb-3 border-bottom">
-                                                <div class="form-label fw-semibold mb-2 survey-question-richtext">@Html.Raw(Model.Rows[i].QuestionText ?? string.Empty)</div>
+                                                <div class="form-label fw-semibold mb-2 survey-question-richtext">@Html.Raw(Model.ResolveFinancialYearDisplayText(Model.Rows[i].QuestionText ?? string.Empty))</div>
                                                 <input type="hidden" asp-for="Rows[i].QuestionId" />
                                                 <input type="hidden" asp-for="Rows[i].OrderNumber" />
                                                 <input type="hidden" asp-for="Rows[i].GroupId" />
@@ -898,7 +898,7 @@
                                 <div class="mb-3 pb-3 border-bottom">
                                     <div class="d-flex justify-content-between align-items-start mb-2">
                                         <div>
-                                            <div class="form-label fw-semibold mb-0 survey-question-richtext">@Html.Raw(Model.Rows[i].QuestionText ?? string.Empty)</div>
+                                            <div class="form-label fw-semibold mb-0 survey-question-richtext">@Html.Raw(Model.ResolveFinancialYearDisplayText(Model.Rows[i].QuestionText ?? string.Empty))</div>
                                         </div>
                                         <span class="badge text-bg-secondary">@Model.Rows[i].AnswerType</span>
                                     </div>
@@ -927,13 +927,13 @@
                                         <div class="col-md-8">
                                             @if (answerType.Equals("Number", StringComparison.OrdinalIgnoreCase))
                                             {
-                                                <input asp-for="Rows[i].AnswerNumber" class="form-control" placeholder="Enter number" />
+                                                <input asp-for="Rows[i].AnswerNumber" class="form-control" placeholder="Enter Number" />
                                                 <input type="hidden" asp-for="Rows[i].AnswerText" />
                                                 <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
                                             }
                                             else if (answerType.Equals("Currency", StringComparison.OrdinalIgnoreCase))
                                             {
-                                                <input asp-for="Rows[i].AnswerCurrency" class="form-control" placeholder="Enter currency" />
+                                                <input asp-for="Rows[i].AnswerCurrency" class="form-control" placeholder="Enter Number" />
                                                 <input type="hidden" asp-for="Rows[i].AnswerText" />
                                                 <input type="hidden" asp-for="Rows[i].AnswerNumber" />
                                             }
@@ -943,7 +943,7 @@
                                                     <option value="">Select an option</option>
                                                     @foreach (var option in Model.Rows[i].ChoiceOptions)
                                                     {
-                                                        <option value="@option">@option</option>
+                                                        <option value="@option">@Model.ResolveFinancialYearDisplayText(option)</option>
                                                     }
                                                 </select>
                                                 <input type="hidden" asp-for="Rows[i].AnswerNumber" />
@@ -971,7 +971,7 @@
                                                                 value="@option"
                                                                 id="@optionId"
                                                                 @(isChecked ? "checked" : null) />
-                                                            <label class="form-check-label" for="@optionId">@option</label>
+                                                            <label class="form-check-label" for="@optionId">@Model.ResolveFinancialYearDisplayText(option)</label>
                                                         </div>
                                                     }
                                                 }
@@ -1001,7 +1001,7 @@
                                                                 value="@option"
                                                                 id="@optionId"
                                                                 @(isChecked ? "checked" : null) />
-                                                            <label class="form-check-label" for="@optionId">@option</label>
+                                                            <label class="form-check-label" for="@optionId">@Model.ResolveFinancialYearDisplayText(option)</label>
                                                         </div>
                                                     }
                                                 }

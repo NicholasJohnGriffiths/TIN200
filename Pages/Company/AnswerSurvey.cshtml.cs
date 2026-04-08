@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -53,6 +55,42 @@ namespace TINWeb.Pages.Company
         public string SurveyPageDescription { get; set; } = "Please complete the survey answers for the current survey year.";
         public List<QuestionGroup> SurveyQuestionGroups { get; set; } = new();
         public HashSet<int> AvailableGroupImageIds { get; set; } = new();
+
+        public string ResolveFinancialYearDisplayText(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return string.Empty;
+            }
+
+            if (FinancialYear <= 0)
+            {
+                return text;
+            }
+
+            var resolvedText = Regex.Replace(
+                text,
+                @"current\s*financial\s*year\s*-\s*(\d+)|year\s*-\s*(\d+)",
+                match =>
+                {
+                    var offsetGroup = match.Groups[1].Success ? match.Groups[1] : match.Groups[2];
+                    if (!int.TryParse(offsetGroup.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var offset))
+                    {
+                        return match.Value;
+                    }
+
+                    return (FinancialYear - offset).ToString(CultureInfo.InvariantCulture);
+                },
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+            resolvedText = Regex.Replace(
+                resolvedText,
+                @"current\s*financial\s*year",
+                FinancialYear.ToString(CultureInfo.InvariantCulture),
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+            return resolvedText;
+        }
 
         public async Task<IActionResult> OnGetAsync(int id, string token, bool saved = false, bool submitted = false)
         {
