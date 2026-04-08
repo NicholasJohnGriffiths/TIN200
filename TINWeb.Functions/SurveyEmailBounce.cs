@@ -58,6 +58,7 @@ public class SurveyEmailBounce
         }
 
         var recipientEmail = FirstNonEmpty(
+            GetString(data, "recipient"),
             GetString(data, "recipientAddress"),
             GetString(data, "recipientTo"),
             GetString(data, "to"),
@@ -66,12 +67,13 @@ public class SurveyEmailBounce
 
         if (string.IsNullOrWhiteSpace(recipientEmail))
         {
-            _logger.LogWarning("Bounce event received with no recipient email.");
+            _logger.LogWarning("Bounce event received with no recipient email. EventType={EventType}, Data={EventData}", eventType, eventGridEvent.Data.ToString());
             return;
         }
 
         var normalizedEmail = recipientEmail.Trim().ToLowerInvariant();
         var reason = FirstNonEmpty(
+            GetNestedString(data, "deliveryStatusDetails", "statusMessage"),
             GetString(data, "statusDetails"),
             GetString(data, "diagnosticCode"),
             GetString(data, "diagnosticInformation"),
@@ -448,6 +450,24 @@ Please review the contact email for this company before resending the survey.";
                     JsonValueKind.False => "false",
                     _ => prop.Value.GetRawText()
                 };
+            }
+        }
+
+        return null;
+    }
+
+    private static string? GetNestedString(JsonElement element, string propertyName, string nestedPropertyName)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        foreach (var prop in element.EnumerateObject())
+        {
+            if (string.Equals(prop.Name, propertyName, StringComparison.OrdinalIgnoreCase))
+            {
+                return GetString(prop.Value, nestedPropertyName);
             }
         }
 

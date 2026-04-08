@@ -99,6 +99,7 @@ namespace TINWeb.Services
             }
 
             var recipientEmail = FirstNonEmpty(
+                GetString(dataElement, "recipient"),
                 GetString(dataElement, "recipientAddress"),
                 GetString(dataElement, "recipientTo"),
                 GetString(dataElement, "to"),
@@ -107,12 +108,13 @@ namespace TINWeb.Services
 
             if (string.IsNullOrWhiteSpace(recipientEmail))
             {
-                _logger.LogWarning("Email bounce webhook received without a recipient address.");
+                _logger.LogWarning("Email bounce webhook received without a recipient address. EventType={EventType}, Data={EventData}", eventType, dataElement.GetRawText());
                 return false;
             }
 
             var normalizedEmail = recipientEmail.Trim().ToLowerInvariant();
             var reason = FirstNonEmpty(
+                GetNestedString(dataElement, "deliveryStatusDetails", "statusMessage"),
                 GetString(dataElement, "statusDetails"),
                 GetString(dataElement, "diagnosticCode"),
                 GetString(dataElement, "diagnosticInformation"),
@@ -337,6 +339,16 @@ namespace TINWeb.Services
                 JsonValueKind.Array => string.Join(", ", valueElement.EnumerateArray().Select(item => item.ValueKind == JsonValueKind.String ? item.GetString() : item.GetRawText())),
                 _ => valueElement.GetRawText()
             };
+        }
+
+        private static string? GetNestedString(JsonElement element, string propertyName, string nestedPropertyName)
+        {
+            if (!TryGetPropertyIgnoreCase(element, propertyName, out var nestedElement))
+            {
+                return null;
+            }
+
+            return GetString(nestedElement, nestedPropertyName);
         }
 
         private static bool TryGetPropertyIgnoreCase(JsonElement element, string propertyName, out JsonElement value)

@@ -2,4 +2,6 @@ bin/
 obj/
 publish/
 publish.zip
+publish-live/
+publish-live.zip
 local.settings.json
