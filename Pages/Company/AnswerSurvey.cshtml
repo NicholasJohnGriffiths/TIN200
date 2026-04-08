@@ -1,7 +1,7 @@
 @page "{id:int}/{token?}"
 @model TINWeb.Pages.Company.AnswerSurveyModel
 @{
-    ViewData["Title"] = "Survey Answers";
+    ViewData["Title"] = Model.SurveyPageTitle;
     Layout = "_SurveyLayout";
 }
 
@@ -230,8 +230,8 @@
                     <img src="@Model.SurveyHeaderImageUrl" alt="Survey Header" class="img-fluid" />
                 }
             </div>
-            <h1>Survey Answers</h1>
-            <p class="text-muted">Please complete the survey answers for the current survey year.</p>
+            <h1>@Model.SurveyPageTitle</h1>
+            <p class="text-muted" style="white-space: pre-line;">@Model.SurveyPageDescription</p>
             <hr />
 
             @if (Model.Submitted)

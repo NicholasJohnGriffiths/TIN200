@@ -49,6 +49,10 @@ namespace TINWeb.Pages.Company
         public bool Saved { get; set; }
         public bool Submitted { get; set; }
         public bool IsLocked { get; set; }
+        public string? CompanySurveyTitle { get; set; }
+        public string? CompanySurveyDescription { get; set; }
+        public string SurveyPageTitle => string.IsNullOrWhiteSpace(CompanySurveyTitle) ? "Survey Answers" : CompanySurveyTitle.Trim();
+        public string SurveyPageDescription => string.IsNullOrWhiteSpace(CompanySurveyDescription) ? "Please complete the survey answers for the current survey year." : CompanySurveyDescription.Trim();
         public List<QuestionGroup> SurveyQuestionGroups { get; set; } = new();
         public HashSet<int> AvailableGroupImageIds { get; set; } = new();
 
@@ -100,6 +104,8 @@ namespace TINWeb.Pages.Company
             var companySurveyId = await EnsureCompanySurveyAsync(company.Id, survey.Id);
             var companySurvey = await _context.CompanySurvey.FirstOrDefaultAsync(cs => cs.Id == companySurveyId);
             IsLocked = (companySurvey?.Locked).GetValueOrDefault();
+            CompanySurveyTitle = companySurvey?.Title;
+            CompanySurveyDescription = companySurvey?.Description;
 
             Rows = await LoadAnswerRowsAsync(company.Id, companySurveyId, survey.FinancialYear);
             SurveyQuestionGroups = await LoadSurveyQuestionGroupsAsync();
@@ -221,6 +227,8 @@ namespace TINWeb.Pages.Company
             var companySurveyId = await EnsureCompanySurveyAsync(company.Id, survey.Id);
             var companySurvey = await _context.CompanySurvey.FirstOrDefaultAsync(cs => cs.Id == companySurveyId);
             IsLocked = (companySurvey?.Locked).GetValueOrDefault();
+            CompanySurveyTitle = companySurvey?.Title;
+            CompanySurveyDescription = companySurvey?.Description;
 
             if (IsLocked)
             {

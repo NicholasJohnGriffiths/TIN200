@@ -18,6 +18,12 @@
         <dt class="col-sm-3">Survey ID</dt>
         <dd class="col-sm-9">@Model.Record.SurveyId</dd>
 
+        <dt class="col-sm-3">Title</dt>
+        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Record.Title) ? "Survey Answers" : Model.Record.Title)</dd>
+
+        <dt class="col-sm-3">Description</dt>
+        <dd class="col-sm-9" style="white-space: pre-line;">@(string.IsNullOrWhiteSpace(Model.Record.Description) ? "Please complete the survey answers for the current survey year." : Model.Record.Description)</dd>
+
         <dt class="col-sm-3">Saved</dt>
         <dd class="col-sm-9">@Model.Record.Saved</dd>
 

@@ -18,6 +18,8 @@ namespace TINWeb.Pages.CompanySurvey
 
         public void OnGet()
         {
+            Record.Title = "Survey Answers";
+            Record.Description = "Please complete the survey answers for the current survey year.";
             Record.Locked = false;
             Record.Estimate = false;
         }

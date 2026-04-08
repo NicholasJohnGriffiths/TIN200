@@ -168,6 +168,8 @@
             <thead class="table-dark">
                 <tr>
                     <th><a class="link-light text-decoration-none" href="@SortHref("CompanyName")"><span>Company Name</span><span>@Model.GetSortIndicator("CompanyName")</span></a></th>
+                    <th>Title</th>
+                    <th>Description</th>
                     <th>Survey Link</th>
                     <th><a class="link-light text-decoration-none" href="@SortHref("Saved")"><span>Saved</span><span>@Model.GetSortIndicator("Saved")</span></a></th>
                     <th><a class="link-light text-decoration-none" href="@SortHref("SavedDate")"><span>Saved Date</span><span>@Model.GetSortIndicator("SavedDate")</span></a></th>
@@ -189,6 +191,8 @@
                 {
                     <tr id="record-@record.Id">
                         <td style="min-width: 250px;">@record.CompanyName</td>
+                        <td style="min-width: 180px;">@(string.IsNullOrWhiteSpace(record.Title) ? "Survey Answers" : record.Title)</td>
+                        <td style="min-width: 260px; max-width: 360px; white-space: pre-line;">@(string.IsNullOrWhiteSpace(record.Description) ? "Please complete the survey answers for the current survey year." : record.Description)</td>
                         <td style="min-width: 300px; max-width: 360px;">
                             @if (!string.IsNullOrWhiteSpace(record.SurveyLink))
                             {

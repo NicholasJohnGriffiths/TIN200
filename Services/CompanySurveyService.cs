@@ -39,6 +39,8 @@ namespace TINWeb.Services
                     CompanyName = company.CompanyName,
                     ExternalId = company.ExternalId,
                     FinancialYear = survey.FinancialYear,
+                    Title = companySurvey.Title,
+                    Description = companySurvey.Description,
                     Saved = companySurvey.Saved,
                     Submitted = companySurvey.Submitted,
                     Requested = companySurvey.Requested,
@@ -182,6 +184,8 @@ namespace TINWeb.Services
             public string? CompanyName { get; set; }
             public string? ExternalId { get; set; }
             public int FinancialYear { get; set; }
+            public string? Title { get; set; }
+            public string? Description { get; set; }
             public bool Saved { get; set; }
             public bool Submitted { get; set; }
             public bool Requested { get; set; }
