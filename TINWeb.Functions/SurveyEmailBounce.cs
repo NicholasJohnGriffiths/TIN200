@@ -427,8 +427,7 @@ Please review the contact email for this company before resending the survey.";
         return !string.IsNullOrWhiteSpace(eventType) &&
                (eventType.Contains("Bounce", StringComparison.OrdinalIgnoreCase)
                 || eventType.Contains("Failed", StringComparison.OrdinalIgnoreCase)
-                || eventType.Contains("Suppressed", StringComparison.OrdinalIgnoreCase)
-                || eventType.Contains("EmailDeliveryReportReceived", StringComparison.OrdinalIgnoreCase));
+                || eventType.Contains("Suppressed", StringComparison.OrdinalIgnoreCase));
     }
 
     private static string? GetString(JsonElement element, string propertyName)
