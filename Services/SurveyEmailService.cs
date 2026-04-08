@@ -131,10 +131,16 @@ Please review the contact email for this company before resending the survey.";
                 },
                 recipients: new EmailRecipients(recipients.Select(email => new EmailAddress(email)).ToList()));
 
-            EmailSendOperation operation;
             try
             {
-                operation = await emailClient.SendAsync(WaitUntil.Completed, emailMessage);
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                await emailClient.SendAsync(WaitUntil.Started, emailMessage, cts.Token);
+            }
+            catch (OperationCanceledException ex)
+            {
+                throw new InvalidOperationException(
+                    "Azure Communication Email send did not receive an acceptance response within 30 seconds. The request was cancelled to avoid the survey send page hanging.",
+                    ex);
             }
             catch (RequestFailedException ex) when (ex.Status == 401)
             {
@@ -147,11 +153,6 @@ Please review the contact email for this company before resending the survey.";
                 throw new InvalidOperationException(
                     $"Azure Communication Email send failed. Status: {ex.Status}, Code: {ex.ErrorCode}, Message: {ex.Message}",
                     ex);
-            }
-
-            if (operation.HasCompleted && operation.Value.Status != EmailSendStatus.Succeeded)
-            {
-                throw new InvalidOperationException($"Email send failed with status: {operation.Value.Status}");
             }
         }
 

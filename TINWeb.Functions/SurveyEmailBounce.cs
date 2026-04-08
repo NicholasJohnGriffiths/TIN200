@@ -405,11 +405,13 @@ Please review the contact email for this company before resending the survey.";
                 },
                 recipients: new EmailRecipients(recipients));
 
-            var operation = await emailClient.SendAsync(WaitUntil.Completed, emailMessage);
-            if (operation.HasCompleted && operation.Value.Status != EmailSendStatus.Succeeded)
-            {
-                _logger.LogWarning("Bounce notification email send completed with non-success status {Status} for admin {AdminEmail}.", operation.Value.Status, adminEmail);
-            }
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var operation = await emailClient.SendAsync(WaitUntil.Started, emailMessage, cts.Token);
+            _logger.LogInformation("Bounce notification email accepted for delivery. OperationId {OperationId} for admin {AdminEmail}.", operation.Id, adminEmail);
+        }
+        catch (OperationCanceledException ex)
+        {
+            _logger.LogWarning(ex, "Timed out waiting for ACS to accept the bounce notification email for {AdminEmail}.", adminEmail);
         }
         catch (RequestFailedException ex)
         {
