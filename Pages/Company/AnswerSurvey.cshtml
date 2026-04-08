@@ -231,7 +231,7 @@
                 }
             </div>
             <h1>@Model.SurveyPageTitle</h1>
-            <p class="text-muted" style="white-space: pre-line;">@Model.SurveyPageDescription</p>
+            <p class="text-muted fst-italic" style="white-space: pre-line;">@Model.SurveyPageDescription</p>
             <hr />
 
             @if (Model.Submitted)
@@ -263,7 +263,6 @@
             <div class="mb-4">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                     <label class="form-label mb-0">Progress</label>
-                    <span id="surveyProgressText" class="small text-body-secondary">0 / 0 progressed</span>
                 </div>
                 <div class="progress" role="progressbar" aria-label="Survey completion progress" aria-valuemin="0" aria-valuemax="100">
                     <div id="surveyProgressBar" class="progress-bar" style="width: 0%">0%</div>
@@ -1013,15 +1012,10 @@
                 var percent = total === 0 ? 0 : Math.round((progressed / total) * 100);
 
                 var progressBar = document.getElementById('surveyProgressBar');
-                var progressText = document.getElementById('surveyProgressText');
                 if (progressBar) {
                     progressBar.style.width = percent + '%';
                     progressBar.textContent = percent + '%';
                     progressBar.setAttribute('aria-valuenow', percent.toString());
-                }
-
-                if (progressText) {
-                    progressText.textContent = progressed + ' / ' + total + ' progressed';
                 }
             }
 
@@ -1156,10 +1150,7 @@
                 }
 
                 if (currentSectionHeader) {
-                    var normalizedTitleForHeader = currentTitle.trim();
-                    currentSectionHeader.textContent = normalizedTitleForHeader.length > 0
-                        ? ('Section ' + sectionNumber + ' of ' + totalSections + ' ' + normalizedTitleForHeader)
-                        : ('Section ' + sectionNumber + ' of ' + totalSections);
+                    currentSectionHeader.textContent = 'Section ' + sectionNumber + ' of ' + totalSections;
                 }
 
                 if (currentSectionSubheader) {
