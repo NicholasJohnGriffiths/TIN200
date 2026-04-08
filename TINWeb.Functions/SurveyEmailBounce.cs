@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Mail;
 using System.Text.Json;
 using Azure;
 using Azure.Communication.Email;
@@ -26,6 +27,7 @@ public class SurveyEmailBounce
     private readonly string _sqlConnectionString;
     private readonly string? _emailConnectionString;
     private readonly string? _fromEmail;
+    private readonly string? _fromName;
 
     public SurveyEmailBounce(ILogger<SurveyEmailBounce> logger)
     {
@@ -36,6 +38,9 @@ public class SurveyEmailBounce
             ?? Environment.GetEnvironmentVariable("AzureCommunicationConnectionString");
         _fromEmail = Environment.GetEnvironmentVariable("AzureCommunicationEmail__FromEmail")
             ?? Environment.GetEnvironmentVariable("AzureCommunicationFromEmail");
+        _fromName = Environment.GetEnvironmentVariable("AzureCommunicationEmail__FromName")
+            ?? Environment.GetEnvironmentVariable("AzureCommunicationFromName")
+            ?? "TIN Survey";
     }
 
     [Function("SurveyEmailBounce")]
@@ -397,7 +402,7 @@ Please review the contact email for this company before resending the survey.";
 
             var emailClient = new EmailClient(_emailConnectionString);
             var emailMessage = new EmailMessage(
-                senderAddress: _fromEmail,
+                senderAddress: BuildSenderAddress(_fromEmail, _fromName),
                 content: new EmailContent(subject)
                 {
                     PlainText = plainTextBody,
@@ -417,6 +422,17 @@ Please review the contact email for this company before resending the survey.";
         {
             _logger.LogWarning(ex, "Failed sending bounce notification email to {AdminEmail}.", adminEmail);
         }
+    }
+
+    private static string BuildSenderAddress(string? fromEmail, string? fromName)
+    {
+        var email = (fromEmail ?? string.Empty).Trim();
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(fromName))
+        {
+            return email;
+        }
+
+        return new MailAddress(email, fromName.Trim()).ToString();
     }
 
     private static bool IsBounceLikeEvent(string? eventType, string? status)

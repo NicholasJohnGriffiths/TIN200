@@ -2,6 +2,7 @@ using Azure;
 using Azure.Communication.Email;
 using Microsoft.Extensions.Options;
 using System.Net;
+using System.Net.Mail;
 
 namespace TINWeb.Services
 {
@@ -123,7 +124,7 @@ Please review the contact email for this company before resending the survey.";
             var emailClient = new EmailClient(_emailSettings.ConnectionString);
 
             var emailMessage = new EmailMessage(
-                senderAddress: _emailSettings.FromEmail,
+                senderAddress: BuildSenderAddress(_emailSettings.FromEmail, _emailSettings.FromName),
                 content: new EmailContent(subject)
                 {
                     PlainText = plainTextBody,
@@ -154,6 +155,17 @@ Please review the contact email for this company before resending the survey.";
                     $"Azure Communication Email send failed. Status: {ex.Status}, Code: {ex.ErrorCode}, Message: {ex.Message}",
                     ex);
             }
+        }
+
+        private static string BuildSenderAddress(string fromEmail, string? fromName)
+        {
+            var email = fromEmail.Trim();
+            if (string.IsNullOrWhiteSpace(fromName))
+            {
+                return email;
+            }
+
+            return new MailAddress(email, fromName.Trim()).ToString();
         }
 
         private static IEnumerable<string> ParseRecipientEmails(IEnumerable<string> recipientEmails)
