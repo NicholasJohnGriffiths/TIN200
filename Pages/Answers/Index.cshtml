@@ -331,7 +331,7 @@
                         <td>@row.CompanyName</td>
                         <td>@row.FinancialYear</td>
                         <td>@row.QuestionOrderNumber</td>
-                        <td>@row.QuestionText</td>
+                        <td>@Html.Raw(row.QuestionText ?? string.Empty)</td>
                         <td>@answerValue</td>
                         <td>
                             @if (row.Id > 0)

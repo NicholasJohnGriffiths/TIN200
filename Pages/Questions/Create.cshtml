@@ -34,7 +34,7 @@
 
         <div class="form-group mb-3">
             <label asp-for="Record.QuestionText" class="form-label">Question</label>
-            <textarea asp-for="Record.QuestionText" class="form-control" rows="3"></textarea>
+            <textarea asp-for="Record.QuestionText" class="form-control" id="questionTextEditor" rows="6"></textarea>
         </div>
 
         <div class="form-group mb-3">
@@ -91,13 +91,34 @@
 
 @section Scripts {
     @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+    <script src="https://cdn.tiny.cloud/1/3kewwfp0mgpaatcm5468igfv49fz4ummxdovtdoxhz00u6gd/tinymce/7/tinymce.min.js"></script>
     <script>
         (function () {
+            tinymce.init({
+                selector: '#questionTextEditor',
+                plugins: 'link lists table code help wordcount',
+                toolbar: 'undo redo | blocks | bold italic underline | alignleft aligncenter alignright | bullist numlist | link | code help',
+                menubar: 'file edit view insert format table help',
+                height: 320,
+                setup: function (editor) {
+                    editor.on('change input undo redo', function () {
+                        tinymce.triggerSave();
+                    });
+                }
+            });
+
+            const form = document.querySelector('form');
+            if (form) {
+                form.addEventListener('submit', function () {
+                    tinymce.triggerSave();
+                });
+            }
+
             const answerTypeSelect = document.getElementById('answerTypeSelect');
             const multichoiceFields = document.getElementById('multichoiceFields');
 
             function toggleMultichoiceFields() {
-                const isChoiceType = answerTypeSelect && (answerTypeSelect.value === 'SingleChoice' || answerTypeSelect.value === 'Multichoice');
+                const isChoiceType = answerTypeSelect && (answerTypeSelect.value === 'SingleChoice' || answerTypeSelect.value === 'Radio' || answerTypeSelect.value === 'Multichoice');
                 if (multichoiceFields) {
                     multichoiceFields.style.display = isChoiceType ? '' : 'none';
                 }

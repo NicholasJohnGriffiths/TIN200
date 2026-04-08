@@ -15,7 +15,7 @@
         <dt class="col-sm-3">Description</dt><dd class="col-sm-9">@Model.Record.Description</dd>
         <dt class="col-sm-3">Group Title</dt><dd class="col-sm-9">@Model.Record.GroupTitle</dd>
         <dt class="col-sm-3">Group Description</dt><dd class="col-sm-9">@Model.Record.GroupDescription</dd>
-        <dt class="col-sm-3">Question</dt><dd class="col-sm-9">@Model.Record.QuestionText</dd>
+        <dt class="col-sm-3">Question</dt><dd class="col-sm-9">@Html.Raw(Model.Record.QuestionText ?? string.Empty)</dd>
         <dt class="col-sm-3">Answer Type</dt><dd class="col-sm-9">@Model.Record.AnswerType</dd>
         <dt class="col-sm-3">Active</dt><dd class="col-sm-9">@(Model.Record.Active == false ? "No" : "Yes")</dd>
         <dt class="col-sm-3">Multi 1-10</dt>

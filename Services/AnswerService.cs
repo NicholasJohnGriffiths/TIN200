@@ -417,7 +417,8 @@ namespace TINWeb.Services
                 answer.AnswerNumber = null;
                 answer.AnswerCurrency = input.AnswerCurrency;
             }
-            else if (answerType.Equals("SingleChoice", StringComparison.OrdinalIgnoreCase))
+            else if (answerType.Equals("SingleChoice", StringComparison.OrdinalIgnoreCase)
+                || answerType.Equals("Radio", StringComparison.OrdinalIgnoreCase))
             {
                 answer.AnswerText = choiceOptions.Contains(input.AnswerText ?? string.Empty)
                     ? input.AnswerText

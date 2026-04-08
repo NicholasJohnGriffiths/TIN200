@@ -56,7 +56,7 @@
                         <td>@record.OrderNumber</td>
                         <td>@(Model.GroupTitlesByQuestionId.TryGetValue(record.Id, out var groupTitle) ? groupTitle : string.Empty)</td>
                         <td class="title-col">@record.Title</td>
-                        <td class="question-col">@record.QuestionText</td>
+                        <td class="question-col">@Html.Raw(record.QuestionText ?? string.Empty)</td>
                         <td class="answer-type-col">@record.AnswerType</td>
                         <td>@(record.Active == false ? "No" : "Yes")</td>
                         <td class="actions-col">

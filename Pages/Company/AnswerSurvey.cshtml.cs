@@ -263,7 +263,9 @@ namespace TINWeb.Pages.Company
                     row.AnswerText = null;
                     row.AnswerNumber = null;
                 }
-                else if (answerType != null && answerType.Equals("SingleChoice", StringComparison.OrdinalIgnoreCase))
+                else if (answerType != null && (
+                    answerType.Equals("SingleChoice", StringComparison.OrdinalIgnoreCase)
+                    || answerType.Equals("Radio", StringComparison.OrdinalIgnoreCase)))
                 {
                     row.AnswerText = allowedOptions.Contains(row.AnswerText ?? string.Empty, StringComparer.Ordinal)
                         ? row.AnswerText

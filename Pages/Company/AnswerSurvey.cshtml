@@ -28,6 +28,20 @@
         margin-bottom: 0;
     }
 
+    .survey-table-question p,
+    .survey-table-question ul,
+    .survey-table-question ol,
+    .survey-question-richtext p,
+    .survey-question-richtext ul,
+    .survey-question-richtext ol {
+        margin-bottom: 0.35rem;
+    }
+
+    .survey-table-question > :last-child,
+    .survey-question-richtext > :last-child {
+        margin-bottom: 0;
+    }
+
     .survey-table-inline-row {
         display: flex;
         align-items: center;
@@ -496,7 +510,7 @@
                                                     @foreach (var headerRowIndex in subgroupHeaderRows)
                                                     {
                                                         <th class="survey-table-header-cell">
-                                                            <div class="survey-table-question">@Model.Rows[headerRowIndex].QuestionText</div>
+                                                            <div class="survey-table-question">@Html.Raw(Model.Rows[headerRowIndex].QuestionText ?? string.Empty)</div>
                                                         </th>
                                                     }
                                                 </tr>
@@ -564,6 +578,36 @@
                                                                                     <option value="@option">@option</option>
                                                                                 }
                                                                             </select>
+                                                                            <input type="hidden" asp-for="Rows[i].AnswerNumber" />
+                                                                            <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
+                                                                        }
+                                                                        else if (answerType.Equals("Radio", StringComparison.OrdinalIgnoreCase))
+                                                                        {
+                                                                            if (Model.Rows[i].ChoiceOptions.Count == 0)
+                                                                            {
+                                                                                <div class="text-muted small">No options available.</div>
+                                                                            }
+                                                                            else
+                                                                            {
+                                                                                <div class="survey-table-multichoice">
+                                                                                    @for (var optionIndex = 0; optionIndex < Model.Rows[i].ChoiceOptions.Count; optionIndex++)
+                                                                                    {
+                                                                                        var option = Model.Rows[i].ChoiceOptions[optionIndex];
+                                                                                        var optionId = $"row_{i}_radio_{optionIndex}";
+                                                                                        var isChecked = string.Equals(Model.Rows[i].AnswerText, option, StringComparison.Ordinal);
+                                                                                        <div class="form-check">
+                                                                                            <input
+                                                                                                class="form-check-input"
+                                                                                                type="radio"
+                                                                                                name="Rows[@i].AnswerText"
+                                                                                                value="@option"
+                                                                                                id="@optionId"
+                                                                                                @(isChecked ? "checked" : null) />
+                                                                                            <label class="form-check-label small" for="@optionId">@option</label>
+                                                                                        </div>
+                                                                                    }
+                                                                                </div>
+                                                                            }
                                                                             <input type="hidden" asp-for="Rows[i].AnswerNumber" />
                                                                             <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
                                                                         }
@@ -637,7 +681,7 @@
 
                             if (nonSubgroupRows.Count > 0)
                             {
-                                var textFieldRows = nonSubgroupRows.Where(i => !(Model.Rows[i].AnswerType ?? string.Empty).Trim().Equals("Number", StringComparison.OrdinalIgnoreCase) && !(Model.Rows[i].AnswerType ?? string.Empty).Trim().Equals("Currency", StringComparison.OrdinalIgnoreCase) && !(Model.Rows[i].AnswerType ?? string.Empty).Trim().Equals("SingleChoice", StringComparison.OrdinalIgnoreCase) && !(Model.Rows[i].AnswerType ?? string.Empty).Trim().Equals("Multichoice", StringComparison.OrdinalIgnoreCase) && !(Model.Rows[i].AnswerType ?? string.Empty).Trim().Equals("MultiChoice", StringComparison.OrdinalIgnoreCase)).ToList();
+                                var textFieldRows = nonSubgroupRows.Where(i => !(Model.Rows[i].AnswerType ?? string.Empty).Trim().Equals("Number", StringComparison.OrdinalIgnoreCase) && !(Model.Rows[i].AnswerType ?? string.Empty).Trim().Equals("Currency", StringComparison.OrdinalIgnoreCase) && !(Model.Rows[i].AnswerType ?? string.Empty).Trim().Equals("SingleChoice", StringComparison.OrdinalIgnoreCase) && !(Model.Rows[i].AnswerType ?? string.Empty).Trim().Equals("Radio", StringComparison.OrdinalIgnoreCase) && !(Model.Rows[i].AnswerType ?? string.Empty).Trim().Equals("Multichoice", StringComparison.OrdinalIgnoreCase) && !(Model.Rows[i].AnswerType ?? string.Empty).Trim().Equals("MultiChoice", StringComparison.OrdinalIgnoreCase)).ToList();
                                 var compactRows = nonSubgroupRows.Except(textFieldRows).ToList();
 
                                 <div class="table-responsive">
@@ -653,7 +697,7 @@
 
                                                 <tr class="survey-answer-row" data-row-index="@i">
                                                     <td class="survey-table-cell">
-                                                        <div class="survey-table-question">@Model.Rows[i].QuestionText</div>
+                                                        <div class="survey-table-question">@Html.Raw(Model.Rows[i].QuestionText ?? string.Empty)</div>
                                                     </td>
                                                     <td class="survey-table-cell">
                                                         <input type="hidden" asp-for="Rows[i].QuestionId" />
@@ -698,6 +742,36 @@
                                                                             <option value="@option">@option</option>
                                                                         }
                                                                     </select>
+                                                                    <input type="hidden" asp-for="Rows[i].AnswerNumber" />
+                                                                    <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
+                                                                }
+                                                                else if (answerType.Equals("Radio", StringComparison.OrdinalIgnoreCase))
+                                                                {
+                                                                    if (Model.Rows[i].ChoiceOptions.Count == 0)
+                                                                    {
+                                                                        <div class="text-muted small">No options available.</div>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <div class="survey-table-multichoice">
+                                                                            @for (var optionIndex = 0; optionIndex < Model.Rows[i].ChoiceOptions.Count; optionIndex++)
+                                                                            {
+                                                                                var option = Model.Rows[i].ChoiceOptions[optionIndex];
+                                                                                var optionId = $"row_{i}_radio_{optionIndex}";
+                                                                                var isChecked = string.Equals(Model.Rows[i].AnswerText, option, StringComparison.Ordinal);
+                                                                                <div class="form-check">
+                                                                                    <input
+                                                                                        class="form-check-input"
+                                                                                        type="radio"
+                                                                                        name="Rows[@i].AnswerText"
+                                                                                        value="@option"
+                                                                                        id="@optionId"
+                                                                                        @(isChecked ? "checked" : null) />
+                                                                                    <label class="form-check-label small" for="@optionId">@option</label>
+                                                                                </div>
+                                                                            }
+                                                                        </div>
+                                                                    }
                                                                     <input type="hidden" asp-for="Rows[i].AnswerNumber" />
                                                                     <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
                                                                 }
@@ -776,7 +850,7 @@
                                             var previousYearCurrency = Model.Rows[i].PreviousYearAnswerCurrency?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
 
                                             <div class="mb-3 pb-3 border-bottom">
-                                                <label class="form-label fw-semibold mb-2">@Model.Rows[i].QuestionText</label>
+                                                <div class="form-label fw-semibold mb-2 survey-question-richtext">@Html.Raw(Model.Rows[i].QuestionText ?? string.Empty)</div>
                                                 <input type="hidden" asp-for="Rows[i].QuestionId" />
                                                 <input type="hidden" asp-for="Rows[i].OrderNumber" />
                                                 <input type="hidden" asp-for="Rows[i].GroupId" />
@@ -824,7 +898,7 @@
                                 <div class="mb-3 pb-3 border-bottom">
                                     <div class="d-flex justify-content-between align-items-start mb-2">
                                         <div>
-                                            <label class="form-label fw-semibold mb-0">@Model.Rows[i].QuestionText</label>
+                                            <div class="form-label fw-semibold mb-0 survey-question-richtext">@Html.Raw(Model.Rows[i].QuestionText ?? string.Empty)</div>
                                         </div>
                                         <span class="badge text-bg-secondary">@Model.Rows[i].AnswerType</span>
                                     </div>
@@ -872,6 +946,36 @@
                                                         <option value="@option">@option</option>
                                                     }
                                                 </select>
+                                                <input type="hidden" asp-for="Rows[i].AnswerNumber" />
+                                                <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
+                                            }
+                                            else if (answerType.Equals("Radio", StringComparison.OrdinalIgnoreCase))
+                                            {
+                                                if (Model.Rows[i].ChoiceOptions.Count == 0)
+                                                {
+                                                    <div class="text-muted small">No options available for this question.</div>
+                                                }
+                                                else
+                                                {
+                                                    for (var optionIndex = 0; optionIndex < Model.Rows[i].ChoiceOptions.Count; optionIndex++)
+                                                    {
+                                                        var option = Model.Rows[i].ChoiceOptions[optionIndex];
+                                                        var optionId = $"row_{i}_radio_{optionIndex}";
+                                                        var isChecked = string.Equals(Model.Rows[i].AnswerText, option, StringComparison.Ordinal);
+
+                                                        <div class="form-check">
+                                                            <input
+                                                                class="form-check-input"
+                                                                type="radio"
+                                                                name="Rows[@i].AnswerText"
+                                                                value="@option"
+                                                                id="@optionId"
+                                                                @(isChecked ? "checked" : null) />
+                                                            <label class="form-check-label" for="@optionId">@option</label>
+                                                        </div>
+                                                    }
+                                                }
+
                                                 <input type="hidden" asp-for="Rows[i].AnswerNumber" />
                                                 <input type="hidden" asp-for="Rows[i].AnswerCurrency" />
                                             }
@@ -982,6 +1086,11 @@
                 var checkboxes = row.querySelectorAll("input[type='checkbox']");
                 if (checkboxes.length > 0) {
                     return Array.from(checkboxes).some(function (checkbox) { return checkbox.checked; });
+                }
+
+                var radios = row.querySelectorAll("input[type='radio']");
+                if (radios.length > 0) {
+                    return Array.from(radios).some(function (radio) { return radio.checked; });
                 }
 
                 var select = row.querySelector('select');
@@ -1213,6 +1322,15 @@
                         document.querySelectorAll(selector).forEach(function (checkbox) {
                             checkbox.checked = selectedSet.has((checkbox.value || '').trim());
                             checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+                        });
+                        return;
+                    }
+
+                    if (answerType === 'radio') {
+                        var radioSelector = "input[type='radio'][name='Rows[" + rowIndex + "].AnswerText']";
+                        document.querySelectorAll(radioSelector).forEach(function (radio) {
+                            radio.checked = (radio.value || '').trim() === prevText.trim();
+                            radio.dispatchEvent(new Event('change', { bubbles: true }));
                         });
                         return;
                     }

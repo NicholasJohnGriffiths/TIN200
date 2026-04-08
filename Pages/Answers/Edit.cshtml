@@ -13,7 +13,7 @@
         <div class="mb-3">
             <div><strong>Company:</strong> @Model.Details.CompanyName</div>
             <div><strong>Financial Year:</strong> @Model.Details.FinancialYear</div>
-            <div><strong>Question:</strong> @Model.Details.QuestionText</div>
+            <div><strong>Question:</strong> @Html.Raw(Model.Details.QuestionText ?? string.Empty)</div>
         </div>
     }
 
@@ -60,6 +60,39 @@
                         <option value="@option">@option</option>
                     }
                 </select>
+                <span asp-validation-for="Input.AnswerText" class="text-danger"></span>
+            </div>
+
+            <input type="hidden" asp-for="Input.AnswerNumber" />
+            <input type="hidden" asp-for="Input.AnswerCurrency" />
+        }
+        else if (answerType.Equals("Radio", StringComparison.OrdinalIgnoreCase))
+        {
+            <div class="form-group mb-3">
+                <label class="form-label">Answer</label>
+                @if (Model.Input.ChoiceOptions.Count == 0)
+                {
+                    <div class="text-muted">No options available for this question.</div>
+                }
+                else
+                {
+                    for (var optionIndex = 0; optionIndex < Model.Input.ChoiceOptions.Count; optionIndex++)
+                    {
+                        var option = Model.Input.ChoiceOptions[optionIndex];
+                        var optionId = $"radio_{optionIndex}";
+                        var isChecked = string.Equals(Model.Input.AnswerText, option, StringComparison.Ordinal);
+                        <div class="form-check">
+                            <input
+                                class="form-check-input"
+                                type="radio"
+                                name="Input.AnswerText"
+                                value="@option"
+                                id="@optionId"
+                                @(isChecked ? "checked" : null) />
+                            <label class="form-check-label" for="@optionId">@option</label>
+                        </div>
+                    }
+                }
                 <span asp-validation-for="Input.AnswerText" class="text-danger"></span>
             </div>
 

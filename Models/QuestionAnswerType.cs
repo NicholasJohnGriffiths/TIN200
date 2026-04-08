@@ -6,6 +6,7 @@ namespace TINWeb.Models
         Currency,
         Number,
         SingleChoice,
+        Radio,
         Multichoice
     }
 }
