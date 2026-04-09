@@ -13,6 +13,21 @@
 
         <dt class="col-sm-3">Admin Email</dt>
         <dd class="col-sm-9">@Model.Record.AdminEmail</dd>
+
+        <dt class="col-sm-3">Survey Email Subject</dt>
+        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Record.SurveyEmailSubject) ? "Default" : Model.Record.SurveyEmailSubject)</dd>
+
+        <dt class="col-sm-3">Survey Email Template</dt>
+        <dd class="col-sm-9">
+            @if (string.IsNullOrWhiteSpace(Model.Record.SurveyEmailTemplate))
+            {
+                <span class="text-muted">Not set</span>
+            }
+            else
+            {
+                <div class="border rounded p-3 bg-light">@Html.Raw(Model.Record.SurveyEmailTemplate)</div>
+            }
+        </dd>
     </dl>
 
     <div class="d-flex gap-2">

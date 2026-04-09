@@ -32,6 +32,12 @@ public class CreateModel : PageModel
     {
         Record.Id = 1;
         Record.AdminEmail = Record.AdminEmail?.Trim() ?? string.Empty;
+        Record.SurveyEmailSubject = string.IsNullOrWhiteSpace(Record.SurveyEmailSubject)
+            ? null
+            : Record.SurveyEmailSubject.Trim();
+        Record.SurveyEmailTemplate = string.IsNullOrWhiteSpace(Record.SurveyEmailTemplate)
+            ? null
+            : Record.SurveyEmailTemplate.Trim();
 
         if (string.IsNullOrWhiteSpace(Record.AdminEmail))
         {

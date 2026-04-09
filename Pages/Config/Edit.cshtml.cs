@@ -38,6 +38,12 @@ public class EditModel : PageModel
     public async Task<IActionResult> OnPostAsync()
     {
         Record.AdminEmail = Record.AdminEmail?.Trim() ?? string.Empty;
+        Record.SurveyEmailSubject = string.IsNullOrWhiteSpace(Record.SurveyEmailSubject)
+            ? null
+            : Record.SurveyEmailSubject.Trim();
+        Record.SurveyEmailTemplate = string.IsNullOrWhiteSpace(Record.SurveyEmailTemplate)
+            ? null
+            : Record.SurveyEmailTemplate.Trim();
 
         if (string.IsNullOrWhiteSpace(Record.AdminEmail))
         {
@@ -56,6 +62,8 @@ public class EditModel : PageModel
         }
 
         existing.AdminEmail = Record.AdminEmail;
+        existing.SurveyEmailSubject = Record.SurveyEmailSubject;
+        existing.SurveyEmailTemplate = Record.SurveyEmailTemplate;
         await _context.SaveChangesAsync();
 
         StatusMessage = "Config updated successfully.";

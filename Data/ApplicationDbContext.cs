@@ -650,6 +650,17 @@ namespace TINWeb.Data
                     .HasColumnType("varchar(255)")
                     .HasMaxLength(255)
                     .IsRequired();
+
+                entity.Property(e => e.SurveyEmailSubject)
+                    .HasColumnName("SurveyEmailSubject")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255)
+                    .IsRequired(false);
+
+                entity.Property(e => e.SurveyEmailTemplate)
+                    .HasColumnName("SurveyEmailTemplate")
+                    .HasColumnType("text")
+                    .IsRequired(false);
             });
 
             // Configure view models - no key required for views

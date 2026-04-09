@@ -1,19 +1,25 @@
 using Azure;
 using Azure.Communication.Email;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Net;
+using System.Text.RegularExpressions;
+using TINWeb.Data;
 
 namespace TINWeb.Services
 {
     public class SurveyEmailService : ISurveyEmailService
     {
+        private readonly ApplicationDbContext _context;
         private readonly AzureCommunicationEmailSettings _emailSettings;
         private readonly SurveyLinkSettings _surveyLinkSettings;
 
         public SurveyEmailService(
+            ApplicationDbContext context,
             IOptions<AzureCommunicationEmailSettings> emailOptions,
             IOptions<SurveyLinkSettings> surveyLinkOptions)
         {
+            _context = context;
             _emailSettings = emailOptions.Value;
             _surveyLinkSettings = surveyLinkOptions.Value;
         }
@@ -25,37 +31,30 @@ namespace TINWeb.Services
             var recipientName = string.IsNullOrWhiteSpace(companyName) ? "there" : companyName.Trim();
             var senderDisplayName = GetSenderDisplayName();
             var supportEmail = "tin100@tinetwork.com";
-            var subject = "TIN200 survey request: please review your company details";
+            var defaultSubject = "TIN200 survey request: please review your company details";
 
             var unsubscribeToken = GenerateUnsubscribeToken(clientId);
             var baseUrl = _surveyLinkSettings.BaseUrl ?? string.Empty;
             baseUrl = baseUrl.Trim().TrimEnd('/');
             var unsubscribeUrl = $"{baseUrl}/Company/Unsubscribe?id={clientId}&token={Uri.EscapeDataString(unsubscribeToken)}";
 
-            var plainTextBody = $@"Hello {recipientName},
+            var configuredEmailOptions = await _context.AppConfig
+                .AsNoTracking()
+                .OrderBy(c => c.Id)
+                .Select(c => new { c.SurveyEmailSubject, c.SurveyEmailTemplate })
+                .FirstOrDefaultAsync();
 
-You have been invited to review and update your company details for TIN200.
+            var subject = string.IsNullOrWhiteSpace(configuredEmailOptions?.SurveyEmailSubject)
+                ? defaultSubject
+                : configuredEmailOptions.SurveyEmailSubject.Trim();
 
-Open your secure survey link
-{surveyUrl}
-
-If you did not expect this email, you can safely ignore it.
-
-Need help? Contact {supportEmail}.
-
-To unsubscribe from future TIN200 surveys:
-{unsubscribeUrl}
-
-Regards,
-{senderDisplayName}";
-
-            var htmlBody = $@"<p>Hello {WebUtility.HtmlEncode(recipientName)},</p>
-<p>You have been invited to review and update your company details for <strong>TIN200</strong>.</p>
-<p><a href=""{WebUtility.HtmlEncode(surveyUrl)}"">Open your secure survey link</a></p>
-<p>If you did not expect this email, you can safely ignore it.</p>
-<p>Need help? Contact <a href=""mailto:{WebUtility.HtmlEncode(supportEmail)}"">{WebUtility.HtmlEncode(supportEmail)}</a>.</p>
-<p><small><a href=""{WebUtility.HtmlEncode(unsubscribeUrl)}"" style=""color: #999; font-size: 12px;"">Unsubscribe from future surveys</a></small></p>
-<p>Regards,<br/>{WebUtility.HtmlEncode(senderDisplayName)}</p>";
+            var (plainTextBody, htmlBody) = BuildSurveyEmailBodies(
+                configuredEmailOptions?.SurveyEmailTemplate,
+                recipientName,
+                surveyUrl,
+                unsubscribeUrl,
+                supportEmail,
+                senderDisplayName);
 
             await SendEmailAsync(new[] { recipientEmail }, subject, plainTextBody, htmlBody);
         }
@@ -102,6 +101,135 @@ Please review the contact email for this company before resending the survey.";
 <p>Please review the contact email for this company before resending the survey.</p>";
 
             await SendEmailAsync(new[] { adminEmail }, subject, plainTextBody, htmlBody);
+        }
+
+        private (string PlainTextBody, string HtmlBody) BuildSurveyEmailBodies(
+            string? configuredTemplate,
+            string recipientName,
+            string surveyUrl,
+            string unsubscribeUrl,
+            string supportEmail,
+            string senderDisplayName)
+        {
+            var unsubscribePlainText = $@"To unsubscribe from future TIN200 surveys:
+{unsubscribeUrl}";
+
+            var unsubscribeHtml = $@"<p><small><a href=""{WebUtility.HtmlEncode(unsubscribeUrl)}"" style=""color: #999; font-size: 12px;"">Unsubscribe from future surveys</a></small></p>";
+
+            var footerPlainText = $@"If you did not expect this email, you can safely ignore it.
+
+Need help? Contact {supportEmail}.
+
+{unsubscribePlainText}
+
+Regards,
+{senderDisplayName}";
+
+            var footerHtml = $@"<p>If you did not expect this email, you can safely ignore it.</p>
+<p>Need help? Contact <a href=""mailto:{WebUtility.HtmlEncode(supportEmail)}"">{WebUtility.HtmlEncode(supportEmail)}</a>.</p>
+{unsubscribeHtml}
+<p>Regards,<br/>{WebUtility.HtmlEncode(senderDisplayName)}</p>";
+
+            if (!string.IsNullOrWhiteSpace(configuredTemplate))
+            {
+                var htmlTemplate = ApplySurveyTemplate(configuredTemplate, recipientName, surveyUrl, encodeForHtml: true);
+                var plainTextTemplate = ConvertHtmlToPlainText(ApplySurveyTemplate(configuredTemplate, recipientName, surveyUrl, encodeForHtml: false));
+
+                var plainTextBody = string.IsNullOrWhiteSpace(plainTextTemplate)
+                    ? unsubscribePlainText
+                    : $"{plainTextTemplate}\r\n\r\n{unsubscribePlainText}";
+
+                var htmlBody = string.IsNullOrWhiteSpace(htmlTemplate)
+                    ? unsubscribeHtml
+                    : $"{htmlTemplate}\n{unsubscribeHtml}";
+
+                return (plainTextBody, htmlBody);
+            }
+
+            var fallbackPlainTextBody = $@"Hello {recipientName},
+
+You have been invited to review and update your company details for TIN200.
+
+Open your secure survey link
+{surveyUrl}
+
+{footerPlainText}";
+
+            var fallbackHtmlBody = $@"<p>Hello {WebUtility.HtmlEncode(recipientName)},</p>
+<p>You have been invited to review and update your company details for <strong>TIN200</strong>.</p>
+<p><a href=""{WebUtility.HtmlEncode(surveyUrl)}"">Open your secure survey link</a></p>
+{footerHtml}";
+
+            return (fallbackPlainTextBody, fallbackHtmlBody);
+        }
+
+        private static string ApplySurveyTemplate(string template, string recipientName, string surveyUrl, bool encodeForHtml)
+        {
+            if (string.IsNullOrWhiteSpace(template))
+            {
+                return string.Empty;
+            }
+
+            var companyReplacement = encodeForHtml
+                ? WebUtility.HtmlEncode(recipientName)
+                : recipientName;
+
+            var surveyLinkReplacement = encodeForHtml
+                ? $@"<a id=""surveylink"" href=""{WebUtility.HtmlEncode(surveyUrl)}"">{WebUtility.HtmlEncode(surveyUrl)}</a>"
+                : surveyUrl;
+
+            var result = template
+                .Replace("(Company Name)", companyReplacement, StringComparison.OrdinalIgnoreCase)
+                .Replace("(Name)", companyReplacement, StringComparison.OrdinalIgnoreCase)
+                .Replace("(Survey link)", surveyLinkReplacement, StringComparison.OrdinalIgnoreCase);
+
+            if (encodeForHtml)
+            {
+                result = Regex.Replace(
+                    result,
+                    @"<a\b(?=[^>]*\bid\s*=\s*['""]surveylink['""])([^>]*)>(.*?)</a>",
+                    match =>
+                    {
+                        var attributes = Regex.Replace(
+                            match.Groups[1].Value,
+                            @"\s+href\s*=\s*(['""]).*?\1",
+                            string.Empty,
+                            RegexOptions.IgnoreCase | RegexOptions.Singleline).Trim();
+
+                        var attributePrefix = string.IsNullOrWhiteSpace(attributes)
+                            ? string.Empty
+                            : $" {attributes}";
+
+                        var linkText = match.Groups[2].Value;
+                        return $@"<a{attributePrefix} href=""{WebUtility.HtmlEncode(surveyUrl)}"">{linkText}</a>";
+                    },
+                    RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            }
+            else
+            {
+                result = Regex.Replace(
+                    result,
+                    @"<a\b(?=[^>]*\bid\s*=\s*['""]surveylink['""])([^>]*)>(.*?)</a>",
+                    surveyUrl,
+                    RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            }
+
+            return result;
+        }
+
+        private static string ConvertHtmlToPlainText(string html)
+        {
+            if (string.IsNullOrWhiteSpace(html))
+            {
+                return string.Empty;
+            }
+
+            var text = Regex.Replace(html, @"<\s*br\s*/?>", "\n", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"<\s*/p\s*>", "\n\n", RegexOptions.IgnoreCase);
+            text = Regex.Replace(text, @"<[^>]+>", string.Empty);
+            text = WebUtility.HtmlDecode(text);
+
+            return Regex.Replace(text, @"\n{3,}", "\n\n").Trim();
         }
 
         private void EnsureEmailConfigured()

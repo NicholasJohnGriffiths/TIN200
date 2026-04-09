@@ -50,7 +50,16 @@
             <div class="card mb-3">
                 <div class="card-header">Bulk Send</div>
                 <div class="card-body">
+                    <form method="get" class="mb-3">
+                        <div class="form-check">
+                            <input asp-for="IncludeTestCompanies" class="form-check-input" onchange="this.form.submit()" />
+                            <label asp-for="IncludeTestCompanies" class="form-check-label">Include Test Companies</label>
+                        </div>
+                        <div class="form-text">By default, test companies are hidden from this page.</div>
+                    </form>
+
                     <form id="bulkSendForm" method="post" asp-page-handler="Bulk">
+                        <input type="hidden" asp-for="IncludeTestCompanies" />
                         <div class="form-check mb-3">
                             <input asp-for="SendToAllClients" class="form-check-input" />
                             <label asp-for="SendToAllClients" class="form-check-label">Send to all clients with an email address</label>

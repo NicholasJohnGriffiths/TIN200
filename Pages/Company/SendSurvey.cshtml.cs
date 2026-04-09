@@ -35,6 +35,9 @@ namespace TINWeb.Pages.Company
         [BindProperty]
         public bool SendToAllClients { get; set; }
 
+        [BindProperty(SupportsGet = true)]
+        public bool IncludeTestCompanies { get; set; }
+
         public List<SurveyClientRow> AvailableClients { get; set; } = new();
 
         public bool HasQueryPreselection { get; set; }
@@ -227,6 +230,11 @@ namespace TINWeb.Pages.Company
         private async Task LoadAvailableClientsAsync()
         {
             var clients = await _companyService.GetAllCompaniesAsync();
+            if (!IncludeTestCompanies)
+            {
+                clients = clients.Where(c => c.Test != true).ToList();
+            }
+
             var lockedCompanyIds = await GetLockedCompanyIdsForCurrentSurveyAsync();
             var surveyEmailStatusByCompanyId = await GetSurveyEmailStatusByCompanyIdForCurrentSurveyAsync();
 

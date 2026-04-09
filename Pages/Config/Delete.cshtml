@@ -14,6 +14,12 @@
 
         <dt class="col-sm-3">Admin Email</dt>
         <dd class="col-sm-9">@Model.Record.AdminEmail</dd>
+
+        <dt class="col-sm-3">Survey Email Subject</dt>
+        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Record.SurveyEmailSubject) ? "Default" : Model.Record.SurveyEmailSubject)</dd>
+
+        <dt class="col-sm-3">Survey Email Template</dt>
+        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Record.SurveyEmailTemplate) ? "Not set" : "Configured")</dd>
     </dl>
 
     <form method="post" class="d-flex gap-2">
