@@ -2,7 +2,6 @@ using Azure;
 using Azure.Communication.Email;
 using Microsoft.Extensions.Options;
 using System.Net;
-using System.Net.Mail;
 
 namespace TINWeb.Services
 {
@@ -24,6 +23,7 @@ namespace TINWeb.Services
             EnsureEmailConfigured();
 
             var recipientName = string.IsNullOrWhiteSpace(companyName) ? "there" : companyName.Trim();
+            var senderDisplayName = GetSenderDisplayName();
             var supportEmail = "tin100@tinetwork.com";
             var subject = "TIN200 survey request: please review your company details";
 
@@ -47,7 +47,7 @@ To unsubscribe from future TIN200 surveys:
 {unsubscribeUrl}
 
 Regards,
-TIN200 Team";
+{senderDisplayName}";
 
             var htmlBody = $@"<p>Hello {WebUtility.HtmlEncode(recipientName)},</p>
 <p>You have been invited to review and update your company details for <strong>TIN200</strong>.</p>
@@ -55,7 +55,7 @@ TIN200 Team";
 <p>If you did not expect this email, you can safely ignore it.</p>
 <p>Need help? Contact <a href=""mailto:{WebUtility.HtmlEncode(supportEmail)}"">{WebUtility.HtmlEncode(supportEmail)}</a>.</p>
 <p><small><a href=""{WebUtility.HtmlEncode(unsubscribeUrl)}"" style=""color: #999; font-size: 12px;"">Unsubscribe from future surveys</a></small></p>
-<p>Regards,<br/>TIN200 Team</p>";
+<p>Regards,<br/>{WebUtility.HtmlEncode(senderDisplayName)}</p>";
 
             await SendEmailAsync(new[] { recipientEmail }, subject, plainTextBody, htmlBody);
         }
@@ -157,15 +157,19 @@ Please review the contact email for this company before resending the survey.";
             }
         }
 
+        private string GetSenderDisplayName()
+        {
+            return string.IsNullOrWhiteSpace(_emailSettings.FromName)
+                ? "TIN Survey"
+                : _emailSettings.FromName.Trim();
+        }
+
         private static string BuildSenderAddress(string fromEmail, string? fromName)
         {
-            var email = fromEmail.Trim();
-            if (string.IsNullOrWhiteSpace(fromName))
-            {
-                return email;
-            }
-
-            return new MailAddress(email, fromName.Trim()).ToString();
+            // Azure Communication Email expects senderAddress to be only the email address.
+            // The configured FromName is still used throughout the survey email content and should
+            // also match the sender identity configured in Azure for the mailbox.
+            return fromEmail.Trim();
         }
 
         private static IEnumerable<string> ParseRecipientEmails(IEnumerable<string> recipientEmails)

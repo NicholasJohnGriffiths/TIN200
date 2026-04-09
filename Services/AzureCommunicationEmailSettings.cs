@@ -4,6 +4,6 @@ namespace TINWeb.Services
     {
         public string ConnectionString { get; set; } = string.Empty;
         public string FromEmail { get; set; } = string.Empty;
-        public string FromName { get; set; } = "TIN200 Survey";
+        public string FromName { get; set; } = "TIN Survey";
     }
 }

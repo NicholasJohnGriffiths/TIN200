@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Mail;
 using System.Text.Json;
 using Azure;
 using Azure.Communication.Email;
@@ -426,13 +425,9 @@ Please review the contact email for this company before resending the survey.";
 
     private static string BuildSenderAddress(string? fromEmail, string? fromName)
     {
-        var email = (fromEmail ?? string.Empty).Trim();
-        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(fromName))
-        {
-            return email;
-        }
-
-        return new MailAddress(email, fromName.Trim()).ToString();
+        // Azure Communication Email expects senderAddress to be only the email address.
+        // Passing "Display Name <email@domain>" causes a 400 BadRequest on senderAddress.
+        return (fromEmail ?? string.Empty).Trim();
     }
 
     private static bool IsBounceLikeEvent(string? eventType, string? status)

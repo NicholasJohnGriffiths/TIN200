@@ -85,7 +85,8 @@
 
                 <div class="form-group mb-3">
                     <div class="form-check">
-                        <input asp-for="Record.Test" type="checkbox" class="form-check-input" />
+                        <input type="hidden" name="Record.Test" value="false" />
+                        <input type="checkbox" id="Record_Test" name="Record.Test" value="true" class="form-check-input" @(Model.Record.Test == true ? "checked" : "") />
                         <label asp-for="Record.Test" class="form-check-label"></label>
                     </div>
                 </div>
