@@ -49,6 +49,21 @@ namespace TINWeb.Data
                     .HasColumnName("CEOLastName")
                     .HasColumnType("varchar(255)")
                     .HasMaxLength(255);
+
+                entity.Property(e => e.ContactFirstName)
+                    .HasColumnName("ContactFirstName")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255);
+
+                entity.Property(e => e.ContactLastName)
+                    .HasColumnName("ContactLastName")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255);
+
+                entity.Property(e => e.ContactEmail)
+                    .HasColumnName("ContactEmail")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255);
                 
                 entity.Property(e => e.Email)
                     .HasColumnName("Email")
@@ -72,6 +87,11 @@ namespace TINWeb.Data
 
                 entity.Property(e => e.ExternalIdImportColumnName)
                     .HasColumnName("ExternalId_ImportColumnName")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255);
+
+                entity.Property(e => e.ExternalIdImportColumnNameAlt)
+                    .HasColumnName("ExternalId_ImportColumnNameAlt")
                     .HasColumnType("varchar(255)")
                     .HasMaxLength(255);
 

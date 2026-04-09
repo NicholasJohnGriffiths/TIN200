@@ -59,7 +59,7 @@ namespace TINWeb.Pages.Company
 
             foreach (var r in records)
             {
-                var email = CsvField(r.Email);
+                var email = CsvField(r.ContactEmail);
                 var externalId = CsvField(r.ExternalId);
                 var firstName = CsvField(r.CeoFirstName);
                 var lastName = CsvField(r.CeoLastName);

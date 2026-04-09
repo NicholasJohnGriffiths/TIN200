@@ -19,7 +19,9 @@ namespace TINWeb.Pages.Company
         public bool ShowTestCompanies { get; set; }
         public CompanyService.ResetFyeValuesResult? PreviewSummary { get; set; }
         public CompanyService.CompanyGlobalImportPreviewResult? GlobalImportPreview { get; set; }
+        public CompanyService.CompanyContactImportPreviewResult? ContactImportPreview { get; set; }
         public string? PendingGlobalImportToken { get; set; }
+        public string? PendingContactImportToken { get; set; }
         public int? SelectedImportYear { get; set; }
 
         [TempData]
@@ -138,6 +140,90 @@ namespace TINWeb.Pages.Company
                 else
                 {
                     StatusMessage = $"Global company import completed. Import Year: {result.ImportYear}. Added: {result.InsertedCount}, Updated: {result.UpdatedCount}, Unchanged: {result.UnchangedCount}, CompanySurvey created: {result.CompanySurveyCreatedCount}.";
+                }
+            }
+            finally
+            {
+                PendingImports.TryRemove(previewToken, out _);
+                if (System.IO.File.Exists(pendingImport.TempFilePath))
+                {
+                    System.IO.File.Delete(pendingImport.TempFilePath);
+                }
+            }
+
+            return RedirectToPage(new { lastTin200Year = pendingImport.LastTin200Year, companySearch = pendingImport.CompanySearch, showTestCompanies = pendingImport.ShowTestCompanies });
+        }
+
+        public async Task<IActionResult> OnPostPreviewContactImportAsync(IFormFile? importFile, int? lastTin200Year, string? companySearch, bool showTestCompanies = false)
+        {
+            if (importFile == null || importFile.Length == 0)
+            {
+                ErrorMessage = "Contact import failed: please select an Excel file.";
+                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies });
+            }
+
+            var fileName = importFile.FileName ?? string.Empty;
+            if (!fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                ErrorMessage = "Contact import failed: only .xlsx Excel files are supported.";
+                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies });
+            }
+
+            CleanupExpiredPendingImports();
+
+            var token = Guid.NewGuid().ToString("N");
+            var tempDir = Path.Combine(Path.GetTempPath(), "tinweb-company-contact-import");
+            Directory.CreateDirectory(tempDir);
+            var tempFilePath = Path.Combine(tempDir, $"{token}.xlsx");
+
+            await using (var tempFileStream = System.IO.File.Create(tempFilePath))
+            {
+                await importFile.CopyToAsync(tempFileStream);
+            }
+
+            CompanyService.CompanyContactImportPreviewResult preview;
+            await using (var readStream = System.IO.File.OpenRead(tempFilePath))
+            {
+                preview = await _service.PreviewContactImportFromExcelAsync(readStream);
+            }
+
+            PendingImports[token] = new PendingCompanyImport
+            {
+                Token = token,
+                TempFilePath = tempFilePath,
+                CreatedUtc = DateTime.UtcNow,
+                LastTin200Year = lastTin200Year,
+                CompanySearch = companySearch,
+                ShowTestCompanies = showTestCompanies
+            };
+
+            await LoadPageAsync(lastTin200Year, companySearch, showTestCompanies);
+            ContactImportPreview = preview;
+            PendingContactImportToken = token;
+            return Page();
+        }
+
+        public async Task<IActionResult> OnPostApplyContactImportAsync(string? previewToken)
+        {
+            CleanupExpiredPendingImports();
+
+            if (string.IsNullOrWhiteSpace(previewToken) || !PendingImports.TryGetValue(previewToken, out var pendingImport))
+            {
+                ErrorMessage = "Apply contact import failed: preview session not found or expired. Please preview the file again.";
+                return RedirectToPage();
+            }
+
+            try
+            {
+                await using var stream = System.IO.File.OpenRead(pendingImport.TempFilePath);
+                var result = await _service.ImportContactsFromExcelAsync(stream);
+                if (result.Errors.Any())
+                {
+                    StatusMessage = $"Contact import completed with warnings. Updated: {result.UpdatedCount}, Unchanged: {result.UnchangedCount}, Not Found: {result.NotFoundCount}. Warnings: {string.Join(" ", result.Errors.Take(5))}";
+                }
+                else
+                {
+                    StatusMessage = $"Contact import completed. Updated: {result.UpdatedCount}, Unchanged: {result.UnchangedCount}, Not Found: {result.NotFoundCount}.";
                 }
             }
             finally

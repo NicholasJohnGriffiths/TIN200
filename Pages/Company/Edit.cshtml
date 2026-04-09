@@ -30,6 +30,24 @@
                 </div>
 
                 <div class="form-group mb-3">
+                    <label asp-for="Record.ContactFirstName" class="form-label"></label>
+                    <input asp-for="Record.ContactFirstName" class="form-control" />
+                    <span asp-validation-for="Record.ContactFirstName" class="text-danger"></span>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label asp-for="Record.ContactLastName" class="form-label"></label>
+                    <input asp-for="Record.ContactLastName" class="form-control" />
+                    <span asp-validation-for="Record.ContactLastName" class="text-danger"></span>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label asp-for="Record.ContactEmail" class="form-label"></label>
+                    <input asp-for="Record.ContactEmail" type="email" class="form-control" />
+                    <span asp-validation-for="Record.ContactEmail" class="text-danger"></span>
+                </div>
+
+                <div class="form-group mb-3">
                     <label asp-for="Record.Email" class="form-label"></label>
                     <input asp-for="Record.Email" type="email" class="form-control" />
                     <span asp-validation-for="Record.Email" class="text-danger"></span>
@@ -39,6 +57,18 @@
                     <label asp-for="Record.ExternalId" class="form-label"></label>
                     <input asp-for="Record.ExternalId" class="form-control" />
                     <span asp-validation-for="Record.ExternalId" class="text-danger"></span>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label asp-for="Record.ExternalIdImportColumnName" class="form-label"></label>
+                    <input asp-for="Record.ExternalIdImportColumnName" class="form-control" />
+                    <span asp-validation-for="Record.ExternalIdImportColumnName" class="text-danger"></span>
+                </div>
+
+                <div class="form-group mb-3">
+                    <label asp-for="Record.ExternalIdImportColumnNameAlt" class="form-label"></label>
+                    <input asp-for="Record.ExternalIdImportColumnNameAlt" class="form-control" />
+                    <span asp-validation-for="Record.ExternalIdImportColumnNameAlt" class="text-danger"></span>
                 </div>
 
                 <div class="form-group mb-3">

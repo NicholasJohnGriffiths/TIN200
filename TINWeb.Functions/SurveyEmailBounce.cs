@@ -223,8 +223,8 @@ public class SurveyEmailBounce
             SELECT Id,
                    ISNULL(NULLIF(LTRIM(RTRIM(CompanyName)), ''), CONCAT('Company ', Id)) AS CompanyName
             FROM dbo.Company
-            WHERE Email IS NOT NULL
-              AND LOWER(LTRIM(RTRIM(Email))) = @Email;
+            WHERE (ContactEmail IS NOT NULL AND LOWER(LTRIM(RTRIM(ContactEmail))) = @Email)
+               OR (Email IS NOT NULL AND LOWER(LTRIM(RTRIM(Email))) = @Email);
             """;
 
         var results = new List<(int, string)>();

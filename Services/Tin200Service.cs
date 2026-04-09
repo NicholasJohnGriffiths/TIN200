@@ -204,11 +204,15 @@ namespace TINWeb.Services
 
                 duplicatedCompany.CeoFirstName = sourceCompany.CeoFirstName;
                 duplicatedCompany.CeoLastName = sourceCompany.CeoLastName;
+                duplicatedCompany.ContactFirstName = sourceCompany.ContactFirstName;
+                duplicatedCompany.ContactLastName = sourceCompany.ContactLastName;
+                duplicatedCompany.ContactEmail = sourceCompany.ContactEmail;
                 duplicatedCompany.Email = sourceCompany.Email;
                 duplicatedCompany.ExternalId = ClampToMaxLength(nextExternalId, 50);
                 duplicatedCompany.CompanyName = duplicateName;
                 duplicatedCompany.CompanyDescription = sourceCompany.CompanyDescription;
                 duplicatedCompany.ExternalIdImportColumnName = sourceCompany.ExternalIdImportColumnName;
+                duplicatedCompany.ExternalIdImportColumnNameAlt = sourceCompany.ExternalIdImportColumnNameAlt;
                 duplicatedCompany.CompanyNameImportColumnName = sourceCompany.CompanyNameImportColumnName;
                 duplicatedCompany.CompanyDescriptionImportColumnName = sourceCompany.CompanyDescriptionImportColumnName;
                 duplicatedCompany.Fye2025 = sourceCompany.Fye2025;
@@ -231,11 +235,15 @@ namespace TINWeb.Services
                     Id = nextCompanyId + 1,
                     CeoFirstName = sourceCompany.CeoFirstName,
                     CeoLastName = sourceCompany.CeoLastName,
+                    ContactFirstName = sourceCompany.ContactFirstName,
+                    ContactLastName = sourceCompany.ContactLastName,
+                    ContactEmail = sourceCompany.ContactEmail,
                     Email = sourceCompany.Email,
                     ExternalId = ClampToMaxLength(nextExternalId, 50),
                     CompanyName = duplicateName,
                     CompanyDescription = sourceCompany.CompanyDescription,
                     ExternalIdImportColumnName = sourceCompany.ExternalIdImportColumnName,
+                    ExternalIdImportColumnNameAlt = sourceCompany.ExternalIdImportColumnNameAlt,
                     CompanyNameImportColumnName = sourceCompany.CompanyNameImportColumnName,
                     CompanyDescriptionImportColumnName = sourceCompany.CompanyDescriptionImportColumnName,
                     Fye2025 = sourceCompany.Fye2025,
@@ -529,6 +537,102 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             result.CompanySurveyCreatedCount = await EnsureCompanySurveyRowsForImportAsync(plan, importYear, result.Errors);
 
             await transaction.CommitAsync();
+            return result;
+        }
+
+        public async Task<CompanyContactImportPreviewResult> PreviewContactImportFromExcelAsync(Stream excelStream)
+        {
+            var plan = await BuildCompanyContactImportPlanAsync(excelStream);
+            var matchedHeaders = new[]
+            {
+                plan.MatchedCompanyNameHeader,
+                plan.MatchedContactFirstNameHeader,
+                plan.MatchedContactLastNameHeader,
+                plan.MatchedContactEmailHeader
+            }
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Select(x => x!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+            var unmatchedHeaders = plan.AvailableHeaders
+                .Except(matchedHeaders, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return new CompanyContactImportPreviewResult
+            {
+                AvailableHeaders = plan.AvailableHeaders,
+                MatchedHeaders = matchedHeaders,
+                UnmatchedHeaders = unmatchedHeaders,
+                MatchedFields = plan.MatchedFields,
+                Errors = new List<string>(plan.Errors),
+                UpdatedCount = plan.Operations.Count(x => x.Action == CompanyContactImportAction.Update),
+                UnchangedCount = plan.Operations.Count(x => x.Action == CompanyContactImportAction.Unchanged),
+                NotFoundCount = plan.Operations.Count(x => x.Action == CompanyContactImportAction.NotFound),
+                PreviewRows = plan.Operations
+                    .OrderBy(x => x.RowNumber)
+                    .Take(200)
+                    .Select(x => new CompanyContactImportPreviewRow
+                    {
+                        RowNumber = x.RowNumber,
+                        Action = x.Action.ToString(),
+                        ExistingCompanyId = x.CompanyId,
+                        CompanyName = x.CompanyName,
+                        CurrentContactFirstName = x.CurrentContactFirstName,
+                        ImportedContactFirstName = x.ImportedContactFirstName,
+                        CurrentContactLastName = x.CurrentContactLastName,
+                        ImportedContactLastName = x.ImportedContactLastName,
+                        CurrentContactEmail = x.CurrentContactEmail,
+                        ImportedContactEmail = x.ImportedContactEmail
+                    })
+                    .ToList()
+            };
+        }
+
+        public async Task<CompanyContactImportResult> ImportContactsFromExcelAsync(Stream excelStream)
+        {
+            var plan = await BuildCompanyContactImportPlanAsync(excelStream);
+            var result = new CompanyContactImportResult
+            {
+                Errors = new List<string>(plan.Errors),
+                UpdatedCount = plan.Operations.Count(x => x.Action == CompanyContactImportAction.Update),
+                UnchangedCount = plan.Operations.Count(x => x.Action == CompanyContactImportAction.Unchanged),
+                NotFoundCount = plan.Operations.Count(x => x.Action == CompanyContactImportAction.NotFound)
+            };
+
+            var operationsToApply = plan.Operations
+                .Where(x => x.Action == CompanyContactImportAction.Update && x.CompanyId.HasValue)
+                .ToList();
+
+            if (!operationsToApply.Any())
+            {
+                return result;
+            }
+
+            var companyIds = operationsToApply
+                .Select(x => x.CompanyId!.Value)
+                .Distinct()
+                .ToList();
+
+            var companies = await _context.Tin200
+                .Where(x => companyIds.Contains(x.Id))
+                .ToDictionaryAsync(x => x.Id);
+
+            foreach (var operation in operationsToApply)
+            {
+                if (!operation.CompanyId.HasValue || !companies.TryGetValue(operation.CompanyId.Value, out var company))
+                {
+                    continue;
+                }
+
+                company.ContactFirstName = operation.ImportedContactFirstName;
+                company.ContactLastName = operation.ImportedContactLastName;
+                company.ContactEmail = operation.ImportedContactEmail;
+            }
+
+            await _context.SaveChangesAsync();
             return result;
         }
 
@@ -1330,6 +1434,219 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             return plan;
         }
 
+        private async Task<CompanyContactImportPlan> BuildCompanyContactImportPlanAsync(Stream excelStream)
+        {
+            var plan = new CompanyContactImportPlan();
+
+            using var workbook = new XLWorkbook(excelStream);
+            var worksheet = workbook.Worksheets.FirstOrDefault();
+            if (worksheet == null)
+            {
+                plan.Errors.Add("The Excel workbook does not contain any worksheets.");
+                return plan;
+            }
+
+            var headerRow = worksheet.FirstRowUsed();
+            if (headerRow == null)
+            {
+                plan.Errors.Add("The worksheet does not contain any data.");
+                return plan;
+            }
+
+            var headerRowNumber = headerRow.RowNumber();
+            var lastColumnNumber = worksheet.LastColumnUsed()?.ColumnNumber() ?? 0;
+            var columnByHeader = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            for (var column = 1; column <= lastColumnNumber; column++)
+            {
+                var header = headerRow.Cell(column).GetString().Trim();
+                if (string.IsNullOrWhiteSpace(header) || columnByHeader.ContainsKey(header))
+                {
+                    continue;
+                }
+
+                columnByHeader[header] = column;
+            }
+
+            if (!columnByHeader.Any())
+            {
+                plan.Errors.Add("The worksheet header row does not contain any usable column names.");
+                return plan;
+            }
+
+            plan.AvailableHeaders = columnByHeader.Keys.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
+
+            var normalizedColumnByHeader = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var header in columnByHeader)
+            {
+                var normalizedHeader = NormalizeHeader(header.Key);
+                if (!string.IsNullOrWhiteSpace(normalizedHeader) && !normalizedColumnByHeader.ContainsKey(normalizedHeader))
+                {
+                    normalizedColumnByHeader[normalizedHeader] = header.Value;
+                }
+            }
+
+            var headerByColumn = columnByHeader.ToDictionary(x => x.Value, x => x.Key);
+
+            bool TryGetColumn(List<string> aliases, out int columnNumber, out string matchedHeader)
+            {
+                foreach (var alias in aliases)
+                {
+                    if (columnByHeader.TryGetValue(alias, out columnNumber))
+                    {
+                        matchedHeader = alias;
+                        return true;
+                    }
+
+                    var normalizedAlias = NormalizeHeader(alias);
+                    if (!string.IsNullOrWhiteSpace(normalizedAlias)
+                        && normalizedColumnByHeader.TryGetValue(normalizedAlias, out columnNumber))
+                    {
+                        matchedHeader = headerByColumn.TryGetValue(columnNumber, out var resolvedHeader)
+                            ? resolvedHeader
+                            : alias;
+                        return true;
+                    }
+                }
+
+                columnNumber = 0;
+                matchedHeader = string.Empty;
+                return false;
+            }
+
+            var companyNameAliases = new List<string> { "Company Name" };
+            var contactFirstNameAliases = new List<string> { "Contact Person - First Name" };
+            var contactLastNameAliases = new List<string> { "Contact Person - Last Name" };
+            var contactEmailAliases = new List<string> { "Contact Email" };
+
+            if (!TryGetColumn(companyNameAliases, out var companyNameColumn, out var matchedCompanyNameHeader))
+            {
+                plan.Errors.Add("Could not find the Company Name column. Expected header: Company Name");
+                return plan;
+            }
+
+            plan.MatchedCompanyNameHeader = matchedCompanyNameHeader;
+            plan.MatchedFields.Add($"Company Name -> {matchedCompanyNameHeader}");
+
+            var hasContactFirstNameColumn = TryGetColumn(contactFirstNameAliases, out var contactFirstNameColumn, out var matchedContactFirstNameHeader);
+            if (hasContactFirstNameColumn)
+            {
+                plan.MatchedContactFirstNameHeader = matchedContactFirstNameHeader;
+                plan.MatchedFields.Add($"Contact First Name -> {matchedContactFirstNameHeader}");
+            }
+
+            var hasContactLastNameColumn = TryGetColumn(contactLastNameAliases, out var contactLastNameColumn, out var matchedContactLastNameHeader);
+            if (hasContactLastNameColumn)
+            {
+                plan.MatchedContactLastNameHeader = matchedContactLastNameHeader;
+                plan.MatchedFields.Add($"Contact Last Name -> {matchedContactLastNameHeader}");
+            }
+
+            var hasContactEmailColumn = TryGetColumn(contactEmailAliases, out var contactEmailColumn, out var matchedContactEmailHeader);
+            if (hasContactEmailColumn)
+            {
+                plan.MatchedContactEmailHeader = matchedContactEmailHeader;
+                plan.MatchedFields.Add($"Contact Email -> {matchedContactEmailHeader}");
+            }
+
+            if (!hasContactFirstNameColumn && !hasContactLastNameColumn && !hasContactEmailColumn)
+            {
+                plan.Errors.Add("Could not find any contact columns. Expected headers: Contact Person - First Name, Contact Person - Last Name, Contact Email.");
+                return plan;
+            }
+
+            var existingCompanies = await _context.Tin200
+                .AsNoTracking()
+                .Select(t => new
+                {
+                    t.Id,
+                    t.CompanyName,
+                    t.ContactFirstName,
+                    t.ContactLastName,
+                    t.ContactEmail
+                })
+                .ToListAsync();
+
+            var companyByName = existingCompanies
+                .Where(x => !string.IsNullOrWhiteSpace(x.CompanyName))
+                .GroupBy(x => x.CompanyName!.Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.Id).First(), StringComparer.OrdinalIgnoreCase);
+
+            var seenCompanyNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var firstDataRowNumber = headerRowNumber + 1;
+            var lastRowNumber = worksheet.LastRowUsed()?.RowNumber() ?? headerRowNumber;
+
+            for (var rowNumber = firstDataRowNumber; rowNumber <= lastRowNumber; rowNumber++)
+            {
+                var row = worksheet.Row(rowNumber);
+                var importedCompanyName = row.Cell(companyNameColumn).GetString().Trim();
+                var importedContactFirstName = hasContactFirstNameColumn ? row.Cell(contactFirstNameColumn).GetString().Trim() : string.Empty;
+                var importedContactLastName = hasContactLastNameColumn ? row.Cell(contactLastNameColumn).GetString().Trim() : string.Empty;
+                var importedContactEmail = hasContactEmailColumn ? row.Cell(contactEmailColumn).GetString().Trim() : string.Empty;
+
+                if (string.IsNullOrWhiteSpace(importedCompanyName)
+                    && string.IsNullOrWhiteSpace(importedContactFirstName)
+                    && string.IsNullOrWhiteSpace(importedContactLastName)
+                    && string.IsNullOrWhiteSpace(importedContactEmail))
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(importedCompanyName))
+                {
+                    plan.Errors.Add($"Row {rowNumber}: skipped because Company Name is blank.");
+                    continue;
+                }
+
+                if (!seenCompanyNames.Add(importedCompanyName))
+                {
+                    plan.Errors.Add($"Row {rowNumber}: duplicate company name '{importedCompanyName}' skipped.");
+                    continue;
+                }
+
+                var existing = companyByName.TryGetValue(importedCompanyName, out var matchedCompany)
+                    ? matchedCompany
+                    : null;
+
+                var finalContactFirstName = hasContactFirstNameColumn
+                    ? NullIfWhiteSpace(importedContactFirstName)
+                    : NullIfWhiteSpace(existing?.ContactFirstName);
+                var finalContactLastName = hasContactLastNameColumn
+                    ? NullIfWhiteSpace(importedContactLastName)
+                    : NullIfWhiteSpace(existing?.ContactLastName);
+                var finalContactEmail = hasContactEmailColumn
+                    ? NullIfWhiteSpace(importedContactEmail)
+                    : NullIfWhiteSpace(existing?.ContactEmail);
+
+                var action = CompanyContactImportAction.NotFound;
+                if (existing != null)
+                {
+                    var unchanged = string.Equals(NullIfWhiteSpace(existing.ContactFirstName), finalContactFirstName, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(NullIfWhiteSpace(existing.ContactLastName), finalContactLastName, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(NullIfWhiteSpace(existing.ContactEmail), finalContactEmail, StringComparison.OrdinalIgnoreCase);
+
+                    action = unchanged
+                        ? CompanyContactImportAction.Unchanged
+                        : CompanyContactImportAction.Update;
+                }
+
+                plan.Operations.Add(new CompanyContactImportOperation
+                {
+                    RowNumber = rowNumber,
+                    Action = action,
+                    CompanyId = existing?.Id,
+                    CompanyName = importedCompanyName,
+                    CurrentContactFirstName = NullIfWhiteSpace(existing?.ContactFirstName),
+                    ImportedContactFirstName = finalContactFirstName,
+                    CurrentContactLastName = NullIfWhiteSpace(existing?.ContactLastName),
+                    ImportedContactLastName = finalContactLastName,
+                    CurrentContactEmail = NullIfWhiteSpace(existing?.ContactEmail),
+                    ImportedContactEmail = finalContactEmail
+                });
+            }
+
+            return plan;
+        }
+
         private static List<string> BuildHeaderAliases(IEnumerable<string?> configuredValues, params string[] fallbackAliases)
         {
             var aliases = configuredValues
@@ -1437,6 +1754,41 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             public List<string> Errors { get; set; } = new();
         }
 
+        public class CompanyContactImportPreviewResult
+        {
+            public List<string> AvailableHeaders { get; set; } = new();
+            public List<string> MatchedHeaders { get; set; } = new();
+            public List<string> UnmatchedHeaders { get; set; } = new();
+            public List<string> MatchedFields { get; set; } = new();
+            public List<string> Errors { get; set; } = new();
+            public int UpdatedCount { get; set; }
+            public int UnchangedCount { get; set; }
+            public int NotFoundCount { get; set; }
+            public List<CompanyContactImportPreviewRow> PreviewRows { get; set; } = new();
+        }
+
+        public class CompanyContactImportPreviewRow
+        {
+            public int RowNumber { get; set; }
+            public string Action { get; set; } = string.Empty;
+            public int? ExistingCompanyId { get; set; }
+            public string? CompanyName { get; set; }
+            public string? CurrentContactFirstName { get; set; }
+            public string? ImportedContactFirstName { get; set; }
+            public string? CurrentContactLastName { get; set; }
+            public string? ImportedContactLastName { get; set; }
+            public string? CurrentContactEmail { get; set; }
+            public string? ImportedContactEmail { get; set; }
+        }
+
+        public class CompanyContactImportResult
+        {
+            public int UpdatedCount { get; set; }
+            public int UnchangedCount { get; set; }
+            public int NotFoundCount { get; set; }
+            public List<string> Errors { get; set; } = new();
+        }
+
         private sealed class CompanyGlobalImportPlan
         {
             public List<string> AvailableHeaders { get; set; } = new();
@@ -1461,11 +1813,44 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             public string? ImportedCompanyDescription { get; set; }
         }
 
+        private sealed class CompanyContactImportPlan
+        {
+            public List<string> AvailableHeaders { get; set; } = new();
+            public List<string> MatchedFields { get; set; } = new();
+            public List<string> Errors { get; set; } = new();
+            public string? MatchedCompanyNameHeader { get; set; }
+            public string? MatchedContactFirstNameHeader { get; set; }
+            public string? MatchedContactLastNameHeader { get; set; }
+            public string? MatchedContactEmailHeader { get; set; }
+            public List<CompanyContactImportOperation> Operations { get; set; } = new();
+        }
+
+        private sealed class CompanyContactImportOperation
+        {
+            public int RowNumber { get; set; }
+            public CompanyContactImportAction Action { get; set; }
+            public int? CompanyId { get; set; }
+            public string? CompanyName { get; set; }
+            public string? CurrentContactFirstName { get; set; }
+            public string? ImportedContactFirstName { get; set; }
+            public string? CurrentContactLastName { get; set; }
+            public string? ImportedContactLastName { get; set; }
+            public string? CurrentContactEmail { get; set; }
+            public string? ImportedContactEmail { get; set; }
+        }
+
         private enum CompanyImportAction
         {
             Add,
             Update,
             Unchanged
+        }
+
+        private enum CompanyContactImportAction
+        {
+            Update,
+            Unchanged,
+            NotFound
         }
 
         private async Task<List<Tin200>> GetAllCompaniesFallbackAsync(int? lastTin200Year = null)
@@ -1499,11 +1884,15 @@ SELECT
     [{map["Id"]}] AS Id,
     [{map["CeoFirstName"]}] AS CeoFirstName,
     [{map["CeoLastName"]}] AS CeoLastName,
+    {SelectOrDefault(map, "ContactFirstName", "ContactFirstName")},
+    {SelectOrDefault(map, "ContactLastName", "ContactLastName")},
+    {SelectOrDefault(map, "ContactEmail", "ContactEmail")},
     [{map["Email"]}] AS Email,
     [{map["ExternalId"]}] AS ExternalId,
     [{map["CompanyName"]}] AS CompanyName,
     [{map["CompanyDescription"]}] AS CompanyDescription,
     {SelectOrDefault(map, "ExternalIdImportColumnName", "ExternalIdImportColumnName")},
+    {SelectOrDefault(map, "ExternalIdImportColumnNameAlt", "ExternalIdImportColumnNameAlt")},
     {SelectOrDefault(map, "CompanyNameImportColumnName", "CompanyNameImportColumnName")},
     {SelectOrDefault(map, "CompanyDescriptionImportColumnName", "CompanyDescriptionImportColumnName")},
     {SelectOrDefault(map, "Fye2025", "Fye2025")},
@@ -1533,11 +1922,15 @@ FROM [Company]";
                         Id = GetInt32(reader, "Id"),
                         CeoFirstName = GetString(reader, "CeoFirstName"),
                         CeoLastName = GetString(reader, "CeoLastName"),
+                        ContactFirstName = GetString(reader, "ContactFirstName"),
+                        ContactLastName = GetString(reader, "ContactLastName"),
+                        ContactEmail = GetString(reader, "ContactEmail"),
                         Email = GetString(reader, "Email"),
                         ExternalId = GetString(reader, "ExternalId"),
                         CompanyName = GetString(reader, "CompanyName"),
                         CompanyDescription = GetString(reader, "CompanyDescription"),
                         ExternalIdImportColumnName = GetString(reader, "ExternalIdImportColumnName"),
+                        ExternalIdImportColumnNameAlt = GetString(reader, "ExternalIdImportColumnNameAlt"),
                         CompanyNameImportColumnName = GetString(reader, "CompanyNameImportColumnName"),
                         CompanyDescriptionImportColumnName = GetString(reader, "CompanyDescriptionImportColumnName"),
                         Fye2025 = GetDecimal(reader, "Fye2025"),
@@ -1613,11 +2006,15 @@ WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'Company'";
                     ["Id"] = Pick("Id"),
                     ["CeoFirstName"] = Pick("CEOFirstName", "CeoFirstName", "CEO First Name", "CEO First Name "),
                     ["CeoLastName"] = Pick("CEOLastName", "CeoLastName", "CEO Last Name", "CEO Last Name "),
+                    ["ContactFirstName"] = PickOptional("ContactFirstName", "Contact First Name"),
+                    ["ContactLastName"] = PickOptional("ContactLastName", "Contact Last Name"),
+                    ["ContactEmail"] = PickOptional("ContactEmail", "Contact Email"),
                     ["Email"] = Pick("Email", "Email "),
                     ["ExternalId"] = Pick("ExternalID", "ExternalId", "External ID"),
                     ["CompanyName"] = Pick("CompanyName", "Company Name"),
                     ["CompanyDescription"] = Pick("CompanyDescription", "Company Description"),
                     ["ExternalIdImportColumnName"] = PickOptional("ExternalId_ImportColumnName", "External ID Import Column Name"),
+                    ["ExternalIdImportColumnNameAlt"] = PickOptional("ExternalId_ImportColumnNameAlt", "External ID Import Column Name Alt"),
                     ["CompanyNameImportColumnName"] = PickOptional("CompanyName_ImportColumnName", "Company Name Import Column Name"),
                     ["CompanyDescriptionImportColumnName"] = PickOptional("CompanyDescription_ImportColumnName", "Company Description Import Column Name"),
                     ["Fye2025"] = PickOptional("FYELastFinancialYear", "FYE2025", "Fye2025", "FYE 2025"),

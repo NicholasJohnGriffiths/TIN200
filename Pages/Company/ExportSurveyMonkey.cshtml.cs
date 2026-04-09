@@ -43,7 +43,7 @@ namespace TINWeb.Pages.Company
             {
                 var cols = new[]
                 {
-                    EscapeCsv(record.Email),
+                    EscapeCsv(record.ContactEmail),
                     EscapeCsv(record.CeoFirstName),
                     EscapeCsv(record.CeoLastName),
                     EscapeCsv(record.CompanyName),

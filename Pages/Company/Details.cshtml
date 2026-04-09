@@ -29,12 +29,38 @@
 
                         <div class="row mb-3">
                             <div class="col-md-6">
+                                <h6 class="text-muted">Contact First Name</h6>
+                                <p>@(Model.Record.ContactFirstName ?? "N/A")</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-muted">Contact Last Name</h6>
+                                <p>@(Model.Record.ContactLastName ?? "N/A")</p>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4">
                                 <h6 class="text-muted">Email</h6>
                                 <p>@(Model.Record.Email ?? "N/A")</p>
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
+                                <h6 class="text-muted">Contact Email</h6>
+                                <p>@(Model.Record.ContactEmail ?? "N/A")</p>
+                            </div>
+                            <div class="col-md-4">
                                 <h6 class="text-muted">External ID</h6>
                                 <p>@(Model.Record.ExternalId ?? "N/A")</p>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <h6 class="text-muted">External ID Import Column Name</h6>
+                                <p>@(Model.Record.ExternalIdImportColumnName ?? "N/A")</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-muted">External ID Import Column Name Alt</h6>
+                                <p>@(Model.Record.ExternalIdImportColumnNameAlt ?? "N/A")</p>
                             </div>
                         </div>
 

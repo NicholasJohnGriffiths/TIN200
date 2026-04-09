@@ -9,7 +9,7 @@
         <div class="col-12">
             <h1>Send Company Survey</h1>
             <p class="text-muted mb-1">Send a secure data update survey link to selected companies or all companies.</p>
-            <p class="small text-muted">Survey links currently remain valid for <strong>@Model.LinkExpiryDays day(s)</strong> (@Model.LinkExpiryHours hours).</p>
+            <p class="small text-muted">Survey link expiry is controlled by the current application settings.</p>
             <hr />
 
             @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
@@ -51,6 +51,7 @@
                 <div class="card-header">Bulk Send</div>
                 <div class="card-body">
                     <form method="get" class="mb-3">
+                        <input type="hidden" asp-for="SelectedLastTin200Year" />
                         <div class="form-check">
                             <input asp-for="IncludeTestCompanies" class="form-check-input" onchange="this.form.submit()" />
                             <label asp-for="IncludeTestCompanies" class="form-check-label">Include Test Companies</label>
@@ -58,11 +59,25 @@
                         <div class="form-text">By default, test companies are hidden from this page.</div>
                     </form>
 
+                    <form method="get" class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                        <input type="hidden" asp-for="IncludeTestCompanies" />
+                        <label asp-for="SelectedLastTin200Year" class="form-label mb-0">Filter Last TIN200 Year:</label>
+                        <select asp-for="SelectedLastTin200Year" class="form-select" style="max-width: 160px;" aria-label="Last TIN200 Year">
+                            <option value="">All</option>
+                            @foreach (var y in Model.AvailableLastTin200Years)
+                            {
+                                <option value="@y">@y</option>
+                            }
+                        </select>
+                        <button type="submit" class="btn btn-outline-primary btn-sm">Apply</button>
+                    </form>
+
                     <form id="bulkSendForm" method="post" asp-page-handler="Bulk">
                         <input type="hidden" asp-for="IncludeTestCompanies" />
+                        <input type="hidden" asp-for="SelectedLastTin200Year" />
                         <div class="form-check mb-3">
                             <input asp-for="SendToAllClients" class="form-check-input" />
-                            <label asp-for="SendToAllClients" class="form-check-label">Send to all clients with an email address</label>
+                            <label asp-for="SendToAllClients" class="form-check-label">Send to all clients with a contact email address</label>
                         </div>
 
                         <div class="mb-2">
@@ -72,13 +87,13 @@
 
                         <div class="form-group mb-3">
                             <label for="clientSearchInput" class="form-label">Search clients</label>
-                            <input id="clientSearchInput" class="form-control" type="text" placeholder="Search by ID, company, or email" />
+                            <input id="clientSearchInput" class="form-control" type="text" placeholder="Search by ID, company, or contact email" />
                         </div>
 
                         <div class="mb-3" role="group" aria-label="Client email filters">
                             <button type="button" class="btn btn-outline-secondary btn-sm client-filter-btn active" data-filter="all">All</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm client-filter-btn" data-filter="has-email">Has Email Only</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm client-filter-btn" data-filter="missing-email">Missing Email</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm client-filter-btn" data-filter="has-email">Has Contact Email Only</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm client-filter-btn" data-filter="missing-email">Missing Contact Email</button>
                         </div>
 
                         <div class="mb-3 d-flex align-items-center" role="group" aria-label="Survey email sent filter">
@@ -88,6 +103,12 @@
                                 <option value="sent">Sent</option>
                                 <option value="not-sent">Not sent</option>
                             </select>
+                        </div>
+
+                        <div class="mb-2 small text-muted">
+                            <strong>Displayed companies:</strong> <span id="displayedCompanyCount">@Model.AvailableClients.Count</span>
+                            <span class="mx-2">|</span>
+                            <strong>Selected:</strong> <span id="selectedCompanyCount">@(Model.SelectedClientIds.Count)</span>
                         </div>
 
                         <div id="clientListContainer" class="table-responsive" style="max-height: 420px; overflow-y: auto;">
@@ -102,7 +123,7 @@
                                             <button type="button" class="btn btn-link p-0 sort-header" data-sort-key="company">Company</button>
                                         </th>
                                         <th>
-                                            <button type="button" class="btn btn-link p-0 sort-header" data-sort-key="email">Email</button>
+                                            <button type="button" class="btn btn-link p-0 sort-header" data-sort-key="email">Contact Email</button>
                                         </th>
                                         <th style="min-width: 260px;">Survey Link</th>
                                         <th style="min-width: 170px;">Link Expiry</th>
@@ -121,7 +142,7 @@
                                             ? "This company has unsubscribed from surveys."
                                             : clientRow.IsLocked
                                                 ? "Survey record is locked. Contact the Technology Investment Network."
-                                                : "Cannot send survey email because no email address is available.";
+                                                : "Cannot send survey email because no contact email address is available.";
                                         var searchText = $"{clientRow.Id} {clientRow.CompanyName} {clientRow.Email}".ToLowerInvariant();
                                         var companySort = (clientRow.CompanyName ?? string.Empty).ToLowerInvariant();
                                         var emailSort = (clientRow.Email ?? string.Empty).ToLowerInvariant();
@@ -148,7 +169,7 @@
                                                 }
                                                 else
                                                 {
-                                                    <span class="text-muted">No email</span>
+                                                    <span class="text-muted">No contact email</span>
                                                 }
                                             </td>
                                             <td style="min-width: 260px; max-width: 360px;">
@@ -242,6 +263,8 @@
             const sendToAllToggle = document.getElementById('SendToAllClients');
             const searchInput = document.getElementById('clientSearchInput');
             const surveyEmailSentFilterSelect = document.getElementById('surveyEmailSentFilter');
+            const displayedCompanyCount = document.getElementById('displayedCompanyCount');
+            const selectedCompanyCount = document.getElementById('selectedCompanyCount');
             const filterButtons = Array.from(document.querySelectorAll('.client-filter-btn'));
             const sortButtons = Array.from(document.querySelectorAll('.sort-header'));
             const selectableCheckboxes = Array.from(document.querySelectorAll('.client-selector:not([disabled])'));
@@ -300,11 +323,22 @@
             const getVisibleRows = () => Array.from(document.querySelectorAll('tbody tr')).filter(row => row.style.display !== 'none');
             const getSearchRows = () => Array.from(document.querySelectorAll('tbody tr[data-search]'));
 
+            const updateCounts = () => {
+                if (displayedCompanyCount) {
+                    displayedCompanyCount.textContent = String(getVisibleRows().length);
+                }
+
+                if (selectedCompanyCount) {
+                    selectedCompanyCount.textContent = String(getCheckboxes().filter(cb => cb.checked).length);
+                }
+            };
+
             const saveSelections = () => {
                 const selectedIds = getCheckboxes()
                     .filter(cb => cb.checked)
                     .map(cb => cb.value);
                 localStorage.setItem(storageKey, JSON.stringify(selectedIds));
+                updateCounts();
             };
 
             const restoreSelections = () => {
@@ -503,6 +537,7 @@
                 });
 
                 syncUrlState();
+                updateCounts();
             };
 
             if (searchInput && searchParam) {
@@ -570,6 +605,7 @@
             }
 
             revealPreselectedClient();
+            updateCounts();
 
             selectAllBtn.addEventListener('click', function () {
                 getVisibleRows().forEach(function (row) {

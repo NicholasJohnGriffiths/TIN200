@@ -147,7 +147,9 @@ namespace TINWeb.Services
             adminEmail = string.IsNullOrWhiteSpace(adminEmail) ? null : adminEmail.Trim();
 
             var matchingCompanies = await _context.Tin200
-                .Where(c => c.Email != null && c.Email.Trim().ToLower() == normalizedEmail)
+                .Where(c =>
+                    (c.ContactEmail != null && c.ContactEmail.Trim().ToLower() == normalizedEmail)
+                    || (c.Email != null && c.Email.Trim().ToLower() == normalizedEmail))
                 .Select(c => new { c.Id, c.CompanyName })
                 .ToListAsync();
 

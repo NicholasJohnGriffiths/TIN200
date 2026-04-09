@@ -79,6 +79,107 @@
         }
     }
 
+    @if (Model.ContactImportPreview != null)
+    {
+        <div class="card mb-3 border-info">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Contact Import Preview</h5>
+                <p class="mb-1"><strong>Records to update:</strong> @Model.ContactImportPreview.UpdatedCount</p>
+                <p class="mb-1"><strong>Unchanged records:</strong> @Model.ContactImportPreview.UnchangedCount</p>
+                <p class="mb-3"><strong>Companies not found:</strong> @Model.ContactImportPreview.NotFoundCount</p>
+                <p class="mb-3 text-muted">Matching used: Excel <strong>Company Name</strong> to Company <strong>CompanyName</strong>. Contact fields read from <strong>Contact Person - First Name</strong>, <strong>Contact Person - Last Name</strong>, and <strong>Contact Email</strong>.</p>
+
+                <p class="mb-1"><strong>Matched columns:</strong></p>
+                @if (Model.ContactImportPreview.MatchedHeaders.Any())
+                {
+                    <div class="small text-success mb-3">@string.Join(", ", Model.ContactImportPreview.MatchedHeaders)</div>
+                }
+                else
+                {
+                    <div class="small text-muted mb-3">(none)</div>
+                }
+
+                <p class="mb-1"><strong>Unmatched columns:</strong></p>
+                @if (Model.ContactImportPreview.UnmatchedHeaders.Any())
+                {
+                    <div class="small text-muted mb-3">@string.Join(", ", Model.ContactImportPreview.UnmatchedHeaders)</div>
+                }
+                else
+                {
+                    <div class="small text-muted mb-3">(none)</div>
+                }
+
+                @if (Model.ContactImportPreview.MatchedFields.Any())
+                {
+                    <p class="mb-1"><strong>Matched company fields:</strong></p>
+                    <ul class="small text-muted mb-3">
+                        @foreach (var matchedField in Model.ContactImportPreview.MatchedFields)
+                        {
+                            <li>@matchedField</li>
+                        }
+                    </ul>
+                }
+
+                @if (Model.ContactImportPreview.Errors.Any())
+                {
+                    <p class="mb-1 text-danger"><strong>Preview warnings:</strong></p>
+                    <ul class="small text-danger mb-3">
+                        @foreach (var error in Model.ContactImportPreview.Errors.Take(20))
+                        {
+                            <li>@error</li>
+                        }
+                    </ul>
+                }
+
+                @if (Model.ContactImportPreview.PreviewRows.Any())
+                {
+                    <div class="table-responsive mb-3">
+                        <table class="table table-sm table-bordered align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Row</th>
+                                    <th>Action</th>
+                                    <th>Company</th>
+                                    <th>Contact First Name</th>
+                                    <th>Contact Last Name</th>
+                                    <th>Contact Email</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in Model.ContactImportPreview.PreviewRows)
+                                {
+                                    <tr>
+                                        <td>@row.RowNumber</td>
+                                        <td>@row.Action</td>
+                                        <td>
+                                            @if (row.ExistingCompanyId.HasValue)
+                                            {
+                                                <span>#@row.ExistingCompanyId</span>
+                                                <span> | @row.CompanyName</span>
+                                            }
+                                            else
+                                            {
+                                                <span>@row.CompanyName</span>
+                                            }
+                                        </td>
+                                        <td>@(row.CurrentContactFirstName != row.ImportedContactFirstName ? $"{row.CurrentContactFirstName} -> {row.ImportedContactFirstName}" : row.CurrentContactFirstName ?? "")</td>
+                                        <td>@(row.CurrentContactLastName != row.ImportedContactLastName ? $"{row.CurrentContactLastName} -> {row.ImportedContactLastName}" : row.CurrentContactLastName ?? "")</td>
+                                        <td>@(row.CurrentContactEmail != row.ImportedContactEmail ? $"{row.CurrentContactEmail} -> {row.ImportedContactEmail}" : row.CurrentContactEmail ?? "")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+
+                <form method="post" asp-page-handler="ApplyContactImport" class="d-inline" id="applyContactImportForm">
+                    <input type="hidden" name="previewToken" value="@Model.PendingContactImportToken" />
+                    <button type="submit" class="btn btn-info text-white">Apply Contact Import</button>
+                </form>
+            </div>
+        </div>
+    }
+
     @if (Model.GlobalImportPreview != null)
     {
         <div class="card mb-3 border-dark">
@@ -197,6 +298,13 @@
         </div>
         <div class="col-md-4 text-end">
             <div class="d-inline-flex align-items-center gap-2 flex-wrap justify-content-end">
+                <form method="post" asp-page-handler="PreviewContactImport" enctype="multipart/form-data" class="d-inline-flex align-items-center gap-2" id="contactImportForm">
+                    <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
+                    <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
+                    <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
+                    <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="max-width: 220px;" />
+                    <button type="submit" class="btn btn-outline-info btn-sm">Import - Contacts</button>
+                </form>
                 <form method="post" asp-page-handler="PreviewGlobalImport" enctype="multipart/form-data" class="d-inline-flex align-items-center gap-2" id="globalImportForm">
                     <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
                     <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
@@ -267,8 +375,8 @@
                     <tr>
                         <th class="sortable" data-type="number">ID</th>
                         <th class="sortable" data-type="string">Company Name</th>
-                        <th class="sortable" data-type="string">CEO Name</th>
-                        <th class="sortable" data-type="string">Email</th>
+                        <th class="sortable" data-type="string">Contact Name</th>
+                        <th class="sortable" data-type="string">Contact Email</th>
                         <th class="sortable" data-type="string">External ID</th>
                         <th class="sortable" data-type="number">FYE Last Financial Year</th>
                         <th class="sortable" data-type="number">FYE Year-1</th>
@@ -285,8 +393,8 @@
                         <tr id="company-row-@record.Id">
                             <td>@record.Id</td>
                             <td>@record.CompanyName</td>
-                            <td>@record.CeoFirstName @record.CeoLastName</td>
-                            <td>@record.Email</td>
+                            <td>@($"{record.ContactFirstName} {record.ContactLastName}".Trim())</td>
+                            <td>@record.ContactEmail</td>
                             <td>@record.ExternalId</td>
                             <td>@(record.Fye2025.HasValue ? record.Fye2025.Value.ToString("C0") : "")</td>
                             <td>@(record.Fye2024.HasValue ? record.Fye2024.Value.ToString("C0") : "")</td>

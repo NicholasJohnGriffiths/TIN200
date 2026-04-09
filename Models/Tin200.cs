@@ -17,6 +17,19 @@ namespace TINWeb.Models
         [StringLength(255)]
         public string? CeoLastName { get; set; }
 
+        [Display(Name = "Contact First Name")]
+        [StringLength(255)]
+        public string? ContactFirstName { get; set; }
+
+        [Display(Name = "Contact Last Name")]
+        [StringLength(255)]
+        public string? ContactLastName { get; set; }
+
+        [Display(Name = "Contact Email")]
+        [StringLength(255)]
+        [EmailAddress]
+        public string? ContactEmail { get; set; }
+
         [Display(Name = "Email")]
         [StringLength(255)]
         [EmailAddress]
@@ -37,6 +50,10 @@ namespace TINWeb.Models
         [Display(Name = "External ID Import Column Name")]
         [StringLength(255)]
         public string? ExternalIdImportColumnName { get; set; }
+
+        [Display(Name = "External ID Import Column Name Alt")]
+        [StringLength(255)]
+        public string? ExternalIdImportColumnNameAlt { get; set; }
 
         [Display(Name = "Company Name Import Column Name")]
         [StringLength(255)]

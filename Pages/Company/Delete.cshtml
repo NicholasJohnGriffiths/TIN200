@@ -24,7 +24,9 @@
                         <h5 class="card-title">@Model.Record.CompanyName</h5>
                         <p class="card-text">
                             <strong>CEO:</strong> @Model.Record.CeoFirstName @Model.Record.CeoLastName<br />
+                            <strong>Contact:</strong> @(string.IsNullOrWhiteSpace(Model.Record.ContactFirstName) && string.IsNullOrWhiteSpace(Model.Record.ContactLastName) ? "N/A" : $"{Model.Record.ContactFirstName} {Model.Record.ContactLastName}".Trim())<br />
                             <strong>Email:</strong> @Model.Record.Email<br />
+                            <strong>Contact Email:</strong> @(Model.Record.ContactEmail ?? "N/A")<br />
                             <strong>Test Company:</strong> @(Model.Record.Test == true ? "Yes" : "No")
                         </p>
                     </div>

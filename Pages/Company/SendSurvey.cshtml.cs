@@ -38,6 +38,10 @@ namespace TINWeb.Pages.Company
         [BindProperty(SupportsGet = true)]
         public bool IncludeTestCompanies { get; set; }
 
+        [BindProperty(SupportsGet = true)]
+        public int? SelectedLastTin200Year { get; set; }
+
+        public List<int> AvailableLastTin200Years { get; set; } = new();
         public List<SurveyClientRow> AvailableClients { get; set; } = new();
 
         public bool HasQueryPreselection { get; set; }
@@ -191,7 +195,7 @@ namespace TINWeb.Pages.Company
 
             BulkSendSucceeded = true;
 
-            return RedirectToPage();
+            return RedirectToPage(new { IncludeTestCompanies, SelectedLastTin200Year });
         }
 
         private string BuildSurveyUrl(int id)
@@ -229,7 +233,9 @@ namespace TINWeb.Pages.Company
 
         private async Task LoadAvailableClientsAsync()
         {
-            var clients = await _companyService.GetAllCompaniesAsync();
+            AvailableLastTin200Years = await _companyService.GetAvailableLastTin200YearsAsync();
+
+            var clients = await _companyService.GetAllCompaniesAsync(SelectedLastTin200Year);
             if (!IncludeTestCompanies)
             {
                 clients = clients.Where(c => c.Test != true).ToList();
@@ -251,7 +257,7 @@ namespace TINWeb.Pages.Company
                     {
                         Id = c.Id,
                         CompanyName = c.CompanyName,
-                        Email = c.Email,
+                        Email = c.ContactEmail,
                         IsLocked = lockedCompanyIds.Contains(c.Id),
                         SurveyEmailSent = status?.SurveyEmailSent ?? false,
                         SurveyEmailSentLastDate = status?.SurveyEmailSentLastDate,
