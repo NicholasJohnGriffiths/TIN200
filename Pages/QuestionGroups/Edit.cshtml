@@ -181,10 +181,11 @@
 
 @section Scripts {
     @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
-    <script src="https://cdn.tiny.cloud/1/3kewwfp0mgpaatcm5468igfv49fz4ummxdovtdoxhz00u6gd/tinymce/7/tinymce.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tinymce@7/tinymce.min.js"></script>
     <script>
         // Initialize TinyMCE for description field
         tinymce.init({
+            license_key: 'gpl',
             selector: '#descriptionEditor',
             plugins: 'link image lists table code help wordcount',
             toolbar: 'undo redo | formatselect | bold italic | alignleft aligncenter alignright | bullist numlist | link image | code help',
