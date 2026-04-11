@@ -270,13 +270,29 @@
                     var answerType = (row.AnswerType ?? string.Empty).Trim();
                     var displayedQuestionHtml = row.QuestionText ?? string.Empty;
                     var plainQuestionText = System.Net.WebUtility.HtmlDecode(System.Text.RegularExpressions.Regex.Replace(displayedQuestionHtml, "<.*?>", string.Empty)).Trim();
+                    var normalizedPlainQuestionText = System.Text.RegularExpressions.Regex.Replace(plainQuestionText, "\\s+", " ").Trim();
                     var lastFinancialYearLabels = new[] { "Last Financial Year", "Last Finacial Year", "Last Finacnail Year" };
-                    var isLastFinancialYearQuestion = lastFinancialYearLabels.Any(label => plainQuestionText.Equals(label, StringComparison.OrdinalIgnoreCase));
+                    var isLastFinancialYearQuestion = lastFinancialYearLabels.Any(label => normalizedPlainQuestionText.Equals(label, StringComparison.OrdinalIgnoreCase));
+                    var containsLastFinancialYearReference = lastFinancialYearLabels.Any(label => normalizedPlainQuestionText.Contains(label, StringComparison.OrdinalIgnoreCase));
                     var companySurveyFinancialYearText = row.FinancialYear.ToString();
 
-                    foreach (var label in lastFinancialYearLabels)
+                    if (isLastFinancialYearQuestion)
                     {
-                        displayedQuestionHtml = displayedQuestionHtml.Replace(label, companySurveyFinancialYearText, StringComparison.OrdinalIgnoreCase);
+                        displayedQuestionHtml = System.Net.WebUtility.HtmlEncode(companySurveyFinancialYearText);
+                    }
+                    else if (containsLastFinancialYearReference)
+                    {
+                        var replacedPlainQuestionText = normalizedPlainQuestionText;
+                        foreach (var label in lastFinancialYearLabels)
+                        {
+                            replacedPlainQuestionText = System.Text.RegularExpressions.Regex.Replace(
+                                replacedPlainQuestionText,
+                                System.Text.RegularExpressions.Regex.Escape(label),
+                                companySurveyFinancialYearText,
+                                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                        }
+
+                        displayedQuestionHtml = System.Net.WebUtility.HtmlEncode(replacedPlainQuestionText);
                     }
 
                     var isBoolean = answerType.Equals("Boolean", StringComparison.OrdinalIgnoreCase)
