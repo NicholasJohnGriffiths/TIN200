@@ -268,11 +268,17 @@
                 @foreach (var row in Model.Rows)
                 {
                     var answerType = (row.AnswerType ?? string.Empty).Trim();
+                    var plainQuestionText = System.Text.RegularExpressions.Regex.Replace(row.QuestionText ?? string.Empty, "<.*?>", string.Empty).Trim();
+                    var isLastFinancialYearQuestion = plainQuestionText.Equals("Last Financial Year", StringComparison.OrdinalIgnoreCase);
                     var isBoolean = answerType.Equals("Boolean", StringComparison.OrdinalIgnoreCase)
                         || answerType.Equals("Bool", StringComparison.OrdinalIgnoreCase);
 
                     string answerValue;
-                    if (isBoolean)
+                    if (isLastFinancialYearQuestion && Model.SelectedFinancialYear.HasValue)
+                    {
+                        answerValue = Model.SelectedFinancialYear.Value.ToString();
+                    }
+                    else if (isBoolean)
                     {
                         var normalizedText = (row.AnswerText ?? string.Empty).Trim();
                         if (!string.IsNullOrWhiteSpace(normalizedText))
