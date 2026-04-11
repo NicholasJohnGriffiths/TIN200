@@ -70,6 +70,12 @@ namespace TINWeb.Pages.Company
 
             var resolvedText = Regex.Replace(
                 text,
+                @"last\s*fin\w*\s*year",
+                FinancialYear.ToString(CultureInfo.InvariantCulture),
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+            resolvedText = Regex.Replace(
+                resolvedText,
                 @"current\s*financial\s*year\s*-\s*(\d+)|year\s*-\s*(\d+)",
                 match =>
                 {
