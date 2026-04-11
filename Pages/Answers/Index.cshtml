@@ -268,15 +268,24 @@
                 @foreach (var row in Model.Rows)
                 {
                     var answerType = (row.AnswerType ?? string.Empty).Trim();
-                    var plainQuestionText = System.Text.RegularExpressions.Regex.Replace(row.QuestionText ?? string.Empty, "<.*?>", string.Empty).Trim();
-                    var isLastFinancialYearQuestion = plainQuestionText.Equals("Last Financial Year", StringComparison.OrdinalIgnoreCase);
+                    var displayedQuestionHtml = row.QuestionText ?? string.Empty;
+                    var plainQuestionText = System.Net.WebUtility.HtmlDecode(System.Text.RegularExpressions.Regex.Replace(displayedQuestionHtml, "<.*?>", string.Empty)).Trim();
+                    var lastFinancialYearLabels = new[] { "Last Financial Year", "Last Finacial Year", "Last Finacnail Year" };
+                    var isLastFinancialYearQuestion = lastFinancialYearLabels.Any(label => plainQuestionText.Equals(label, StringComparison.OrdinalIgnoreCase));
+                    var companySurveyFinancialYearText = row.FinancialYear.ToString();
+
+                    foreach (var label in lastFinancialYearLabels)
+                    {
+                        displayedQuestionHtml = displayedQuestionHtml.Replace(label, companySurveyFinancialYearText, StringComparison.OrdinalIgnoreCase);
+                    }
+
                     var isBoolean = answerType.Equals("Boolean", StringComparison.OrdinalIgnoreCase)
                         || answerType.Equals("Bool", StringComparison.OrdinalIgnoreCase);
 
                     string answerValue;
-                    if (isLastFinancialYearQuestion && Model.SelectedFinancialYear.HasValue)
+                    if (isLastFinancialYearQuestion)
                     {
-                        answerValue = Model.SelectedFinancialYear.Value.ToString();
+                        answerValue = companySurveyFinancialYearText;
                     }
                     else if (isBoolean)
                     {
@@ -337,7 +346,7 @@
                         <td>@row.CompanyName</td>
                         <td>@row.FinancialYear</td>
                         <td>@row.QuestionOrderNumber</td>
-                        <td>@Html.Raw(row.QuestionText ?? string.Empty)</td>
+                        <td>@Html.Raw(displayedQuestionHtml)</td>
                         <td>@answerValue</td>
                         <td>
                             @if (row.Id > 0)
