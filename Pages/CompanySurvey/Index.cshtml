@@ -13,6 +13,7 @@
             financialYear = Model.SelectedFinancialYear,
             companySearch = Model.CompanySearch,
             surveyEmailSentFilter = Model.SurveyEmailSentFilter,
+            includeTestCompanies = Model.IncludeTestCompanies,
             selectedLinkExpiryDateUtc = Model.SelectedLinkExpiryDateUtc?.ToString("yyyy-MM-dd"),
             sortBy = column,
             sortDir = Model.GetNextSortDirection(column)
@@ -89,6 +90,7 @@
                 <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
                 <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
                 <input type="hidden" name="surveyEmailSentFilter" value="@Model.SurveyEmailSentFilter" />
+                <input type="hidden" name="includeTestCompanies" value="@(Model.IncludeTestCompanies ? "true" : "false")" />
                 <div>
                     <label for="SelectedLinkExpiryDateUtc" class="form-label mb-1">Survey Link Expiry Date</label>
                     <input asp-for="SelectedLinkExpiryDateUtc" type="date" asp-format="{0:yyyy-MM-dd}" class="form-control" style="min-width: 180px;" />
@@ -99,6 +101,7 @@
                     <input type="hidden" name="overwriteExisting" value="false" />
                     <label class="form-check-label" for="overwriteExisting">Overwrite Existing Survey Links</label>
                 </div>
+                <div class="selected-record-inputs"></div>
                 <button class="btn btn-warning" type="button" id="previewBtn">Preview Populate Survey Links</button>
             </form>
 
@@ -132,41 +135,119 @@
             </div>
 
             <div id="populateProgress" class="mt-2 d-none" style="max-width: 520px;">
-                <div class="progress" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100">
-                    <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+                <div class="progress" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                    <div id="populateProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%">0%</div>
                 </div>
-                <small class="text-muted">Populating survey links, please wait...</small>
+                <small id="populateProgressText" class="text-muted">Preparing to populate survey links...</small>
+            </div>
+
+            <form id="populatePriorYearDataForm" method="post" asp-page-handler="PopulatePriorYearData" class="d-flex flex-wrap align-items-end gap-2 mt-3">
+                <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
+                <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
+                <input type="hidden" name="surveyEmailSentFilter" value="@Model.SurveyEmailSentFilter" />
+                <input type="hidden" name="includeTestCompanies" value="@(Model.IncludeTestCompanies ? "true" : "false")" />
+                <div>
+                    <label class="form-label mb-1">Historical Year Data</label>
+                    <div class="d-flex flex-column">
+                        <button class="btn btn-success" type="button" id="previewPopulatePriorYearDataBtn">@Model.PopulatePriorYearDataButtonLabel</button>
+                        <small class="text-muted">Preview and fill blank <strong>Year-1</strong> / <strong>Year-2</strong> answers only. Existing values stay unchanged.</small>
+                    </div>
+                </div>
+                <div class="selected-record-inputs"></div>
+            </form>
+
+            <div id="populatePriorYearPreviewPanel" class="card mt-3 d-none" style="max-width: 980px;">
+                <div class="card-body">
+                    <h6 class="card-title mb-2">Populate Historical Year Data Preview</h6>
+                    <div class="alert alert-info mb-2" role="alert">
+                        <span id="populatePriorYearSummaryInline"></span>
+                    </div>
+                    <div>
+                        <label class="form-label mb-1"><strong>Preview</strong> <small class="text-muted" id="populatePriorYearCountInline"></small></label>
+                        <div style="max-height: 240px; overflow-y: auto;">
+                            <table class="table table-sm table-hover mb-2">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 30px;"></th>
+                                        <th>Company Name</th>
+                                        <th>Status</th>
+                                        <th>Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="populatePriorYearTableBodyInline"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-success" id="confirmPopulatePriorYearDataBtn">Confirm & Populate</button>
+                        <button type="button" class="btn btn-outline-secondary" id="cancelPopulatePriorYearDataBtn">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="populatePriorYearProgress" class="mt-2 d-none" style="max-width: 520px;">
+                <div class="progress" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                    <div id="populatePriorYearProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" style="width: 0%">0%</div>
+                </div>
+                <small id="populatePriorYearProgressText" class="text-muted">Preparing to populate historical year data...</small>
             </div>
         </div>
     </div>
 
     <div class="row mb-3">
         <div class="col-12">
-            <form method="get" class="d-flex">
-                <label class="me-2 align-self-center">Survey Financial Year:</label>
-                <select name="financialYear" class="form-select me-2" aria-label="Survey Financial Year" style="max-width: 180px;">
-                    @foreach (var year in Model.FinancialYears)
-                    {
-                        <option value="@year" selected="@(Model.SelectedFinancialYear == year ? "selected" : null)">@year</option>
-                    }
-                </select>
-                <input type="text" name="companySearch" value="@Model.CompanySearch" class="form-control me-2" style="max-width: 340px;" placeholder="Company name or External ID" />
-                <select name="surveyEmailSentFilter" class="form-select me-2" aria-label="Survey email sent filter" style="max-width: 160px;">
-                    <option value="all" selected="@(Model.SurveyEmailSentFilter == "all" ? "selected" : null)">All</option>
-                    <option value="sent" selected="@(Model.SurveyEmailSentFilter == "sent" ? "selected" : null)">Sent</option>
-                    <option value="not-sent" selected="@(Model.SurveyEmailSentFilter == "not-sent" ? "selected" : null)">Not sent</option>
-                </select>
-                <button class="btn btn-outline-primary" type="submit">Apply</button>
-                <a class="btn btn-link" asp-page="./Index" asp-route-financialYear="@Model.SelectedFinancialYear">Clear</a>
+            <form method="get" class="d-flex flex-wrap align-items-end gap-2">
+                <div>
+                    <label class="form-label mb-1">Survey Financial Year</label>
+                    <select name="financialYear" class="form-select" aria-label="Survey Financial Year" style="min-width: 180px;">
+                        @foreach (var year in Model.FinancialYears)
+                        {
+                            <option value="@year" selected="@(Model.SelectedFinancialYear == year ? "selected" : null)">@year</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label mb-1">Company</label>
+                    <input type="text" name="companySearch" value="@Model.CompanySearch" class="form-control" style="min-width: 280px; max-width: 340px;" placeholder="Company name or External ID" />
+                </div>
+                <div>
+                    <label class="form-label mb-1">Survey Email</label>
+                    <select name="surveyEmailSentFilter" class="form-select" aria-label="Survey email sent filter" style="min-width: 160px;">
+                        <option value="all" selected="@(Model.SurveyEmailSentFilter == "all" ? "selected" : null)">All</option>
+                        <option value="sent" selected="@(Model.SurveyEmailSentFilter == "sent" ? "selected" : null)">Sent</option>
+                        <option value="not-sent" selected="@(Model.SurveyEmailSentFilter == "not-sent" ? "selected" : null)">Not sent</option>
+                    </select>
+                </div>
+                <div class="form-check mb-2 ms-1">
+                    <input class="form-check-input" type="checkbox" id="includeTestCompanies" name="includeTestCompanies" value="true" @(Model.IncludeTestCompanies ? "checked" : null) />
+                    <label class="form-check-label" for="includeTestCompanies">Include Test Companies</label>
+                </div>
+                <button class="btn btn-outline-primary mb-2" type="submit">Apply</button>
+                <a class="btn btn-link mb-2" asp-page="./Index" asp-route-financialYear="@Model.SelectedFinancialYear" asp-route-includeTestCompanies="@Model.IncludeTestCompanies">Clear</a>
             </form>
         </div>
     </div>
 
     @if (Model.Records.Any())
     {
+        <div class="card border-0 bg-light mb-3">
+            <div class="card-body py-2 px-3 d-flex flex-wrap align-items-center gap-2">
+                <span class="fw-semibold">Select surveys:</span>
+                <button type="button" class="btn btn-sm btn-outline-primary survey-selection-btn" data-selection="all">All</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary survey-selection-btn" data-selection="none">None</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary survey-selection-btn" data-selection="without-link">No Link</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary survey-selection-btn" data-selection="with-link">With Link</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary survey-selection-btn" data-selection="with-answers">With Answers</button>
+                <span class="text-muted ms-md-auto">Selected: <strong id="selectedSurveyCount">@Model.Records.Count</strong> of <strong>@Model.Records.Count</strong></span>
+            </div>
+        </div>
+
         <table class="table table-striped table-hover company-table">
             <thead class="table-dark">
                 <tr>
+                    <th style="width: 42px;">
+                        <input type="checkbox" class="form-check-input" id="toggleAllSurveyRows" checked title="Select or clear all visible surveys" />
+                    </th>
                     <th><a class="link-light text-decoration-none" href="@SortHref("CompanyName")"><span>Company Name</span><span>@Model.GetSortIndicator("CompanyName")</span></a></th>
                     <th>Survey Link</th>
                     <th><a class="link-light text-decoration-none" href="@SortHref("Saved")"><span>Saved</span><span>@Model.GetSortIndicator("Saved")</span></a></th>
@@ -188,7 +269,21 @@
                 @foreach (var record in Model.Records)
                 {
                     <tr id="record-@record.Id">
-                        <td style="min-width: 250px;">@record.CompanyName</td>
+                        <td class="text-center align-middle">
+                            <input type="checkbox"
+                                   class="form-check-input survey-record-checkbox"
+                                   value="@record.Id"
+                                   checked
+                                   data-has-link="@(!string.IsNullOrWhiteSpace(record.SurveyLink) ? "true" : "false")"
+                                   data-has-answers="@(record.AnswerCount > 0 ? "true" : "false")" />
+                        </td>
+                        <td style="min-width: 250px;">
+                            @record.CompanyName
+                            @if (record.IsTestCompany)
+                            {
+                                <span class="badge bg-secondary ms-1">Test</span>
+                            }
+                        </td>
                         <td style="min-width: 300px; max-width: 360px;">
                             @if (!string.IsNullOrWhiteSpace(record.SurveyLink))
                             {
@@ -281,6 +376,144 @@
         });
     })();
 
+    (function () {
+        const recordCheckboxes = Array.from(document.querySelectorAll('.survey-record-checkbox'));
+        const toggleAllCheckbox = document.getElementById('toggleAllSurveyRows');
+        const selectionButtons = Array.from(document.querySelectorAll('.survey-selection-btn'));
+        const selectedCount = document.getElementById('selectedSurveyCount');
+        const targetForms = [
+            document.getElementById('populateSurveyLinksForm'),
+            document.getElementById('populatePriorYearDataForm')
+        ].filter(Boolean);
+
+        if (!recordCheckboxes.length) {
+            return;
+        }
+
+        function syncSelectedRecordInputs() {
+            const selectedIds = recordCheckboxes.filter(x => x.checked).map(x => x.value);
+
+            targetForms.forEach(function (form) {
+                const container = form.querySelector('.selected-record-inputs');
+                if (!container) {
+                    return;
+                }
+
+                container.innerHTML = '';
+                selectedIds.forEach(function (id) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'selectedRecordIds';
+                    input.value = id;
+                    container.appendChild(input);
+                });
+            });
+
+            if (selectedCount) {
+                selectedCount.textContent = selectedIds.length.toString();
+            }
+
+            if (toggleAllCheckbox) {
+                toggleAllCheckbox.checked = selectedIds.length === recordCheckboxes.length;
+                toggleAllCheckbox.indeterminate = selectedIds.length > 0 && selectedIds.length < recordCheckboxes.length;
+            }
+
+            return selectedIds.length;
+        }
+
+        function applySelection(mode) {
+            recordCheckboxes.forEach(function (checkbox) {
+                switch (mode) {
+                    case 'all':
+                        checkbox.checked = true;
+                        break;
+                    case 'none':
+                        checkbox.checked = false;
+                        break;
+                    case 'without-link':
+                        checkbox.checked = checkbox.getAttribute('data-has-link') !== 'true';
+                        break;
+                    case 'with-link':
+                        checkbox.checked = checkbox.getAttribute('data-has-link') === 'true';
+                        break;
+                    case 'with-answers':
+                        checkbox.checked = checkbox.getAttribute('data-has-answers') === 'true';
+                        break;
+                }
+            });
+
+            syncSelectedRecordInputs();
+        }
+
+        recordCheckboxes.forEach(function (checkbox) {
+            checkbox.addEventListener('change', syncSelectedRecordInputs);
+        });
+
+        if (toggleAllCheckbox) {
+            toggleAllCheckbox.addEventListener('change', function () {
+                recordCheckboxes.forEach(function (checkbox) {
+                    checkbox.checked = toggleAllCheckbox.checked;
+                });
+                syncSelectedRecordInputs();
+            });
+        }
+
+        selectionButtons.forEach(function (button) {
+            button.addEventListener('click', function () {
+                applySelection(button.getAttribute('data-selection'));
+            });
+        });
+
+        window.getSelectedSurveyCount = syncSelectedRecordInputs;
+        syncSelectedRecordInputs();
+    })();
+
+    function startEstimatedProgress(progressContainer, progressBar, progressText, actionLabel) {
+        if (!progressContainer || !progressBar || !progressText) {
+            return;
+        }
+
+        const selectedCount = typeof window.getSelectedSurveyCount === 'function'
+            ? window.getSelectedSurveyCount()
+            : 0;
+
+        let percent = 0;
+        const maxPercentBeforeComplete = 95;
+        const estimatedDurationMs = Math.min(45000, Math.max(6000, (selectedCount || 1) * 140));
+        const startedAt = Date.now();
+
+        progressContainer.classList.remove('d-none');
+
+        function renderProgress(currentPercent) {
+            progressBar.style.width = currentPercent + '%';
+            progressBar.textContent = currentPercent + '%';
+            progressBar.setAttribute('aria-valuenow', currentPercent.toString());
+            progressText.textContent = selectedCount > 0
+                ? `${actionLabel} ${selectedCount} selected survey${selectedCount === 1 ? '' : 's'}... ${currentPercent}%`
+                : `${actionLabel}... ${currentPercent}%`;
+        }
+
+        renderProgress(percent);
+
+        const timer = window.setInterval(function () {
+            const elapsed = Date.now() - startedAt;
+            const nextPercent = Math.min(maxPercentBeforeComplete, Math.max(percent, Math.round((elapsed / estimatedDurationMs) * maxPercentBeforeComplete)));
+
+            if (nextPercent !== percent) {
+                percent = nextPercent;
+                renderProgress(percent);
+            }
+        }, 250);
+
+        window.addEventListener('beforeunload', function () {
+            progressBar.style.width = '100%';
+            progressBar.textContent = '100%';
+            progressBar.setAttribute('aria-valuenow', '100');
+        }, { once: true });
+
+        return timer;
+    }
+
     // Populate Survey Links Handler (inline preview + warning)
     (function () {
         const previewBtn = document.getElementById('previewBtn');
@@ -290,6 +523,8 @@
         const overwriteCheckbox = document.getElementById('overwriteExisting');
         const populateForm = document.getElementById('populateSurveyLinksForm');
         const progress = document.getElementById('populateProgress');
+        const progressBar = document.getElementById('populateProgressBar');
+        const progressText = document.getElementById('populateProgressText');
         const previewSummary = document.getElementById('previewSummaryInline');
         const previewWarning = document.getElementById('previewWarningInline');
         const previewCount = document.getElementById('previewCountInline');
@@ -300,6 +535,11 @@
         previewBtn.addEventListener('click', async function (e) {
             e.preventDefault();
             const overwriteExisting = overwriteCheckbox && overwriteCheckbox.checked;
+
+            if (typeof window.getSelectedSurveyCount === 'function' && window.getSelectedSurveyCount() === 0) {
+                alert('Select at least one survey record first.');
+                return;
+            }
 
             previewBtn.disabled = true;
             previewBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Loading preview...';
@@ -320,7 +560,7 @@
                     return;
                 }
 
-                let summaryHtml = `<strong>${data.totalRecords}</strong> total survey records`;
+                let summaryHtml = `<strong>${data.selectedRecords}</strong> selected survey records`;
                 summaryHtml += `<br/>Will update: <strong class="text-success">${data.willUpdate}</strong> records`;
                 if (data.willSkip > 0) {
                     summaryHtml += `<br/>Will skip: <strong class="text-muted">${data.willSkip}</strong> records (already have links)`;
@@ -365,9 +605,14 @@
         });
 
         confirmBtn.addEventListener('click', function () {
+            if (typeof window.getSelectedSurveyCount === 'function' && window.getSelectedSurveyCount() === 0) {
+                alert('Select at least one survey record first.');
+                return;
+            }
+
             confirmBtn.disabled = true;
             previewBtn.disabled = true;
-            progress.classList.remove('d-none');
+            startEstimatedProgress(progress, progressBar, progressText, 'Populating survey links for');
             populateForm.submit();
         });
 
@@ -378,19 +623,123 @@
             previewCount.textContent = '';
             previewTableBody.innerHTML = '';
         });
-
-        function escapeHtml(text) {
-            if (!text) return '';
-            const map = {
-                '&': '&amp;',
-                '<': '&lt;',
-                '>': '&gt;',
-                '"': '&quot;',
-                "'": '&#039;'
-            };
-            return text.replace(/[&<>"']/g, m => map[m]);
-        }
     })();
+
+    // Historical Year Data preview handler
+    (function () {
+        const previewBtn = document.getElementById('previewPopulatePriorYearDataBtn');
+        const confirmBtn = document.getElementById('confirmPopulatePriorYearDataBtn');
+        const cancelBtn = document.getElementById('cancelPopulatePriorYearDataBtn');
+        const previewPanel = document.getElementById('populatePriorYearPreviewPanel');
+        const populateForm = document.getElementById('populatePriorYearDataForm');
+        const progress = document.getElementById('populatePriorYearProgress');
+        const progressBar = document.getElementById('populatePriorYearProgressBar');
+        const progressText = document.getElementById('populatePriorYearProgressText');
+        const previewSummary = document.getElementById('populatePriorYearSummaryInline');
+        const previewCount = document.getElementById('populatePriorYearCountInline');
+        const previewTableBody = document.getElementById('populatePriorYearTableBodyInline');
+
+        if (!previewBtn || !confirmBtn || !cancelBtn || !previewPanel || !populateForm) return;
+
+        previewBtn.addEventListener('click', async function (e) {
+            e.preventDefault();
+
+            if (typeof window.getSelectedSurveyCount === 'function' && window.getSelectedSurveyCount() === 0) {
+                alert('Select at least one survey record first.');
+                return;
+            }
+
+            previewBtn.disabled = true;
+            previewBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Loading preview...';
+
+            try {
+                const formData = new FormData(populateForm);
+                const response = await fetch(window.location.pathname + '?handler=PreviewPopulatePriorYearData', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                const data = await response.json();
+                if (!data.success) {
+                    alert('Error: ' + data.message);
+                    return;
+                }
+
+                let summaryHtml = `<strong>${data.selectedRecords}</strong> selected survey records`;
+                summaryHtml += `<br/>Will fill blank answers: <strong class="text-success">${data.willUpdateFields}</strong>`;
+                summaryHtml += `<br/>Companies affected: <strong>${data.affectedCompanies}</strong>`;
+                summaryHtml += `<br/>Targets: <strong>${data.yearMinusTwo}</strong> (Year-2) and <strong>${data.yearMinusOne}</strong> (Year-1)`;
+                if (data.existingValueCount > 0) {
+                    summaryHtml += `<br/>Already populated: <strong class="text-muted">${data.existingValueCount}</strong>`;
+                }
+                if (data.missingSourceCount > 0) {
+                    summaryHtml += `<br/>No source found: <strong class="text-warning">${data.missingSourceCount}</strong>`;
+                }
+                previewSummary.innerHTML = summaryHtml;
+
+                const previewRows = data.previewRows || [];
+                previewCount.textContent = `Showing ${data.totalPreviewShown} of ${data.totalRecords} records`;
+                previewTableBody.innerHTML = previewRows.map(row => `
+                    <tr>
+                        <td>${row.icon}</td>
+                        <td>${escapeHtml(row.companyName)}</td>
+                        <td><span class="${row.statusClass}">${escapeHtml(row.status)}</span></td>
+                        <td class="small text-muted">${escapeHtml(row.details || '')}</td>
+                    </tr>
+                `).join('');
+
+                if (!previewRows.length) {
+                    previewTableBody.innerHTML = '<tr><td colspan="4" class="text-muted text-center">No updates are required for the current filter.</td></tr>';
+                } else if (data.moreRows > 0) {
+                    previewTableBody.innerHTML += `<tr><td colspan="4" class="text-muted text-center">... and ${data.moreRows} more</td></tr>`;
+                }
+
+                previewPanel.classList.remove('d-none');
+                previewPanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                setTimeout(() => confirmBtn.focus(), 200);
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error loading preview: ' + error.message);
+            } finally {
+                previewBtn.disabled = false;
+                previewBtn.innerHTML = '@Model.PopulatePriorYearDataButtonLabel';
+            }
+        });
+
+        confirmBtn.addEventListener('click', function () {
+            if (typeof window.getSelectedSurveyCount === 'function' && window.getSelectedSurveyCount() === 0) {
+                alert('Select at least one survey record first.');
+                return;
+            }
+
+            confirmBtn.disabled = true;
+            previewBtn.disabled = true;
+            startEstimatedProgress(progress, progressBar, progressText, 'Populating historical year data for');
+            populateForm.submit();
+        });
+
+        cancelBtn.addEventListener('click', function () {
+            previewPanel.classList.add('d-none');
+            previewSummary.innerHTML = '';
+            previewCount.textContent = '';
+            previewTableBody.innerHTML = '';
+        });
+    })();
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, m => map[m]);
+    }
 </script>
 
 <style>

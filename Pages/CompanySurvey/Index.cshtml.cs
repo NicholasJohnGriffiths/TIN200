@@ -22,8 +22,17 @@ namespace TINWeb.Pages.CompanySurvey
         public int TotalCompaniesWithAnswers { get; set; }
         public string CompanySearch { get; set; } = string.Empty;
         public string SurveyEmailSentFilter { get; set; } = "all";
+
+        [BindProperty(SupportsGet = true)]
+        public bool IncludeTestCompanies { get; set; }
+
         public string SortBy { get; set; } = "CompanyName";
         public string SortDir { get; set; } = "asc";
+        public int? PopulateYearMinusOne => SelectedFinancialYear.HasValue ? SelectedFinancialYear.Value - 1 : null;
+        public int? PopulateYearMinusTwo => SelectedFinancialYear.HasValue ? SelectedFinancialYear.Value - 2 : null;
+        public string PopulatePriorYearDataButtonLabel => SelectedFinancialYear.HasValue
+            ? $"Populate {SelectedFinancialYear.Value - 2}, {SelectedFinancialYear.Value - 1} Data"
+            : "Populate Prior Year Data";
 
         [BindProperty]
         public DateTime? SelectedLinkExpiryDateUtc { get; set; }
@@ -48,65 +57,110 @@ namespace TINWeb.Pages.CompanySurvey
             _environment = environment;
         }
 
-        public async Task OnGetAsync(int? financialYear, string? sortBy, string? sortDir, string? companySearch, string? surveyEmailSentFilter, DateTime? selectedLinkExpiryDateUtc)
+        public async Task OnGetAsync(int? financialYear, string? sortBy, string? sortDir, string? companySearch, string? surveyEmailSentFilter, bool includeTestCompanies, DateTime? selectedLinkExpiryDateUtc)
         {
-            FinancialYears = await _service.GetAvailableFinancialYearsAsync();
-
-            SelectedFinancialYear = financialYear ?? await _service.GetCurrentSurveyFinancialYearAsync();
-            CompanySearch = (companySearch ?? string.Empty).Trim();
-            SurveyEmailSentFilter = NormalizeSurveyEmailSentFilter(surveyEmailSentFilter);
-            SortBy = NormalizeSortBy(sortBy);
-            SortDir = NormalizeSortDir(sortDir);
-            SelectedLinkExpiryDateUtc = selectedLinkExpiryDateUtc?.Date ?? GetDefaultLinkExpiryDateUtc();
-
-            Records = await _service.GetListRowsAsync(SelectedFinancialYear);
-
-            NormalizeSurveyLinksForCurrentHost();
-
-            if (string.Equals(SurveyEmailSentFilter, "sent", StringComparison.OrdinalIgnoreCase))
-            {
-                Records = Records.Where(x => x.SurveyEmailSent).ToList();
-            }
-            else if (string.Equals(SurveyEmailSentFilter, "not-sent", StringComparison.OrdinalIgnoreCase))
-            {
-                Records = Records.Where(x => !x.SurveyEmailSent).ToList();
-            }
-
-            if (!string.IsNullOrWhiteSpace(CompanySearch))
-            {
-                Records = Records
-                    .Where(x =>
-                        (!string.IsNullOrWhiteSpace(x.CompanyName) && x.CompanyName.Contains(CompanySearch, StringComparison.OrdinalIgnoreCase))
-                        || (!string.IsNullOrWhiteSpace(x.ExternalId) && x.ExternalId.Contains(CompanySearch, StringComparison.OrdinalIgnoreCase)))
-                    .ToList();
-            }
-            Records = ApplySorting(Records, SortBy, SortDir).ToList();
-            TotalCompaniesWithAnswers = Records.Count(r => r.AnswerCount > 0);
+            await LoadPageDataAsync(financialYear, sortBy, sortDir, companySearch, surveyEmailSentFilter, includeTestCompanies, selectedLinkExpiryDateUtc);
         }
 
-        public async Task<IActionResult> OnPostBulkSubmitWithAnswersAsync(int? financialYear, string? companySearch, string? surveyEmailSentFilter)
+        public async Task<IActionResult> OnPostBulkSubmitWithAnswersAsync(int? financialYear, string? companySearch, string? surveyEmailSentFilter, bool includeTestCompanies = false)
         {
             await _service.BulkSubmitWithAnswersAsync(financialYear);
-            return RedirectToPage(new { financialYear, companySearch, surveyEmailSentFilter });
+            return RedirectToPage(new { financialYear, companySearch, surveyEmailSentFilter, includeTestCompanies });
         }
 
-        public async Task<IActionResult> OnPostPreviewPopulateSurveyLinksAsync(int? financialYear, bool overwriteExisting)
+        public async Task<IActionResult> OnPostPreviewPopulatePriorYearDataAsync(int? financialYear, string? companySearch, string? surveyEmailSentFilter, bool includeTestCompanies = false, List<int>? selectedRecordIds = null)
+        {
+            await LoadPageDataAsync(financialYear, sortBy: null, sortDir: null, companySearch, surveyEmailSentFilter, includeTestCompanies, selectedLinkExpiryDateUtc: SelectedLinkExpiryDateUtc);
+
+            if (!SelectedFinancialYear.HasValue)
+            {
+                return new JsonResult(new { success = false, message = "No survey financial year is selected." });
+            }
+
+            var targetRecordIds = ResolveSelectedRecordIds(selectedRecordIds);
+            if (targetRecordIds.Count == 0)
+            {
+                return new JsonResult(new { success = false, message = "Select at least one survey record first." });
+            }
+
+            var result = await _service.PreviewPopulatePriorYearDataAsync(targetRecordIds, SelectedFinancialYear.Value);
+
+            return new JsonResult(new
+            {
+                success = true,
+                selectedRecords = targetRecordIds.Count,
+                totalRecords = result.TotalRecords,
+                affectedCompanies = result.AffectedCompanyCount,
+                willUpdateFields = result.UpdatedFieldCount,
+                existingValueCount = result.ExistingValueCount,
+                missingSourceCount = result.MissingSourceCount,
+                yearMinusOne = result.YearMinusOne,
+                yearMinusTwo = result.YearMinusTwo,
+                previewRows = result.PreviewRows.Select(row => new
+                {
+                    companyName = row.CompanyName,
+                    status = row.WillUpdateCount > 0
+                        ? $"Will populate {row.WillUpdateCount} field{(row.WillUpdateCount == 1 ? string.Empty : "s")}"
+                        : "No blank year data to populate",
+                    statusClass = row.WillUpdateCount > 0 ? "text-success" : "text-muted",
+                    icon = row.WillUpdateCount > 0 ? "✓" : "•",
+                    details = BuildPreviewDetails(row)
+                }).ToList(),
+                totalPreviewShown = result.PreviewRows.Count,
+                moreRows = Math.Max(0, result.TotalRecords - result.PreviewRows.Count)
+            });
+        }
+
+        public async Task<IActionResult> OnPostPopulatePriorYearDataAsync(int? financialYear, string? companySearch, string? surveyEmailSentFilter, bool includeTestCompanies = false, List<int>? selectedRecordIds = null)
+        {
+            var redirectValues = new
+            {
+                financialYear,
+                companySearch,
+                surveyEmailSentFilter,
+                includeTestCompanies,
+                selectedLinkExpiryDateUtc = SelectedLinkExpiryDateUtc?.ToString("yyyy-MM-dd")
+            };
+
+            await LoadPageDataAsync(financialYear, sortBy: null, sortDir: null, companySearch, surveyEmailSentFilter, includeTestCompanies, selectedLinkExpiryDateUtc: SelectedLinkExpiryDateUtc);
+
+            if (!SelectedFinancialYear.HasValue)
+            {
+                StatusMessage = "Error: No survey financial year is selected.";
+                return RedirectToPage(redirectValues);
+            }
+
+            var targetRecordIds = ResolveSelectedRecordIds(selectedRecordIds);
+            if (targetRecordIds.Count == 0)
+            {
+                StatusMessage = "Error: Select at least one survey record first.";
+                return RedirectToPage(redirectValues);
+            }
+
+            var result = await _service.PopulatePriorYearDataAsync(targetRecordIds, SelectedFinancialYear.Value);
+
+            StatusMessage = $"Historical year data populated for {SelectedFinancialYear.Value}. Selected surveys: {targetRecordIds.Count}. Filled {result.UpdatedFieldCount} blank answers across {result.AffectedCompanyCount} companies. Already populated: {result.ExistingValueCount}. No source found: {result.MissingSourceCount}.";
+            return RedirectToPage(redirectValues);
+        }
+
+        public async Task<IActionResult> OnPostPreviewPopulateSurveyLinksAsync(int? financialYear, bool overwriteExisting, string? companySearch, string? surveyEmailSentFilter, bool includeTestCompanies = false, List<int>? selectedRecordIds = null)
         {
             if (!TryGetSelectedExpiryAtUtc(SelectedLinkExpiryDateUtc, out var selectedExpiryAtUtc, out var expiryValidationMessage))
             {
                 return new JsonResult(new { success = false, message = expiryValidationMessage });
             }
 
-            var targetSurvey = await GetTargetSurveyAsync(financialYear);
+            await LoadPageDataAsync(financialYear, sortBy: null, sortDir: null, companySearch, surveyEmailSentFilter, includeTestCompanies, selectedLinkExpiryDateUtc: SelectedLinkExpiryDateUtc);
 
-            if (targetSurvey == null)
+            var targetRecordIds = ResolveSelectedRecordIds(selectedRecordIds);
+            if (targetRecordIds.Count == 0)
             {
-                return new JsonResult(new { success = false, message = "No survey was found for the selected financial year." });
+                return new JsonResult(new { success = false, message = "Select at least one survey record first." });
             }
 
-            // Get all CompanySurvey records for the selected survey with company names
+            // Get selected CompanySurvey records with company names
             var companySurveys = await _context.CompanySurvey
-                .Where(cs => cs.SurveyId == targetSurvey.Id)
+                .Where(cs => targetRecordIds.Contains(cs.Id))
                 .Join(_context.Tin200,
                     cs => cs.CompanyId,
                     t => t.Id,
@@ -153,6 +207,7 @@ namespace TINWeb.Pages.CompanySurvey
             return new JsonResult(new
             {
                 success = true,
+                selectedRecords = targetRecordIds.Count,
                 totalRecords = companySurveys.Count,
                 blankCount,
                 existingCount,
@@ -166,13 +221,29 @@ namespace TINWeb.Pages.CompanySurvey
             });
         }
 
-        public async Task<IActionResult> OnPostPopulateSurveyLinksAsync(int? financialYear, bool overwriteExisting, string? companySearch, string? surveyEmailSentFilter)
+        public async Task<IActionResult> OnPostPopulateSurveyLinksAsync(int? financialYear, bool overwriteExisting, string? companySearch, string? surveyEmailSentFilter, bool includeTestCompanies = false, List<int>? selectedRecordIds = null)
         {
-            var redirectValues = new { financialYear, companySearch, surveyEmailSentFilter, selectedLinkExpiryDateUtc = SelectedLinkExpiryDateUtc?.ToString("yyyy-MM-dd") };
+            var redirectValues = new
+            {
+                financialYear,
+                companySearch,
+                surveyEmailSentFilter,
+                includeTestCompanies,
+                selectedLinkExpiryDateUtc = SelectedLinkExpiryDateUtc?.ToString("yyyy-MM-dd")
+            };
 
             if (!TryGetSelectedExpiryAtUtc(SelectedLinkExpiryDateUtc, out var selectedExpiryAtUtc, out var expiryValidationMessage))
             {
                 StatusMessage = $"Error: {expiryValidationMessage}";
+                return RedirectToPage(redirectValues);
+            }
+
+            await LoadPageDataAsync(financialYear, sortBy: null, sortDir: null, companySearch, surveyEmailSentFilter, includeTestCompanies, selectedLinkExpiryDateUtc: SelectedLinkExpiryDateUtc);
+
+            var targetRecordIds = ResolveSelectedRecordIds(selectedRecordIds);
+            if (targetRecordIds.Count == 0)
+            {
+                StatusMessage = "Error: Select at least one survey record first.";
                 return RedirectToPage(redirectValues);
             }
 
@@ -184,9 +255,9 @@ namespace TINWeb.Pages.CompanySurvey
                 return RedirectToPage(redirectValues);
             }
 
-            // Get all CompanySurvey records for the selected survey
+            // Get selected CompanySurvey records
             var companySurveys = await _context.CompanySurvey
-                .Where(cs => cs.SurveyId == targetSurvey.Id)
+                .Where(cs => targetRecordIds.Contains(cs.Id))
                 .ToListAsync();
 
             int createdCount = 0;
@@ -226,8 +297,60 @@ namespace TINWeb.Pages.CompanySurvey
                 ? $" Selected expiry date: {selectedExpiryAtUtc.Value:dd/MM/yyyy HH:mm} UTC."
                 : string.Empty;
 
-            StatusMessage = $"Survey links updated for {targetSurvey.FinancialYear}. Created: {createdCount}, Overwritten: {overwrittenCount}, Skipped: {skippedCount}.{expiryMessage}";
+            StatusMessage = $"Survey links updated for {targetSurvey.FinancialYear}. Selected surveys: {targetRecordIds.Count}. Created: {createdCount}, Overwritten: {overwrittenCount}, Skipped: {skippedCount}.{expiryMessage}";
             return RedirectToPage(redirectValues);
+        }
+
+        private List<int> ResolveSelectedRecordIds(IEnumerable<int>? selectedRecordIds)
+        {
+            var validRecordIds = Records.Select(r => r.Id).ToHashSet();
+
+            return (selectedRecordIds ?? Enumerable.Empty<int>())
+                .Where(id => validRecordIds.Contains(id))
+                .Distinct()
+                .ToList();
+        }
+
+        private async Task LoadPageDataAsync(int? financialYear, string? sortBy, string? sortDir, string? companySearch, string? surveyEmailSentFilter, bool includeTestCompanies, DateTime? selectedLinkExpiryDateUtc)
+        {
+            FinancialYears = await _service.GetAvailableFinancialYearsAsync();
+
+            SelectedFinancialYear = financialYear ?? await _service.GetCurrentSurveyFinancialYearAsync();
+            CompanySearch = (companySearch ?? string.Empty).Trim();
+            SurveyEmailSentFilter = NormalizeSurveyEmailSentFilter(surveyEmailSentFilter);
+            IncludeTestCompanies = includeTestCompanies;
+            SortBy = NormalizeSortBy(sortBy);
+            SortDir = NormalizeSortDir(sortDir);
+            SelectedLinkExpiryDateUtc = selectedLinkExpiryDateUtc?.Date ?? GetDefaultLinkExpiryDateUtc();
+
+            Records = await _service.GetListRowsAsync(SelectedFinancialYear);
+            NormalizeSurveyLinksForCurrentHost();
+
+            if (!IncludeTestCompanies)
+            {
+                Records = Records.Where(x => !x.IsTestCompany).ToList();
+            }
+
+            if (string.Equals(SurveyEmailSentFilter, "sent", StringComparison.OrdinalIgnoreCase))
+            {
+                Records = Records.Where(x => x.SurveyEmailSent).ToList();
+            }
+            else if (string.Equals(SurveyEmailSentFilter, "not-sent", StringComparison.OrdinalIgnoreCase))
+            {
+                Records = Records.Where(x => !x.SurveyEmailSent).ToList();
+            }
+
+            if (!string.IsNullOrWhiteSpace(CompanySearch))
+            {
+                Records = Records
+                    .Where(x =>
+                        (!string.IsNullOrWhiteSpace(x.CompanyName) && x.CompanyName.Contains(CompanySearch, StringComparison.OrdinalIgnoreCase))
+                        || (!string.IsNullOrWhiteSpace(x.ExternalId) && x.ExternalId.Contains(CompanySearch, StringComparison.OrdinalIgnoreCase)))
+                    .ToList();
+            }
+
+            Records = ApplySorting(Records, SortBy, SortDir).ToList();
+            TotalCompaniesWithAnswers = Records.Count(r => r.AnswerCount > 0);
         }
 
         private DateTime GetDefaultLinkExpiryDateUtc()
@@ -341,6 +464,28 @@ namespace TINWeb.Pages.CompanySurvey
                 "not-sent" => "not-sent",
                 _ => "all"
             };
+        }
+
+        private static string BuildPreviewDetails(CompanySurveyService.PopulatePriorYearDataPreviewRow row)
+        {
+            var details = new List<string>();
+
+            if (row.ExistingValueCount > 0)
+            {
+                details.Add($"{row.ExistingValueCount} already populated");
+            }
+
+            if (row.MissingSourceCount > 0)
+            {
+                details.Add($"{row.MissingSourceCount} without source");
+            }
+
+            if (!string.IsNullOrWhiteSpace(row.FieldsSummary))
+            {
+                details.Add($"Fields: {row.FieldsSummary}");
+            }
+
+            return details.Count == 0 ? "No updates needed." : string.Join(" • ", details);
         }
 
         public string GetNextSortDirection(string column)

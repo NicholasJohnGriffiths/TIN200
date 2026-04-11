@@ -98,6 +98,241 @@ namespace TINWeb.Pages.Company
             return resolvedText;
         }
 
+        public bool HasPreviousYearValue(AnswerEditRow row)
+        {
+            var answerType = (row.AnswerType ?? string.Empty).Trim();
+
+            if (answerType.Equals("Number", StringComparison.OrdinalIgnoreCase))
+            {
+                return row.PreviousYearAnswerNumber.HasValue || !string.IsNullOrWhiteSpace(row.PreviousYearValue);
+            }
+
+            if (answerType.Equals("Currency", StringComparison.OrdinalIgnoreCase))
+            {
+                return row.PreviousYearAnswerCurrency.HasValue || !string.IsNullOrWhiteSpace(row.PreviousYearValue);
+            }
+
+            if (answerType.Equals("Multichoice", StringComparison.OrdinalIgnoreCase)
+                || answerType.Equals("MultiChoice", StringComparison.OrdinalIgnoreCase))
+            {
+                return !string.IsNullOrWhiteSpace(row.PreviousYearAnswerText)
+                    || !string.IsNullOrWhiteSpace(row.PreviousYearValue);
+            }
+
+            return !string.IsNullOrWhiteSpace(row.PreviousYearAnswerText)
+                || !string.IsNullOrWhiteSpace(row.PreviousYearValue);
+        }
+
+        public bool HasCurrentAnswer(AnswerEditRow row)
+        {
+            var answerType = (row.AnswerType ?? string.Empty).Trim();
+
+            if (answerType.Equals("Number", StringComparison.OrdinalIgnoreCase))
+            {
+                return row.AnswerNumber.HasValue;
+            }
+
+            if (answerType.Equals("Currency", StringComparison.OrdinalIgnoreCase))
+            {
+                return row.AnswerCurrency.HasValue;
+            }
+
+            if (answerType.Equals("Multichoice", StringComparison.OrdinalIgnoreCase)
+                || answerType.Equals("MultiChoice", StringComparison.OrdinalIgnoreCase))
+            {
+                return row.SelectedChoices?.Count > 0;
+            }
+
+            return !string.IsNullOrWhiteSpace(row.AnswerText);
+        }
+
+        public bool ShouldHidePreviousYearCopy(string? text)
+        {
+            var offset = ResolveHistoricalQuestionOffset(text);
+            return offset is 1 or 2;
+        }
+
+        private int? ResolveHistoricalQuestionOffset(string? text)
+        {
+            return ResolveHistoricalQuestionOffset(FinancialYear, text);
+        }
+
+        private static int? ResolveHistoricalQuestionOffset(int financialYear, params string?[] candidates)
+        {
+            if (financialYear <= 0)
+            {
+                return null;
+            }
+
+            foreach (var candidate in candidates)
+            {
+                if (string.IsNullOrWhiteSpace(candidate))
+                {
+                    continue;
+                }
+
+                var normalized = NormalizeQuestionKey(candidate);
+                if (string.IsNullOrWhiteSpace(normalized))
+                {
+                    continue;
+                }
+
+                if (normalized.Contains("lastfinancialyear", StringComparison.Ordinal)
+                    || normalized.Contains("lastfinacialyear", StringComparison.Ordinal)
+                    || normalized.Contains("lastfinacnailyear", StringComparison.Ordinal))
+                {
+                    return 0;
+                }
+
+                if (normalized.Contains("currentfinancialyear01", StringComparison.Ordinal)
+                    || normalized.Contains("currentfinancialyear1", StringComparison.Ordinal)
+                    || normalized.Contains("year01", StringComparison.Ordinal)
+                    || normalized.Contains("year1", StringComparison.Ordinal))
+                {
+                    return 1;
+                }
+
+                if (normalized.Contains("currentfinancialyear02", StringComparison.Ordinal)
+                    || normalized.Contains("currentfinancialyear2", StringComparison.Ordinal)
+                    || normalized.Contains("year02", StringComparison.Ordinal)
+                    || normalized.Contains("year2", StringComparison.Ordinal))
+                {
+                    return 2;
+                }
+
+                var matches = Regex.Matches(candidate, @"(?:19|20)\d{2}");
+                foreach (Match match in matches)
+                {
+                    if (!int.TryParse(match.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var year))
+                    {
+                        continue;
+                    }
+
+                    var offset = (financialYear - 1) - year;
+                    if (offset >= 0 && offset <= 2)
+                    {
+                        return offset;
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private static string? BuildTemporalBaseKey(int financialYear, int? groupId, int? subgroupId, params string?[] candidates)
+        {
+            foreach (var candidate in candidates)
+            {
+                var normalized = NormalizeQuestionKey(candidate);
+                if (string.IsNullOrWhiteSpace(normalized))
+                {
+                    continue;
+                }
+
+                var baseKey = normalized;
+                var yearsToRemove = new[]
+                {
+                    (financialYear - 1).ToString(CultureInfo.InvariantCulture),
+                    (financialYear - 2).ToString(CultureInfo.InvariantCulture),
+                    (financialYear - 3).ToString(CultureInfo.InvariantCulture)
+                };
+
+                foreach (var year in yearsToRemove)
+                {
+                    baseKey = baseKey.Replace(year, string.Empty, StringComparison.Ordinal);
+                }
+
+                baseKey = baseKey
+                    .Replace("lastfinancialyear", string.Empty, StringComparison.Ordinal)
+                    .Replace("lastfinacialyear", string.Empty, StringComparison.Ordinal)
+                    .Replace("lastfinacnailyear", string.Empty, StringComparison.Ordinal)
+                    .Replace("currentfinancialyear01", string.Empty, StringComparison.Ordinal)
+                    .Replace("currentfinancialyear1", string.Empty, StringComparison.Ordinal)
+                    .Replace("currentfinancialyear02", string.Empty, StringComparison.Ordinal)
+                    .Replace("currentfinancialyear2", string.Empty, StringComparison.Ordinal)
+                    .Replace("year01", string.Empty, StringComparison.Ordinal)
+                    .Replace("year1", string.Empty, StringComparison.Ordinal)
+                    .Replace("year02", string.Empty, StringComparison.Ordinal)
+                    .Replace("year2", string.Empty, StringComparison.Ordinal)
+                    .Trim();
+
+                if (!string.IsNullOrWhiteSpace(baseKey))
+                {
+                    return baseKey;
+                }
+            }
+
+            if (subgroupId.HasValue)
+            {
+                return $"group-{groupId ?? 0}-subgroup-{subgroupId.Value}";
+            }
+
+            if (groupId.HasValue)
+            {
+                return $"group-{groupId.Value}";
+            }
+
+            return null;
+        }
+
+        private static string NormalizeQuestionKey(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return string.Empty;
+            }
+
+            return new string(text
+                .Where(char.IsLetterOrDigit)
+                .Select(char.ToLowerInvariant)
+                .ToArray());
+        }
+
+        private static bool HasAnswerValue(Answer? answer)
+        {
+            return answer != null
+                && (!string.IsNullOrWhiteSpace(answer.AnswerText)
+                    || answer.AnswerNumber.HasValue
+                    || answer.AnswerCurrency.HasValue);
+        }
+
+        private static Answer? ResolvePriorYearSourceAnswer(
+            int financialYear,
+            string baseKey,
+            int targetOffset,
+            IReadOnlyDictionary<(int SurveyFinancialYear, string BaseKey, int Offset), Answer> priorAnswersByYearKey)
+        {
+            if (targetOffset == 0)
+            {
+                if (priorAnswersByYearKey.TryGetValue((financialYear - 1, baseKey, 0), out var lastFinancialYearSource)
+                    && HasAnswerValue(lastFinancialYearSource))
+                {
+                    return lastFinancialYearSource;
+                }
+
+                return null;
+            }
+
+            for (var step = 1; step <= targetOffset; step++)
+            {
+                var sourceSurveyYear = financialYear - step;
+                var sourceOffset = targetOffset - step;
+
+                if (sourceOffset < 0)
+                {
+                    continue;
+                }
+
+                if (priorAnswersByYearKey.TryGetValue((sourceSurveyYear, baseKey, sourceOffset), out var source)
+                    && HasAnswerValue(source))
+                {
+                    return source;
+                }
+            }
+
+            return null;
+        }
+
         public async Task<IActionResult> OnGetAsync(int id, string token, bool saved = false, bool submitted = false)
         {
             token = GetEffectiveToken(token);
@@ -544,8 +779,6 @@ namespace TINWeb.Pages.Company
                 .Where(g => groupIds.Contains(g.Id))
                 .ToDictionaryAsync(g => g.Id);
 
-            var previousYearAnswersByQuestionId = await GetPreviousYearAnswersByQuestionIdAsync(companyId, currentFinancialYear);
-
             var subgroupAssignments = await (
                 from subgroupQuestion in _context.QuestionSubgroupQuestion
                 join subgroup in _context.QuestionSubgroup on subgroupQuestion.QuestionSubgroupId equals subgroup.Id
@@ -569,6 +802,8 @@ namespace TINWeb.Pages.Company
                         .ThenBy(x => x.Id)
                         .First());
 
+            var previousYearAnswersByQuestionId = new Dictionary<int, Answer>();
+
             var answers = await _context.Answer
                 .Where(a => a.CompanySurveyId == companySurveyId)
                 .OrderByDescending(a => a.Id)
@@ -578,7 +813,7 @@ namespace TINWeb.Pages.Company
                 .GroupBy(a => a.QuestionId)
                 .ToDictionary(g => g.Key, g => g.First());
 
-            return questions
+            var rows = questions
                 .Select(question =>
                 {
                     latestAnswerByQuestionId.TryGetValue(question.Id, out var answer);
@@ -619,34 +854,296 @@ namespace TINWeb.Pages.Company
                     };
                 })
                 .ToList();
+
+            NormalizeRowsForDisplay(rows);
+            ApplyVisibleHistoricalCopyValues(rows, currentFinancialYear);
+            return rows;
         }
 
-        private async Task<Dictionary<int, Answer>> GetPreviousYearAnswersByQuestionIdAsync(int companyId, int currentFinancialYear)
+        private async Task<Dictionary<int, Answer>> GetPreviousYearAnswersByQuestionIdAsync(
+            int companyId,
+            int currentFinancialYear,
+            IReadOnlyList<Question> currentQuestions,
+            IReadOnlyDictionary<int, int?> subgroupIdByQuestionId)
         {
-            if (currentFinancialYear <= 0)
+            if (currentFinancialYear <= 0 || currentQuestions.Count == 0)
             {
                 return new Dictionary<int, Answer>();
             }
 
-            var priorAnswers = await (
+            var priorAnswerRows = await (
                 from answer in _context.Answer
                 join companySurvey in _context.CompanySurvey on answer.CompanySurveyId equals companySurvey.Id
                 join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
+                join question in _context.Question on answer.QuestionId equals question.Id
                 where companySurvey.CompanyId == companyId && survey.FinancialYear < currentFinancialYear
+                orderby survey.FinancialYear descending, answer.Id descending
                 select new
                 {
-                    answer,
-                    survey.FinancialYear
+                    Answer = answer,
+                    SurveyFinancialYear = survey.FinancialYear,
+                    Question = question
                 })
                 .ToListAsync();
 
-            return priorAnswers
-                .GroupBy(x => x.answer.QuestionId)
-                .Select(group => group
-                    .OrderByDescending(x => x.FinancialYear)
-                    .ThenByDescending(x => x.answer.Id)
-                    .First())
-                .ToDictionary(x => x.answer.QuestionId, x => x.answer);
+            if (priorAnswerRows.Count == 0)
+            {
+                return new Dictionary<int, Answer>();
+            }
+
+            var priorQuestionIds = priorAnswerRows
+                .Select(x => x.Question.Id)
+                .Distinct()
+                .ToList();
+
+            var priorSubgroupAssignments = await (
+                from subgroupQuestion in _context.QuestionSubgroupQuestion
+                join subgroup in _context.QuestionSubgroup on subgroupQuestion.QuestionSubgroupId equals subgroup.Id
+                where priorQuestionIds.Contains(subgroupQuestion.QuestionId)
+                select new
+                {
+                    subgroupQuestion.QuestionId,
+                    subgroup.Id,
+                    subgroupQuestion.OrderNumber
+                })
+                .ToListAsync();
+
+            var priorSubgroupIdByQuestionId = priorSubgroupAssignments
+                .GroupBy(x => x.QuestionId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => (int?)g.OrderBy(x => x.OrderNumber ?? int.MaxValue)
+                        .ThenBy(x => x.Id)
+                        .Select(x => x.Id)
+                        .FirstOrDefault());
+
+            var descriptorByQuestionId = currentQuestions
+                .Select(question => new TemporalAnswerQuestionDescriptor
+                {
+                    QuestionId = question.Id,
+                    BaseKey = BuildTemporalBaseKey(
+                        currentFinancialYear,
+                        question.GroupId,
+                        subgroupIdByQuestionId.TryGetValue(question.Id, out var subgroupId) ? subgroupId : null,
+                        question.Title,
+                        question.QuestionText,
+                        question.ImportColumnName,
+                        question.ImportColumnNameAlt),
+                    Offset = ResolveHistoricalQuestionOffset(
+                        currentFinancialYear,
+                        question.Title,
+                        question.QuestionText,
+                        question.ImportColumnName,
+                        question.ImportColumnNameAlt)
+                })
+                .ToDictionary(x => x.QuestionId);
+
+            var priorAnswersByYearKey = priorAnswerRows
+                .Select(x => new
+                {
+                    x.Answer,
+                    x.SurveyFinancialYear,
+                    BaseKey = BuildTemporalBaseKey(
+                        currentFinancialYear,
+                        x.Question.GroupId,
+                        priorSubgroupIdByQuestionId.TryGetValue(x.Question.Id, out var subgroupId) ? subgroupId : null,
+                        x.Question.Title,
+                        x.Question.QuestionText,
+                        x.Question.ImportColumnName,
+                        x.Question.ImportColumnNameAlt),
+                    Offset = ResolveHistoricalQuestionOffset(
+                        currentFinancialYear,
+                        x.Question.Title,
+                        x.Question.QuestionText,
+                        x.Question.ImportColumnName,
+                        x.Question.ImportColumnNameAlt)
+                })
+                .Where(x => !string.IsNullOrWhiteSpace(x.BaseKey) && x.Offset.HasValue)
+                .GroupBy(x => (x.SurveyFinancialYear, BaseKey: x.BaseKey!, Offset: x.Offset!.Value))
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.OrderByDescending(x => x.Answer.Id)
+                        .Select(x => x.Answer)
+                        .First());
+
+            var latestPriorAnswerByQuestionId = priorAnswerRows
+                .GroupBy(x => x.Answer.QuestionId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.OrderByDescending(x => x.SurveyFinancialYear)
+                        .ThenByDescending(x => x.Answer.Id)
+                        .Select(x => x.Answer)
+                        .First());
+
+            var resolvedAnswers = new Dictionary<int, Answer>();
+
+            foreach (var question in currentQuestions)
+            {
+                if (descriptorByQuestionId.TryGetValue(question.Id, out var descriptor)
+                    && !string.IsNullOrWhiteSpace(descriptor.BaseKey)
+                    && descriptor.Offset.HasValue)
+                {
+                    var temporalMatch = ResolvePriorYearSourceAnswer(
+                        currentFinancialYear,
+                        descriptor.BaseKey,
+                        descriptor.Offset.Value,
+                        priorAnswersByYearKey);
+
+                    if (temporalMatch != null)
+                    {
+                        resolvedAnswers[question.Id] = temporalMatch;
+                        continue;
+                    }
+                }
+
+                if (latestPriorAnswerByQuestionId.TryGetValue(question.Id, out var latestPriorAnswer)
+                    && HasAnswerValue(latestPriorAnswer))
+                {
+                    resolvedAnswers[question.Id] = latestPriorAnswer;
+                }
+            }
+
+            return resolvedAnswers;
+        }
+
+        private static void NormalizeRowsForDisplay(List<AnswerEditRow> rows)
+        {
+            foreach (var row in rows)
+            {
+                var answerType = (row.AnswerType ?? string.Empty).Trim();
+
+                if (answerType.Equals("Number", StringComparison.OrdinalIgnoreCase))
+                {
+                    row.AnswerText = null;
+                    row.AnswerCurrency = null;
+                    row.PreviousYearAnswerText = null;
+                    row.PreviousYearAnswerCurrency = null;
+                }
+                else if (answerType.Equals("Currency", StringComparison.OrdinalIgnoreCase))
+                {
+                    row.AnswerText = null;
+                    row.AnswerNumber = null;
+                    row.PreviousYearAnswerText = null;
+                    row.PreviousYearAnswerNumber = null;
+                }
+                else if (answerType.Equals("Multichoice", StringComparison.OrdinalIgnoreCase)
+                    || answerType.Equals("MultiChoice", StringComparison.OrdinalIgnoreCase)
+                    || answerType.Equals("SingleChoice", StringComparison.OrdinalIgnoreCase)
+                    || answerType.Equals("Radio", StringComparison.OrdinalIgnoreCase)
+                    || answerType.Equals("Text", StringComparison.OrdinalIgnoreCase))
+                {
+                    row.AnswerNumber = null;
+                    row.AnswerCurrency = null;
+                    row.PreviousYearAnswerNumber = null;
+                    row.PreviousYearAnswerCurrency = null;
+                }
+            }
+        }
+
+        private void ApplyVisibleHistoricalCopyValues(List<AnswerEditRow> rows, int financialYear)
+        {
+            if (financialYear <= 0 || rows.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var row in rows)
+            {
+                row.PreviousYearValue = null;
+                row.PreviousYearAnswerText = null;
+                row.PreviousYearAnswerNumber = null;
+                row.PreviousYearAnswerCurrency = null;
+            }
+
+            foreach (var targetRow in rows)
+            {
+                var answerType = (targetRow.AnswerType ?? string.Empty).Trim();
+                if (!answerType.Equals("Number", StringComparison.OrdinalIgnoreCase)
+                    && !answerType.Equals("Currency", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (HasCurrentAnswer(targetRow))
+                {
+                    continue;
+                }
+
+                var targetOffset = ResolveHistoricalQuestionOffset(financialYear, targetRow.QuestionText);
+                if (targetOffset is not 0 and not 1)
+                {
+                    continue;
+                }
+
+                var sourceOffset = targetOffset.Value + 1;
+
+                var sourceRow = rows
+                    .Where(candidate => !ReferenceEquals(candidate, targetRow))
+                    .Where(candidate => candidate.GroupId == targetRow.GroupId)
+                    .Where(candidate => candidate.SubgroupId == targetRow.SubgroupId)
+                    .Where(candidate => ResolveHistoricalQuestionOffset(financialYear, candidate.QuestionText) == sourceOffset)
+                    .Where(HasCurrentAnswer)
+                    .OrderBy(candidate => candidate.OrderNumber ?? int.MaxValue)
+                    .ThenBy(candidate => candidate.QuestionId)
+                    .FirstOrDefault();
+
+                if (sourceRow == null)
+                {
+                    continue;
+                }
+
+                targetRow.PreviousYearAnswerText = sourceRow.AnswerText;
+                targetRow.PreviousYearAnswerNumber = sourceRow.AnswerNumber;
+                targetRow.PreviousYearAnswerCurrency = sourceRow.AnswerCurrency;
+                targetRow.PreviousYearValue = FormatAnswerPreview(sourceRow);
+            }
+        }
+
+        private static string? BuildCurrentSurveyCopyKey(AnswerEditRow row, int financialYear)
+        {
+            if (row.SubgroupId.HasValue)
+            {
+                return $"group-{row.GroupId ?? 0}-subgroup-{row.SubgroupId.Value}";
+            }
+
+            var baseKey = BuildTemporalBaseKey(
+                financialYear,
+                row.GroupId,
+                row.SubgroupId,
+                row.QuestionText,
+                row.SubgroupTitle,
+                row.GroupTitle);
+
+            if (!string.IsNullOrWhiteSpace(baseKey))
+            {
+                return $"group-{row.GroupId ?? 0}-{baseKey}";
+            }
+
+            return row.GroupId.HasValue
+                ? $"group-{row.GroupId.Value}-question-{row.QuestionId}"
+                : null;
+        }
+
+        private static string? FormatAnswerPreview(AnswerEditRow row)
+        {
+            var normalizedType = row.AnswerType?.Trim();
+
+            if (normalizedType != null && normalizedType.Equals("Currency", StringComparison.OrdinalIgnoreCase) && row.AnswerCurrency.HasValue)
+            {
+                return row.AnswerCurrency.Value.ToString($"N{GetDisplayPrecision(row.DecimalPoints)}");
+            }
+
+            if (normalizedType != null && normalizedType.Equals("Number", StringComparison.OrdinalIgnoreCase) && row.AnswerNumber.HasValue)
+            {
+                return row.AnswerNumber.Value.ToString($"N{GetDisplayPrecision(row.DecimalPoints)}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(row.AnswerText))
+            {
+                return row.AnswerText;
+            }
+
+            return null;
         }
 
         private static string? FormatAnswerPreview(Answer? answer, string? answerType, int? decimalPoints)
@@ -756,6 +1253,49 @@ namespace TINWeb.Pages.Company
         {
             var precision = decimalPoints ?? 2;
             return Math.Max(0, Math.Min(precision, 6));
+        }
+
+        private static int GetInputPrecision(int? decimalPoints)
+        {
+            if (!decimalPoints.HasValue)
+            {
+                return 2;
+            }
+
+            return decimalPoints.Value < 0
+                ? 0
+                : Math.Max(0, Math.Min(decimalPoints.Value, 6));
+        }
+
+        public string FormatNumberInputValue(double? value, int? decimalPoints)
+        {
+            if (!value.HasValue)
+            {
+                return string.Empty;
+            }
+
+            return value.Value.ToString($"F{GetInputPrecision(decimalPoints)}", CultureInfo.InvariantCulture);
+        }
+
+        public string FormatCurrencyInputValue(decimal? value, int? decimalPoints)
+        {
+            if (!value.HasValue)
+            {
+                return string.Empty;
+            }
+
+            return value.Value.ToString($"F{GetInputPrecision(decimalPoints)}", CultureInfo.InvariantCulture);
+        }
+
+        public string GetNumericInputStep(int? decimalPoints)
+        {
+            var precision = GetInputPrecision(decimalPoints);
+            if (precision <= 0)
+            {
+                return "1";
+            }
+
+            return "0." + new string('0', precision - 1) + "1";
         }
 
         private static List<string> GetChoiceOptions(Question question)
@@ -888,6 +1428,13 @@ namespace TINWeb.Pages.Company
             }
 
             return null;
+        }
+
+        private sealed class TemporalAnswerQuestionDescriptor
+        {
+            public int QuestionId { get; set; }
+            public string? BaseKey { get; set; }
+            public int? Offset { get; set; }
         }
 
         public class AnswerEditRow
