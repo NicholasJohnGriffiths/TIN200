@@ -113,6 +113,7 @@ namespace TINWeb.Services
             existingRecord.AnswerType = record.AnswerType;
             existingRecord.DecimalPoints = record.DecimalPoints;
             existingRecord.Active = record.Active;
+            existingRecord.DisplayPreviousYear = record.DisplayPreviousYear;
             existingRecord.Multi1 = record.Multi1;
             existingRecord.Multi2 = record.Multi2;
             existingRecord.Multi3 = record.Multi3;

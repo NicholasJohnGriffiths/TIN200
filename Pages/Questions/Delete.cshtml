@@ -15,6 +15,7 @@
         <dt class="col-sm-3">Title</dt><dd class="col-sm-9">@Model.Record.Title</dd>
         <dt class="col-sm-3">Question</dt><dd class="col-sm-9">@Html.Raw(Model.Record.QuestionText ?? string.Empty)</dd>
         <dt class="col-sm-3">Active</dt><dd class="col-sm-9">@(Model.Record.Active == false ? "No" : "Yes")</dd>
+        <dt class="col-sm-3">Display Previous Year</dt><dd class="col-sm-9">@(Model.Record.DisplayPreviousYear == true ? "Yes" : "No")</dd>
     </dl>
 
     <form method="post">

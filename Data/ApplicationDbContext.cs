@@ -306,6 +306,10 @@ namespace TINWeb.Data
                     .HasColumnName("Active")
                     .HasColumnType("bit");
 
+                entity.Property(e => e.DisplayPreviousYear)
+                    .HasColumnName("DisplayPreviousYear")
+                    .HasColumnType("bit");
+
                 entity.HasOne<QuestionGroup>()
                     .WithMany()
                     .HasForeignKey(e => e.GroupId)

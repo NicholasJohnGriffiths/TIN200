@@ -1,0 +1,557 @@
+@page
+@model TINWeb.Pages.Testing.SurveyDataCheck.IndexModel
+@{
+    ViewData["Title"] = "Survey Data Check";
+    var matchCount    = Model.CheckResults.Count(r => r.RowStatus == IndexModel.CheckStatus.Match);
+    var mismatchCount = Model.CheckResults.Count(r => r.RowStatus == IndexModel.CheckStatus.Mismatch);
+    var noExcelCount  = Model.CheckResults.Count(r => r.RowStatus == IndexModel.CheckStatus.NoExcelMatch);
+}
+
+<div class="container-fluid mt-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="mb-0">Survey Data Check</h1>
+        <span class="text-muted small">Compare Excel file data against survey answers for a financial year</span>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            @Model.ErrorMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @Model.StatusMessage
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
+    <div class="card mb-4 shadow-sm">
+        <div class="card-body">
+
+            @* ── Financial Year (GET) ── *@
+            <form method="get" class="d-flex align-items-end gap-3 mb-3" id="yearForm">
+                <div>
+                    <label class="form-label fw-semibold mb-1">Financial Year</label>
+                    <select asp-for="SelectedFinancialYear" class="form-select" style="min-width:120px;"
+                            onchange="document.getElementById('yearForm').submit();">
+                        @foreach (var year in Model.FinancialYears)
+                        {
+                            <option value="@year" selected="@(Model.SelectedFinancialYear == year)">@year</option>
+                        }
+                    </select>
+                </div>
+                <div class="text-muted small align-self-center">
+                    <strong>@Model.CompanySurveys.Count</strong> company survey records for this year
+                </div>
+            </form>
+
+            <hr class="my-3" />
+
+            @* ── Save / Load config (client-side JSON) ── *@
+            <div class="d-flex gap-2 mb-3">
+                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="saveConfig()">
+                    &#8597; Save Configuration
+                </button>
+                <label class="btn btn-outline-secondary btn-sm mb-0" style="cursor:pointer;">
+                    &#8595; Load Configuration
+                    <input type="file" id="loadConfigFile" accept=".json" class="d-none"
+                           onchange="loadConfig(this.files[0]); this.value='';" />
+                </label>
+                <span class="text-muted small align-self-center">Save/load your question&ndash;to&ndash;column mapping as a JSON file</span>
+            </div>
+
+            @* ── Check-Data form (POST) ── *@
+            <form method="post" asp-page-handler="CheckData" enctype="multipart/form-data" id="checkForm">
+                <input type="hidden" name="SelectedFinancialYear" value="@Model.SelectedFinancialYear" />
+
+                @* Header actions *@
+                <div class="row g-3 align-items-end mb-3">
+                    <div class="col-md-3">
+                        <label asp-for="ExternalIdColumnName" class="form-label fw-semibold mb-1">
+                            External ID Column <span class="text-danger">*</span>
+                        </label>
+                        <input asp-for="ExternalIdColumnName" id="ExternalIdColumnName"
+                               class="form-control" placeholder="e.g. External ID" required />
+                        <div class="form-text">Header in Excel that contains the Company External ID</div>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-semibold mb-1">
+                            Excel File <span class="text-danger">*</span>
+                        </label>
+                        <input type="file" name="excelFile" accept=".xlsx" class="form-control" required />
+                        <div class="form-text">Row 1 = column headers; each subsequent row = one company</div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-check mb-2">
+                            @if (Model.OverwriteExistingData)
+                            {
+                                <input class="form-check-input" type="checkbox" asp-for="OverwriteExistingData" checked />
+                            }
+                            else
+                            {
+                                <input class="form-check-input" type="checkbox" asp-for="OverwriteExistingData" />
+                            }
+                            <input type="hidden" name="OverwriteExistingData" value="false" />
+                            <label class="form-check-label" asp-for="OverwriteExistingData">Overwrite Existing Data</label>
+                        </div>
+                        <div class="form-text">Must be checked if existing answer values should be replaced.</div>
+                    </div>
+                    <div class="col-auto">
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="submit" class="btn btn-primary px-4" data-progress-text="Checking Excel data against DB answers...">Check Data</button>
+                            <button type="submit"
+                                    class="btn btn-warning px-4"
+                                    asp-page-handler="UpdateDbData"
+                                    data-progress-text="Previewing DB updates from Excel data...">
+                                Update DB Data
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-warning py-2 mb-3" role="alert">
+                    <strong>Warning:</strong> Update DB Data will write Excel values into survey answers for the currently ticked questions. Existing answers are only overwritten when <strong>Overwrite Existing Data</strong> is ticked.
+                </div>
+
+                @* ── Dynamic mapping table (one row per question) ── *@
+                <div class="fw-semibold mb-1">
+                    Question &harr; Excel Column Mapping
+                    <small class="fw-normal text-muted ms-1">
+                        — left: include question; right: Excel column to match against
+                        (leave blank to use the question&rsquo;s own ImportColumnNameAlt)
+                    </small>
+                </div>
+                <div class="table-responsive mb-2">
+                    <table class="table table-sm table-bordered mb-0 align-middle" style="font-size:0.875rem;">
+                        <thead class="table-secondary">
+                            <tr>
+                                <th style="width:32px;">#</th>
+                                <th style="width:84px;">Include</th>
+                                <th>Question</th>
+                                <th>Excel Column</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (var i = 0; i < Model.SlotCount; i++)
+                            {
+                                var question = Model.Questions[i];
+                                var isIncluded = Model.IncludeQuestions.Count > i && Model.IncludeQuestions[i];
+                                var currentCol  = Model.SelectedColumnNames.Count > i ? Model.SelectedColumnNames[i] : string.Empty;
+                                <tr>
+                                    <td class="text-muted text-center">@(i + 1)</td>
+                                    <td>
+                                        <input type="hidden" name="QuestionIds[@i]" id="qid_@i" value="@question.Id" />
+                                        <div class="form-check m-0 text-center">
+                                            @if (isIncluded)
+                                            {
+                                                <input class="form-check-input" type="checkbox" name="IncludeQuestions[@i]" id="include_@i" value="true" checked />
+                                            }
+                                            else
+                                            {
+                                                <input class="form-check-input" type="checkbox" name="IncludeQuestions[@i]" id="include_@i" value="true" />
+                                            }
+                                            <input type="hidden" name="IncludeQuestions[@i]" value="false" />
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold">@question.TitleLabel</div>
+                                        @if (!string.IsNullOrWhiteSpace(question.ImportColumnName))
+                                        {
+                                            <small class="text-muted">Default: @question.ImportColumnName</small>
+                                        }
+                                    </td>
+                                    <td>
+                                        <select name="SelectedColumnNames[@i]"
+                                                id="col_@i"
+                                                class="form-select form-select-sm slot-column">
+                                            <option value="">— Use Question Default —</option>
+                                            @foreach (var col in Model.AllImportColumnNames)
+                                            {
+                                                    if (currentCol == col)
+                                                    {
+                                                        <option value="@col" selected>@col</option>
+                                                    }
+                                                    else
+                                                    {
+                                                        <option value="@col">@col</option>
+                                                    }
+                                            }
+                                        </select>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </form>
+
+            @if (Model.UpdatePreview != null && !string.IsNullOrWhiteSpace(Model.PendingUpdateToken))
+            {
+                <div class="card border-warning mt-3">
+                    <div class="card-body">
+                        <h5 class="card-title mb-2">Update Preview</h5>
+                        <p class="text-muted mb-3">Review the proposed DB changes before applying them.</p>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-auto"><span class="badge bg-success">Insert: @Model.UpdatePreview.InsertedCount</span></div>
+                            <div class="col-auto"><span class="badge bg-primary">Update: @Model.UpdatePreview.UpdatedCount</span></div>
+                            <div class="col-auto"><span class="badge bg-secondary">Skipped Existing: @Model.UpdatePreview.SkippedExistingCount</span></div>
+                            <div class="col-auto"><span class="badge bg-warning text-dark">Missing Companies: @Model.UpdatePreview.MissingCompanyCount</span></div>
+                            <div class="col-auto"><span class="badge bg-info text-dark">Missing Columns: @Model.UpdatePreview.MissingColumnCount</span></div>
+                            <div class="col-auto"><span class="badge bg-dark">Blank Excel Values: @Model.UpdatePreview.BlankExcelValueCount</span></div>
+                        </div>
+
+                        @if (Model.UpdatePreview.PreviewRows.Any())
+                        {
+                            <div class="table-responsive mb-3" style="max-height: 280px; overflow-y: auto;">
+                                <table class="table table-sm table-striped align-middle mb-0">
+                                    <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th>Company</th>
+                                            <th>External ID</th>
+                                            <th>Insert</th>
+                                            <th>Update</th>
+                                            <th>Skip</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var row in Model.UpdatePreview.PreviewRows)
+                                        {
+                                            <tr>
+                                                <td class="fw-semibold">@row.CompanyName</td>
+                                                <td><small class="text-muted">@row.ExternalId</small></td>
+                                                <td>@row.InsertedCount</td>
+                                                <td>@row.UpdatedCount</td>
+                                                <td>@row.SkippedCount</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+
+                        <form method="post" asp-page-handler="ConfirmUpdateDbData" id="confirmUpdateForm">
+                            <input type="hidden" name="SelectedFinancialYear" value="@Model.SelectedFinancialYear" />
+                            <input type="hidden" name="ExternalIdColumnName" value="@Model.ExternalIdColumnName" />
+                            <input type="hidden" name="OverwriteExistingData" value="@(Model.OverwriteExistingData ? "true" : "false")" />
+                            <input type="hidden" name="previewToken" value="@Model.PendingUpdateToken" />
+                            @for (var i = 0; i < Model.SlotCount; i++)
+                            {
+                                <input type="hidden" name="QuestionIds[@i]" value="@Model.QuestionIds[i]" />
+                                <input type="hidden" name="IncludeQuestions[@i]" value="@(Model.IncludeQuestions[i] ? "true" : "false")" />
+                                <input type="hidden" name="SelectedColumnNames[@i]" value="@Model.SelectedColumnNames[i]" />
+                            }
+                            <div class="d-flex gap-2">
+                                <button type="submit"
+                                        class="btn btn-danger"
+                                        data-progress-text="Applying DB updates and refreshing check results..."
+                                        data-confirm-message="This will write the previewed changes to the database. Continue?">
+                                    Confirm Update DB Data
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            }
+
+            <div id="pageProcessProgress" class="mt-3 d-none" style="max-width: 720px;">
+                <div class="progress" role="progressbar" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100">
+                    <div id="pageProcessProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%">Processing...</div>
+                </div>
+                <small id="pageProcessProgressText" class="text-muted">Processing...</small>
+            </div>
+        </div>
+    </div>
+
+    @* ── Results ── *@
+    @if (Model.HasResults)
+    {
+        <div class="row g-3 mb-4">
+            <div class="col-auto">
+                <div class="card border-success h-100">
+                    <div class="card-body py-2 px-4 text-center">
+                        <div class="small text-success fw-semibold">All Matched</div>
+                        <div class="fs-3 fw-bold text-success">@matchCount</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="card border-danger h-100">
+                    <div class="card-body py-2 px-4 text-center">
+                        <div class="small text-danger fw-semibold">Mismatches</div>
+                        <div class="fs-3 fw-bold text-danger">@mismatchCount</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-auto">
+                <div class="card border-warning h-100">
+                    <div class="card-body py-2 px-4 text-center">
+                        <div class="small fw-semibold" style="color:#856404;">Not in Excel</div>
+                        <div class="fs-3 fw-bold" style="color:#856404;">@noExcelCount</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-auto align-self-center ms-2">
+                <ul class="list-unstyled mb-0 small">
+                    <li><span class="badge bg-success me-1">&nbsp;</span> DB value matches Excel</li>
+                    <li><span class="badge bg-danger me-1">&nbsp;</span> Values differ — DB / Excel shown</li>
+                    <li><span class="badge bg-warning text-dark me-1">&nbsp;</span> Company not found in Excel</li>
+                    <li><span class="badge bg-info text-dark me-1">&nbsp;</span> Excel column not found</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-bordered table-sm align-middle mb-0" style="font-size:0.82rem;">
+                <thead class="table-dark">
+                    <tr>
+                        <th style="min-width:180px;">Company Name</th>
+                        <th style="min-width:80px;" class="text-center">Survey Link</th>
+                        @foreach (var h in Model.SelectedQuestionHeaders)
+                        {
+                            <th style="min-width:150px;" title="Excel column: @h.ExcelColumnName">
+                                @h.Title
+                                @if (!string.IsNullOrWhiteSpace(h.ExcelColumnName))
+                                {
+                                    <br /><small class="text-info fw-normal opacity-75">[@h.ExcelColumnName]</small>
+                                }
+                            </th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Model.CheckResults)
+                    {
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">@row.CompanyName</div>
+                                <small class="text-muted">@row.ExternalId</small>
+                            </td>
+                            <td class="text-center">
+                                @if (!string.IsNullOrWhiteSpace(row.SurveyLink))
+                                {
+                                    <a href="@row.SurveyLink" target="_blank" rel="noopener noreferrer"
+                                       class="btn btn-sm btn-outline-primary py-0">View</a>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                            @foreach (var q in row.QuestionResults)
+                            {
+                                @if (q.Status == IndexModel.CheckStatus.NoExcelMatch)
+                                {
+                                    <td class="bg-warning bg-opacity-50 text-center">
+                                        <small class="text-dark">Not in Excel</small>
+                                    </td>
+                                }
+                                else if (q.Status == IndexModel.CheckStatus.ColumnNotFound)
+                                {
+                                    <td class="bg-info bg-opacity-25 text-center">
+                                        <small class="text-dark">Column missing</small>
+                                    </td>
+                                }
+                                else if (q.Status == IndexModel.CheckStatus.Match)
+                                {
+                                    <td class="bg-success bg-opacity-75 text-white">
+                                        <small>@(string.IsNullOrWhiteSpace(q.DbValue) ? "(empty)" : q.DbValue)</small>
+                                    </td>
+                                }
+                                else
+                                {
+                                    <td class="bg-danger bg-opacity-75 text-white">
+                                        <small>
+                                            DB:&nbsp;@(string.IsNullOrWhiteSpace(q.DbValue) ? "(empty)" : q.DbValue)<br />
+                                            XL:&nbsp;@(string.IsNullOrWhiteSpace(q.ExcelValue) ? "(empty)" : q.ExcelValue)
+                                        </small>
+                                    </td>
+                                }
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else if (Model.CompanySurveys.Any())
+    {
+        <p class="text-muted mb-2">Select questions, map Excel columns, provide a file, and click <strong>Check Data</strong> to see results.</p>
+        <div class="table-responsive">
+            <table class="table table-striped table-hover table-sm align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Company Name</th>
+                        <th>External ID</th>
+                        <th>Survey Link</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Model.CompanySurveys)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@row.CompanyName</td>
+                            <td><small class="text-muted">@row.ExternalId</small></td>
+                            <td>
+                                @if (!string.IsNullOrWhiteSpace(row.SurveyLink))
+                                {
+                                    <a href="@row.SurveyLink" target="_blank" rel="noopener noreferrer"
+                                       class="btn btn-sm btn-outline-primary py-0">View</a>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else if (Model.SelectedFinancialYear.HasValue)
+    {
+        <div class="alert alert-info">No company survey records found for @Model.SelectedFinancialYear.</div>
+    }
+
+</div>
+
+@section Scripts {
+<script>
+    const slotCount = @Model.SlotCount;
+
+    function showProgress(message) {
+        var container = document.getElementById('pageProcessProgress');
+        var text = document.getElementById('pageProcessProgressText');
+        var bar = document.getElementById('pageProcessProgressBar');
+        if (container) container.classList.remove('d-none');
+        if (text) text.textContent = message || 'Processing...';
+        if (bar) bar.textContent = 'Processing...';
+    }
+
+    function hideProgress() {
+        var container = document.getElementById('pageProcessProgress');
+        if (container) container.classList.add('d-none');
+    }
+
+    // ── Save configuration to JSON file ──────────────────────────────────────
+    function saveConfig() {
+        showProgress('Saving configuration...');
+        var mappings = [];
+        for (var i = 0; i < slotCount; i++) {
+            var qIdInput = document.getElementById('qid_' + i);
+            var chk = document.getElementById('include_' + i);
+            var cSel = document.getElementById('col_' + i);
+            mappings.push({
+                questionId: qIdInput ? parseInt(qIdInput.value) : 0,
+                includeQuestion: chk ? chk.checked : false,
+                excelColumnName: cSel ? cSel.value : ''
+            });
+        }
+        var config = {
+            financialYear: @(Model.SelectedFinancialYear?.ToString() ?? "null"),
+            externalIdColumnName: document.getElementById('ExternalIdColumnName').value,
+            mappings: mappings
+        };
+        var blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'survey-data-check-config.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+        hideProgress();
+    }
+
+    // ── Load configuration from JSON file ────────────────────────────────────
+    function loadConfig(file) {
+        if (!file) return;
+        showProgress('Loading configuration...');
+        var reader = new FileReader();
+        reader.onload = function (e) {
+            try {
+                var config = JSON.parse(e.target.result);
+
+                if (config.externalIdColumnName !== undefined) {
+                    var extId = document.getElementById('ExternalIdColumnName');
+                    if (extId) extId.value = config.externalIdColumnName;
+                }
+
+                if (Array.isArray(config.mappings)) {
+                    var rowIndexByQuestionId = {};
+                    for (var i = 0; i < slotCount; i++) {
+                        var qIdInput = document.getElementById('qid_' + i);
+                        if (qIdInput) {
+                            rowIndexByQuestionId[parseInt(qIdInput.value)] = i;
+                        }
+                    }
+
+                    config.mappings.forEach(function (m, i) {
+                        var targetIndex = i;
+                        if (m.questionId && rowIndexByQuestionId[m.questionId] !== undefined) {
+                            targetIndex = rowIndexByQuestionId[m.questionId];
+                        }
+
+                        var chk = document.getElementById('include_' + targetIndex);
+                        var cSel = document.getElementById('col_' + targetIndex);
+                        if (chk) chk.checked = !!m.includeQuestion;
+                        if (cSel) cSel.value = m.excelColumnName || '';
+                    });
+                }
+
+                if (config.financialYear) {
+                    var note = 'Configuration loaded.';
+                    var yearSel = document.getElementById('SelectedFinancialYear');
+                    if (yearSel && yearSel.value != config.financialYear) {
+                        note += ' Note: config was saved for FY ' + config.financialYear + '; current year is ' + yearSel.value + '.';
+                    }
+                    alert(note);
+                }
+            } catch (err) {
+                alert('Failed to load configuration: ' + err.message);
+            }
+            hideProgress();
+        };
+        reader.onerror = function () {
+            hideProgress();
+        };
+        reader.readAsText(file);
+    }
+
+    document.getElementById('yearForm')?.addEventListener('submit', function () {
+        showProgress('Loading selected financial year...');
+    });
+
+    document.getElementById('checkForm')?.addEventListener('submit', function (event) {
+        var submitter = event.submitter;
+        var confirmMessage = submitter?.dataset?.confirmMessage;
+        if (confirmMessage && !window.confirm(confirmMessage)) {
+            event.preventDefault();
+            hideProgress();
+            return;
+        }
+
+        var message = submitter?.dataset?.progressText || 'Processing...';
+        showProgress(message);
+    });
+
+    document.getElementById('confirmUpdateForm')?.addEventListener('submit', function (event) {
+        var submitter = event.submitter;
+        var confirmMessage = submitter?.dataset?.confirmMessage;
+        if (confirmMessage && !window.confirm(confirmMessage)) {
+            event.preventDefault();
+            hideProgress();
+            return;
+        }
+
+        var message = submitter?.dataset?.progressText || 'Processing...';
+        showProgress(message);
+    });
+</script>
+}

@@ -17,6 +17,9 @@ namespace TINWeb.Pages.Questions
         [BindProperty]
         public bool Active { get; set; } = true;
 
+        [BindProperty]
+        public bool DisplayPreviousYear { get; set; }
+
         public List<string> AnswerTypeOptions { get; } = Enum.GetNames<QuestionAnswerType>().ToList();
         public List<SelectListItem> QuestionGroupOptions { get; set; } = new();
 
@@ -29,12 +32,14 @@ namespace TINWeb.Pages.Questions
         public async Task OnGetAsync()
         {
             Active = true;
+            DisplayPreviousYear = false;
             await LoadQuestionGroupOptionsAsync();
         }
 
         public async Task<IActionResult> OnPostAsync()
         {
             Record.Active = Active;
+            Record.DisplayPreviousYear = DisplayPreviousYear;
 
             if (!Enum.TryParse<QuestionAnswerType>(Record.AnswerType, out _))
             {

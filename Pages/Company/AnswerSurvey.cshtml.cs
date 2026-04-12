@@ -100,6 +100,11 @@ namespace TINWeb.Pages.Company
 
         public bool HasPreviousYearValue(AnswerEditRow row)
         {
+            if (!row.DisplayPreviousYear)
+            {
+                return false;
+            }
+
             var answerType = (row.AnswerType ?? string.Empty).Trim();
 
             if (answerType.Equals("Number", StringComparison.OrdinalIgnoreCase))
@@ -802,7 +807,16 @@ namespace TINWeb.Pages.Company
                         .ThenBy(x => x.Id)
                         .First());
 
-            var previousYearAnswersByQuestionId = new Dictionary<int, Answer>();
+            var subgroupIdByQuestionId = questions
+                .ToDictionary(
+                    q => q.Id,
+                    q => subgroupByQuestionId.TryGetValue(q.Id, out var subgroup) ? (int?)subgroup.Id : null);
+
+            var previousYearAnswersByQuestionId = await GetPreviousYearAnswersByQuestionIdAsync(
+                companyId,
+                currentFinancialYear,
+                questions,
+                subgroupIdByQuestionId);
 
             var answers = await _context.Answer
                 .Where(a => a.CompanySurveyId == companySurveyId)
@@ -818,6 +832,8 @@ namespace TINWeb.Pages.Company
                 {
                     latestAnswerByQuestionId.TryGetValue(question.Id, out var answer);
                     previousYearAnswersByQuestionId.TryGetValue(question.Id, out var previousYearAnswer);
+                    var displayPreviousYear = question.DisplayPreviousYear == true;
+                    var effectivePreviousYearAnswer = displayPreviousYear ? previousYearAnswer : null;
                     groupsById.TryGetValue(question.GroupId ?? 0, out var group);
                     subgroupByQuestionId.TryGetValue(question.Id, out var subgroup);
 
@@ -841,13 +857,14 @@ namespace TINWeb.Pages.Company
                         SubgroupOrderNumber = subgroup?.OrderNumber,
                         QuestionText = question.QuestionText,
                         AnswerType = question.AnswerType,
+                        DisplayPreviousYear = displayPreviousYear,
                         DecimalPoints = question.DecimalPoints,
                         ChoiceOptions = GetChoiceOptions(question),
                         SelectedChoices = ParseMultiChoiceAnswer(answer?.AnswerText),
-                        PreviousYearValue = FormatAnswerPreview(previousYearAnswer, question.AnswerType, question.DecimalPoints),
-                        PreviousYearAnswerText = previousYearAnswer?.AnswerText,
-                        PreviousYearAnswerNumber = ScaleNumberForDisplay(previousYearAnswer?.AnswerNumber, question.DecimalPoints),
-                        PreviousYearAnswerCurrency = ScaleCurrencyForDisplay(previousYearAnswer?.AnswerCurrency, question.DecimalPoints),
+                        PreviousYearValue = FormatAnswerPreview(effectivePreviousYearAnswer, question.AnswerType, question.DecimalPoints),
+                        PreviousYearAnswerText = effectivePreviousYearAnswer?.AnswerText,
+                        PreviousYearAnswerNumber = ScaleNumberForDisplay(effectivePreviousYearAnswer?.AnswerNumber, question.DecimalPoints),
+                        PreviousYearAnswerCurrency = ScaleCurrencyForDisplay(effectivePreviousYearAnswer?.AnswerCurrency, question.DecimalPoints),
                         AnswerText = answer?.AnswerText,
                         AnswerNumber = ScaleNumberForDisplay(answer?.AnswerNumber, question.DecimalPoints),
                         AnswerCurrency = ScaleCurrencyForDisplay(answer?.AnswerCurrency, question.DecimalPoints)
@@ -856,7 +873,6 @@ namespace TINWeb.Pages.Company
                 .ToList();
 
             NormalizeRowsForDisplay(rows);
-            ApplyVisibleHistoricalCopyValues(rows, currentFinancialYear);
             return rows;
         }
 
@@ -1457,6 +1473,7 @@ namespace TINWeb.Pages.Company
             public int? SubgroupOrderNumber { get; set; }
             public string? QuestionText { get; set; }
             public string? AnswerType { get; set; }
+            public bool DisplayPreviousYear { get; set; }
             public int? DecimalPoints { get; set; }
             public List<string> ChoiceOptions { get; set; } = new();
             public List<string> SelectedChoices { get; set; } = new();

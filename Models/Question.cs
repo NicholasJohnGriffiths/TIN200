@@ -67,6 +67,9 @@ namespace TINWeb.Models
 
         public bool? Active { get; set; }
 
+        [Display(Name = "Display Previous Year")]
+        public bool? DisplayPreviousYear { get; set; }
+
         public bool? IncludeInEstimation { get; set; }
     }
 }

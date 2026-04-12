@@ -43,6 +43,7 @@
                         <th class="title-col">Title</th>
                         <th class="question-col">Question</th>
                         <th class="answer-type-col">Answer Type</th>
+                        <th>Display Previous Year</th>
                         <th>Active</th>
                         <th>Actions</th>
                     </tr>
@@ -58,6 +59,7 @@
                         <td class="title-col">@record.Title</td>
                         <td class="question-col">@Html.Raw(record.QuestionText ?? string.Empty)</td>
                         <td class="answer-type-col">@record.AnswerType</td>
+                        <td>@(record.DisplayPreviousYear == true ? "Yes" : "No")</td>
                         <td>@(record.Active == false ? "No" : "Yes")</td>
                         <td class="actions-col">
                             <div class="d-inline-flex gap-1 flex-nowrap">

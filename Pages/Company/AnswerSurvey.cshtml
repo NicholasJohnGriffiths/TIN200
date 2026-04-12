@@ -527,31 +527,11 @@
                                                         {
                                                             var answerType = (Model.Rows[i].AnswerType ?? string.Empty).Trim();
                                                             var hasPreviousYearValue = Model.HasPreviousYearValue(Model.Rows[i]);
-                                                            var currentAnswerExists = Model.HasCurrentAnswer(Model.Rows[i]);
                                                             var previousYearText = Model.Rows[i].PreviousYearAnswerText ?? string.Empty;
                                                             var previousYearNumber = Model.Rows[i].PreviousYearAnswerNumber?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
                                                             var previousYearCurrency = Model.Rows[i].PreviousYearAnswerCurrency?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
-                                                            var showPreviousYearCopy = hasPreviousYearValue && !currentAnswerExists;
-                                                            var cellPosition = subgroup.Rows.IndexOf(i);
-                                                            var isNumericYearCell = answerType.Equals("Number", StringComparison.OrdinalIgnoreCase)
-                                                                || answerType.Equals("Currency", StringComparison.OrdinalIgnoreCase);
-
-                                                            if (!showPreviousYearCopy && !currentAnswerExists && isNumericYearCell && cellPosition >= 0 && cellPosition + 1 < subgroup.Rows.Count)
-                                                            {
-                                                                var sourceRowIndex = subgroup.Rows[cellPosition + 1];
-                                                                var sourceRow = Model.Rows[sourceRowIndex];
-                                                                if (Model.HasCurrentAnswer(sourceRow))
-                                                                {
-                                                                    previousYearText = sourceRow.AnswerText ?? string.Empty;
-                                                                    previousYearNumber = sourceRow.AnswerNumber?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
-                                                                    previousYearCurrency = sourceRow.AnswerCurrency?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
-                                                                    showPreviousYearCopy = true;
-                                                                }
-                                                            }
-
-                                                            var showPreviousYearLabel = showPreviousYearCopy
-                                                                && !answerType.Equals("Number", StringComparison.OrdinalIgnoreCase)
-                                                                && !answerType.Equals("Currency", StringComparison.OrdinalIgnoreCase);
+                                                            var showPreviousYearCopy = Model.Rows[i].DisplayPreviousYear && hasPreviousYearValue;
+                                                            var showPreviousYearLabel = showPreviousYearCopy;
                                                             var isTallCell = subgroup.QuestionRows > 1;
                                                             var tallCellClass = isTallCell ? " survey-table-tall-cell" : string.Empty;
                                                             var inlineRowStyle = isTallCell ? "display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto;row-gap:0.35rem;align-items:start;" : null;
@@ -716,11 +696,8 @@
                                             {
                                                 var answerType = (Model.Rows[i].AnswerType ?? string.Empty).Trim();
                                                 var hasPreviousYearValue = Model.HasPreviousYearValue(Model.Rows[i]);
-                                                var currentAnswerExists = Model.HasCurrentAnswer(Model.Rows[i]);
-                                                var showPreviousYearCopy = hasPreviousYearValue && !currentAnswerExists;
-                                                var showPreviousYearLabel = showPreviousYearCopy
-                                                    && !answerType.Equals("Number", StringComparison.OrdinalIgnoreCase)
-                                                    && !answerType.Equals("Currency", StringComparison.OrdinalIgnoreCase);
+                                                var showPreviousYearCopy = Model.Rows[i].DisplayPreviousYear && hasPreviousYearValue;
+                                                var showPreviousYearLabel = showPreviousYearCopy;
                                                 var previousYearText = Model.Rows[i].PreviousYearAnswerText ?? string.Empty;
                                                 var previousYearNumber = Model.Rows[i].PreviousYearAnswerNumber?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
                                                 var previousYearCurrency = Model.Rows[i].PreviousYearAnswerCurrency?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
@@ -878,11 +855,8 @@
                                         {
                                             var answerType = (Model.Rows[i].AnswerType ?? string.Empty).Trim();
                                             var hasPreviousYearValue = Model.HasPreviousYearValue(Model.Rows[i]);
-                                            var currentAnswerExists = Model.HasCurrentAnswer(Model.Rows[i]);
-                                            var showPreviousYearCopy = hasPreviousYearValue && !currentAnswerExists;
-                                            var showPreviousYearLabel = showPreviousYearCopy
-                                                && !answerType.Equals("Number", StringComparison.OrdinalIgnoreCase)
-                                                && !answerType.Equals("Currency", StringComparison.OrdinalIgnoreCase);
+                                            var showPreviousYearCopy = Model.Rows[i].DisplayPreviousYear && hasPreviousYearValue;
+                                            var showPreviousYearLabel = showPreviousYearCopy;
                                             var previousYearText = Model.Rows[i].PreviousYearAnswerText ?? string.Empty;
                                             var previousYearNumber = Model.Rows[i].PreviousYearAnswerNumber?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
                                             var previousYearCurrency = Model.Rows[i].PreviousYearAnswerCurrency?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
@@ -942,11 +916,8 @@
                             {
                                 var answerType = (Model.Rows[i].AnswerType ?? string.Empty).Trim();
                                 var hasPreviousYearValue = Model.HasPreviousYearValue(Model.Rows[i]);
-                                var currentAnswerExists = Model.HasCurrentAnswer(Model.Rows[i]);
-                                var showPreviousYearCopy = hasPreviousYearValue && !currentAnswerExists;
-                                var showPreviousYearLabel = showPreviousYearCopy
-                                    && !answerType.Equals("Number", StringComparison.OrdinalIgnoreCase)
-                                    && !answerType.Equals("Currency", StringComparison.OrdinalIgnoreCase);
+                                var showPreviousYearCopy = Model.Rows[i].DisplayPreviousYear && hasPreviousYearValue;
+                                var showPreviousYearLabel = showPreviousYearCopy;
                                 var previousYearText = Model.Rows[i].PreviousYearAnswerText ?? string.Empty;
                                 var previousYearNumber = Model.Rows[i].PreviousYearAnswerNumber?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
                                 var previousYearCurrency = Model.Rows[i].PreviousYearAnswerCurrency?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
