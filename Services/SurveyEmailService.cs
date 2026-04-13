@@ -334,7 +334,15 @@ Open your secure survey link
             // Azure Communication Email expects senderAddress to be only the email address.
             // The configured FromName is still used throughout the survey email content and should
             // also match the sender identity configured in Azure for the mailbox.
-            return fromEmail.Trim();
+            var senderAddress = fromEmail.Trim();
+
+            if (senderAddress.Equals("donotreply@tin100.com", StringComparison.OrdinalIgnoreCase))
+            {
+                // return "donotreply@tin100.com"; // Previous sender address if we need to revert.
+                return "tin@tin100.com";
+            }
+
+            return senderAddress;
         }
 
         private static IEnumerable<string> ParseRecipientEmails(IEnumerable<string> recipientEmails)
