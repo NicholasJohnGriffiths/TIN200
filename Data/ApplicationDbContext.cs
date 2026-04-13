@@ -689,6 +689,17 @@ namespace TINWeb.Data
                     .HasColumnName("SurveyEmailTemplate")
                     .HasColumnType("text")
                     .IsRequired(false);
+
+                entity.Property(e => e.EmailHeaderImageId)
+                    .HasColumnName("EmailHeaderImageId")
+                    .HasColumnType("int")
+                    .IsRequired(false);
+
+                entity.HasOne<Image>()
+                    .WithMany()
+                    .HasForeignKey(e => e.EmailHeaderImageId)
+                    .OnDelete(DeleteBehavior.SetNull)
+                    .HasConstraintName("FK_Config_Image_EmailHeaderImageId");
             });
 
             // Configure view models - no key required for views

@@ -7,7 +7,7 @@
 <div class="container mt-4">
     <h1>Edit Config</h1>
 
-    <form method="post" class="mt-3">
+    <form method="post" enctype="multipart/form-data" class="mt-3">
         <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
         <input type="hidden" asp-for="Record.Id" />
 
@@ -26,6 +26,51 @@
             <label asp-for="Record.SurveyEmailSubject" class="form-label">Survey Email Subject</label>
             <input asp-for="Record.SurveyEmailSubject" class="form-control" maxlength="255" />
         </div>
+
+        <div class="mb-3">
+            <label asp-for="Record.EmailHeaderImageId" class="form-label">Email Header Image</label>
+            <select asp-for="Record.EmailHeaderImageId" asp-items="Model.EmailHeaderImageOptions" class="form-select"></select>
+            <span asp-validation-for="Record.EmailHeaderImageId" class="text-danger"></span>
+        </div>
+
+        <div class="mb-3">
+            <label asp-for="EmailHeaderImageFile" class="form-label">Upload New Email Header Image</label>
+            <input asp-for="EmailHeaderImageFile" type="file" class="form-control" accept="image/*" />
+            <div class="form-text">If a file is uploaded, it will be saved and selected as the email header image.</div>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(Model.EmailHeaderImageThumbnailUrl))
+        {
+            <div class="mb-3">
+                <label class="form-label">Current Email Header Image</label>
+                <div class="border rounded p-2 bg-light">
+                    @if (!string.IsNullOrWhiteSpace(Model.EmailHeaderImageFileName))
+                    {
+                        <div><strong>Name:</strong> @Model.EmailHeaderImageFileName</div>
+                    }
+                    <div class="mt-2">
+                        <img src="@Model.EmailHeaderImageThumbnailUrl" alt="Email header image thumbnail" class="img-thumbnail" style="max-width: 270px; max-height: 180px;" />
+                    </div>
+                </div>
+            </div>
+        }
+        else if (Model.EmailHeaderImageMissing)
+        {
+            <div class="mb-3">
+                <label class="form-label">Current Email Header Image</label>
+                <div class="alert alert-warning mb-0" role="alert">
+                    <div class="fw-semibold">Missing file</div>
+                    @if (!string.IsNullOrWhiteSpace(Model.EmailHeaderImageFileName))
+                    {
+                        <div class="small">Name: @Model.EmailHeaderImageFileName</div>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Model.EmailHeaderImageMissingMessage))
+                    {
+                        <div class="small">@Model.EmailHeaderImageMissingMessage</div>
+                    }
+                </div>
+            </div>
+        }
 
         <div class="mb-3">
             <label asp-for="Record.SurveyEmailTemplate" class="form-label">Survey Email Template</label>

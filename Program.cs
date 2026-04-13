@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.StaticFiles;
 using TINWeb.Data;
 using TINWeb.Services;
 
@@ -113,6 +114,44 @@ app.MapPost("/api/webhooks/email-events", async (HttpContext httpContext, Survey
 
     var processedCount = await bounceService.ProcessEventGridEventsAsync(payload);
     return Results.Ok(new { processed = processedCount });
+});
+
+app.MapGet("/api/config/email-header-image/{imageId:int}", async (int imageId, ApplicationDbContext dbContext, IImageStorageService imageStorageService) =>
+{
+    var configuredImageId = await dbContext.AppConfig
+        .AsNoTracking()
+        .OrderBy(c => c.Id)
+        .Select(c => c.EmailHeaderImageId)
+        .FirstOrDefaultAsync();
+
+    if (!configuredImageId.HasValue || configuredImageId.Value != imageId)
+    {
+        return Results.NotFound();
+    }
+
+    var image = await dbContext.Image
+        .AsNoTracking()
+        .FirstOrDefaultAsync(x => x.Id == imageId);
+
+    if (image == null || string.IsNullOrWhiteSpace(image.FilePath))
+    {
+        return Results.NotFound();
+    }
+
+    var stream = await imageStorageService.OpenReadAsync(image.FilePath);
+    if (stream == null)
+    {
+        return Results.NotFound();
+    }
+
+    var contentTypeProvider = new FileExtensionContentTypeProvider();
+    var extension = Path.GetExtension(image.FilePath);
+    if (!contentTypeProvider.TryGetContentType($"file{extension}", out var contentType))
+    {
+        contentType = "application/octet-stream";
+    }
+
+    return Results.File(stream, contentType);
 });
 
 app.MapRazorPages();

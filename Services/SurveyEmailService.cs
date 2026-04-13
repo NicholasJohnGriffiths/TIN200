@@ -41,8 +41,10 @@ namespace TINWeb.Services
             var configuredEmailOptions = await _context.AppConfig
                 .AsNoTracking()
                 .OrderBy(c => c.Id)
-                .Select(c => new { c.SurveyEmailSubject, c.SurveyEmailTemplate })
+                .Select(c => new { c.SurveyEmailSubject, c.SurveyEmailTemplate, c.EmailHeaderImageId })
                 .FirstOrDefaultAsync();
+
+            var emailHeaderImageUrl = BuildEmailHeaderImageUrl(configuredEmailOptions?.EmailHeaderImageId);
 
             var subject = string.IsNullOrWhiteSpace(configuredEmailOptions?.SurveyEmailSubject)
                 ? defaultSubject
@@ -50,6 +52,7 @@ namespace TINWeb.Services
 
             var (plainTextBody, htmlBody) = BuildSurveyEmailBodies(
                 configuredEmailOptions?.SurveyEmailTemplate,
+                emailHeaderImageUrl,
                 recipientName,
                 surveyUrl,
                 unsubscribeUrl,
@@ -105,6 +108,7 @@ Please review the contact email for this company before resending the survey.";
 
         private (string PlainTextBody, string HtmlBody) BuildSurveyEmailBodies(
             string? configuredTemplate,
+            string? emailHeaderImageUrl,
             string recipientName,
             string surveyUrl,
             string unsubscribeUrl,
@@ -130,6 +134,8 @@ Regards,
 {unsubscribeHtml}
 <p>Regards,<br/>{WebUtility.HtmlEncode(senderDisplayName)}</p>";
 
+            var emailHeaderHtml = BuildEmailHeaderImageHtml(emailHeaderImageUrl);
+
             if (!string.IsNullOrWhiteSpace(configuredTemplate))
             {
                 var htmlTemplate = ApplySurveyTemplate(configuredTemplate, recipientName, surveyUrl, encodeForHtml: true);
@@ -140,8 +146,8 @@ Regards,
                     : $"{plainTextTemplate}\r\n\r\n{unsubscribePlainText}";
 
                 var htmlBody = string.IsNullOrWhiteSpace(htmlTemplate)
-                    ? unsubscribeHtml
-                    : $"{htmlTemplate}\n{unsubscribeHtml}";
+                    ? $"{emailHeaderHtml}{unsubscribeHtml}"
+                    : $"{emailHeaderHtml}{htmlTemplate}\n{unsubscribeHtml}";
 
                 return (plainTextBody, htmlBody);
             }
@@ -160,7 +166,38 @@ Open your secure survey link
 <p><a href=""{WebUtility.HtmlEncode(surveyUrl)}"">Open your secure survey link</a></p>
 {footerHtml}";
 
+            fallbackHtmlBody = $"{emailHeaderHtml}{fallbackHtmlBody}";
+
             return (fallbackPlainTextBody, fallbackHtmlBody);
+        }
+
+        private string? BuildEmailHeaderImageUrl(int? emailHeaderImageId)
+        {
+            if (!emailHeaderImageId.HasValue)
+            {
+                return null;
+            }
+
+            var baseUrl = (_surveyLinkSettings.BaseUrl ?? string.Empty).Trim().TrimEnd('/');
+            if (string.IsNullOrWhiteSpace(baseUrl))
+            {
+                return null;
+            }
+
+            return $"{baseUrl}/api/config/email-header-image/{emailHeaderImageId.Value}";
+        }
+
+        private static string BuildEmailHeaderImageHtml(string? emailHeaderImageUrl)
+        {
+            if (string.IsNullOrWhiteSpace(emailHeaderImageUrl))
+            {
+                return string.Empty;
+            }
+
+            return $@"<div style=""margin: 0 0 16px 0; text-align: left;"">
+<img src=""{WebUtility.HtmlEncode(emailHeaderImageUrl)}"" alt=""TIN200"" style=""max-width: 100%; height: auto; display: block;"" />
+</div>
+";
         }
 
         private static string ApplySurveyTemplate(string template, string recipientName, string surveyUrl, bool encodeForHtml)

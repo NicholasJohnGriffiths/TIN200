@@ -16,5 +16,8 @@ namespace TINWeb.Models
         [Display(Name = "Survey Email Template")]
         [DataType(DataType.MultilineText)]
         public string? SurveyEmailTemplate { get; set; }
+
+        [Display(Name = "Email Header Image")]
+        public int? EmailHeaderImageId { get; set; }
     }
 }

@@ -27,6 +27,7 @@
                     <th>Id</th>
                     <th>Admin Email</th>
                     <th>Survey Email Subject</th>
+                    <th>Email Header Image</th>
                     <th>Survey Email Template</th>
                     <th>Actions</th>
                 </tr>
@@ -38,6 +39,7 @@
                     <td>@record.Id</td>
                     <td>@record.AdminEmail</td>
                     <td>@(string.IsNullOrWhiteSpace(record.SurveyEmailSubject) ? "Default" : record.SurveyEmailSubject)</td>
+                    <td>@(record.EmailHeaderImageId.HasValue ? $"Image #{record.EmailHeaderImageId.Value}" : "Not set")</td>
                     <td>@(string.IsNullOrWhiteSpace(record.SurveyEmailTemplate) ? "Not set" : "Configured")</td>
                     <td style="white-space: nowrap;">
                         <a asp-page="./Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
