@@ -29,5 +29,8 @@ namespace TINWeb.Models
 
         [Display(Name = "Display title and description")]
         public bool DisplayTitleDesc { get; set; }
+
+        [Display(Name = "Enforce unique selection")]
+        public bool EnforceUniqueSelection { get; set; }
     }
 }

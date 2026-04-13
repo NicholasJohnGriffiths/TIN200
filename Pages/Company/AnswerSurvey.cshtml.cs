@@ -572,6 +572,14 @@ namespace TINWeb.Pages.Company
                 }
             }
 
+            if (await AddRankingDuplicateSelectionErrorsAsync(Rows))
+            {
+                Rows = await ReloadRowsWithPostedAnswersAsync(company.Id, companySurveyId, survey.FinancialYear, Rows);
+                SurveyQuestionGroups = await LoadSurveyQuestionGroupsAsync();
+                AvailableGroupImageIds = await GetAvailableGroupImageIdsAsync(Rows, SurveyQuestionGroups);
+                return Page();
+            }
+
             var latestAnswerByQuestionId = await _context.Answer
                 .Where(a => a.CompanySurveyId == companySurveyId)
                 .GroupBy(a => a.QuestionId)
@@ -1314,6 +1322,145 @@ namespace TINWeb.Pages.Company
             return "0." + new string('0', precision - 1) + "1";
         }
 
+        private async Task<List<AnswerEditRow>> ReloadRowsWithPostedAnswersAsync(
+            int companyId,
+            int companySurveyId,
+            int financialYear,
+            IReadOnlyCollection<AnswerEditRow> postedRows)
+        {
+            var reloadedRows = await LoadAnswerRowsAsync(companyId, companySurveyId, financialYear);
+            var postedByQuestionId = postedRows
+                .GroupBy(x => x.QuestionId)
+                .ToDictionary(g => g.Key, g => g.Last());
+
+            foreach (var row in reloadedRows)
+            {
+                if (!postedByQuestionId.TryGetValue(row.QuestionId, out var posted))
+                {
+                    continue;
+                }
+
+                row.AnswerText = posted.AnswerText;
+                row.AnswerNumber = posted.AnswerNumber;
+                row.AnswerCurrency = posted.AnswerCurrency;
+                row.SelectedChoices = (posted.SelectedChoices ?? new List<string>())
+                    .Select(x => (x ?? string.Empty).Trim())
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList();
+            }
+
+            return reloadedRows;
+        }
+
+        private async Task<bool> AddRankingDuplicateSelectionErrorsAsync(IReadOnlyCollection<AnswerEditRow> rows)
+        {
+            var groupIds = rows
+                .Where(x => x.GroupId.HasValue)
+                .Select(x => x.GroupId!.Value)
+                .Distinct()
+                .ToList();
+
+            var enforceUniqueGroupIds = groupIds.Count == 0
+                ? new HashSet<int>()
+                : (await _context.QuestionGroup
+                    .Where(x => groupIds.Contains(x.Id) && x.EnforceUniqueSelection)
+                    .Select(x => x.Id)
+                    .ToListAsync())
+                    .ToHashSet();
+
+            var duplicateMessages = rows
+                .Where(row => row.GroupId.HasValue && enforceUniqueGroupIds.Contains(row.GroupId.Value))
+                .Where(IsRankingSingleChoiceRow)
+                .Select(row => new
+                {
+                    SelectedValue = (row.AnswerText ?? string.Empty).Trim(),
+                    GroupKey = BuildRankingGroupKey(row)
+                })
+                .Where(x => !string.IsNullOrWhiteSpace(x.SelectedValue) && !string.IsNullOrWhiteSpace(x.GroupKey))
+                .GroupBy(x => x.GroupKey, StringComparer.Ordinal)
+                .SelectMany(group => group
+                    .GroupBy(x => x.SelectedValue, StringComparer.Ordinal)
+                    .Where(choiceGroup => choiceGroup.Count() > 1)
+                    .Select(choiceGroup => $"Ranking value '{choiceGroup.Key}' is selected more than once in the same ranking block. Each value can only be used once."))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+            foreach (var message in duplicateMessages)
+            {
+                ModelState.AddModelError(string.Empty, message);
+            }
+
+            return duplicateMessages.Count > 0;
+        }
+
+        private static bool IsRankingSingleChoiceRow(AnswerEditRow row)
+        {
+            var answerType = (row.AnswerType ?? string.Empty).Trim();
+            if (!answerType.Equals("SingleChoice", StringComparison.OrdinalIgnoreCase)
+                && !answerType.Equals("Radio", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            return TryBuildNumericChoiceSignature(row.ChoiceOptions) != null;
+        }
+
+        private static string? BuildRankingGroupKey(AnswerEditRow row)
+        {
+            var signature = TryBuildNumericChoiceSignature(row.ChoiceOptions);
+            if (string.IsNullOrWhiteSpace(signature))
+            {
+                return null;
+            }
+
+            var groupKey = row.GroupId.HasValue ? row.GroupId.Value.ToString(CultureInfo.InvariantCulture) : "nogroup";
+            var subgroupKey = row.SubgroupId.HasValue ? row.SubgroupId.Value.ToString(CultureInfo.InvariantCulture) : "nosubgroup";
+            return $"{groupKey}|{subgroupKey}|{signature}";
+        }
+
+        private static string? TryBuildNumericChoiceSignature(IReadOnlyCollection<string>? choiceOptions)
+        {
+            if (choiceOptions == null)
+            {
+                return null;
+            }
+
+            var numbers = choiceOptions
+                .Select(x => (x ?? string.Empty).Trim())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => int.TryParse(x, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
+                    ? (int?)value
+                    : null)
+                .ToList();
+
+            if (numbers.Count == 0 || numbers.Any(x => !x.HasValue))
+            {
+                return null;
+            }
+
+            var distinctSorted = numbers
+                .Select(x => x!.Value)
+                .Distinct()
+                .OrderBy(x => x)
+                .ToList();
+
+            if (distinctSorted.Count < 3)
+            {
+                return null;
+            }
+
+            for (var index = 0; index < distinctSorted.Count; index++)
+            {
+                if (distinctSorted[index] != index + 1)
+                {
+                    return null;
+                }
+            }
+
+            return string.Join(",", distinctSorted);
+        }
+
         private static List<string> GetChoiceOptions(Question question)
         {
             return new[]
@@ -1325,7 +1472,9 @@ namespace TINWeb.Pages.Company
                 question.Multi5,
                 question.Multi6,
                 question.Multi7,
-                question.Multi8
+                question.Multi8,
+                question.Multi9,
+                question.Multi10
             }
             .Select(value => (value ?? string.Empty).Trim())
             .Where(value => !string.IsNullOrWhiteSpace(value))

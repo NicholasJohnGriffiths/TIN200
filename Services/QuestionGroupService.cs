@@ -73,6 +73,7 @@ namespace TINWeb.Services
             existing.TableFormat = record.TableFormat;
             existing.NewPage = record.NewPage;
             existing.DisplayTitleDesc = record.DisplayTitleDesc;
+            existing.EnforceUniqueSelection = record.EnforceUniqueSelection;
 
             if (clearImage1)
             {
@@ -250,6 +251,11 @@ BEGIN
     ALTER TABLE [dbo].[QuestionGroup] ADD [DisplayTitleDesc] [bit] NOT NULL CONSTRAINT [DF_QuestionGroup_DisplayTitleDesc] DEFAULT (0);
 END;
 
+IF COL_LENGTH('dbo.QuestionGroup', 'EnforceUniqueSelection') IS NULL
+BEGIN
+    ALTER TABLE [dbo].[QuestionGroup] ADD [EnforceUniqueSelection] [bit] NOT NULL CONSTRAINT [DF_QuestionGroup_EnforceUniqueSelection] DEFAULT (0);
+END;
+
 IF COL_LENGTH('dbo.QuestionGroup', 'TableFormat') IS NOT NULL
 BEGIN
     UPDATE [dbo].[QuestionGroup]
@@ -331,6 +337,34 @@ BEGIN
     BEGIN
         ALTER TABLE [dbo].[QuestionGroup]
         ADD CONSTRAINT [DF_QuestionGroup_DisplayTitleDesc] DEFAULT (0) FOR [DisplayTitleDesc];
+    END;
+END;
+
+IF COL_LENGTH('dbo.QuestionGroup', 'EnforceUniqueSelection') IS NOT NULL
+BEGIN
+    UPDATE [dbo].[QuestionGroup]
+    SET [EnforceUniqueSelection] = 0
+    WHERE [EnforceUniqueSelection] IS NULL;
+
+    IF EXISTS (
+        SELECT 1
+        FROM sys.columns
+        WHERE object_id = OBJECT_ID(N'[dbo].[QuestionGroup]')
+          AND name = 'EnforceUniqueSelection'
+          AND is_nullable = 1)
+    BEGIN
+        ALTER TABLE [dbo].[QuestionGroup] ALTER COLUMN [EnforceUniqueSelection] [bit] NOT NULL;
+    END;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM sys.columns
+        WHERE object_id = OBJECT_ID(N'[dbo].[QuestionGroup]')
+          AND name = 'EnforceUniqueSelection'
+          AND default_object_id <> 0)
+    BEGIN
+        ALTER TABLE [dbo].[QuestionGroup]
+        ADD CONSTRAINT [DF_QuestionGroup_EnforceUniqueSelection] DEFAULT (0) FOR [EnforceUniqueSelection];
     END;
 END;
 

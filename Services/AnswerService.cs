@@ -346,6 +346,8 @@ namespace TINWeb.Services
                     Multi6 = question.Multi6,
                     Multi7 = question.Multi7,
                     Multi8 = question.Multi8,
+                    Multi9 = question.Multi9,
+                    Multi10 = question.Multi10,
                     AnswerText = answer.AnswerText,
                     AnswerNumber = answer.AnswerNumber,
                     AnswerCurrency = answer.AnswerCurrency
@@ -366,7 +368,9 @@ namespace TINWeb.Services
                 row.Multi5,
                 row.Multi6,
                 row.Multi7,
-                row.Multi8
+                row.Multi8,
+                row.Multi9,
+                row.Multi10
             }
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(value => value!.Trim())
@@ -374,6 +378,113 @@ namespace TINWeb.Services
             .ToList();
 
             return row;
+        }
+
+        public async Task<HashSet<string>> GetUnavailableUniqueSelectionValuesAsync(int answerId)
+        {
+            var answerContext = await (
+                from answer in _context.Answer.AsNoTracking()
+                join question in _context.Question.AsNoTracking() on answer.QuestionId equals question.Id
+                where answer.Id == answerId
+                select new
+                {
+                    answer.CompanySurveyId,
+                    question.GroupId,
+                    question.AnswerType
+                }
+            ).FirstOrDefaultAsync();
+
+            if (answerContext == null || !answerContext.GroupId.HasValue)
+            {
+                return new HashSet<string>(StringComparer.Ordinal);
+            }
+
+            var answerType = (answerContext.AnswerType ?? string.Empty).Trim();
+            var isSingleChoiceType = answerType.Equals("SingleChoice", StringComparison.OrdinalIgnoreCase)
+                || answerType.Equals("Radio", StringComparison.OrdinalIgnoreCase);
+
+            if (!isSingleChoiceType)
+            {
+                return new HashSet<string>(StringComparer.Ordinal);
+            }
+
+            var enforceUniqueSelection = await _context.QuestionGroup
+                .AsNoTracking()
+                .Where(x => x.Id == answerContext.GroupId.Value)
+                .Select(x => x.EnforceUniqueSelection)
+                .FirstOrDefaultAsync();
+
+            if (!enforceUniqueSelection)
+            {
+                return new HashSet<string>(StringComparer.Ordinal);
+            }
+
+            var peerAnswers = await (
+                from answer in _context.Answer.AsNoTracking()
+                join question in _context.Question.AsNoTracking() on answer.QuestionId equals question.Id
+                where answer.CompanySurveyId == answerContext.CompanySurveyId
+                    && answer.Id != answerId
+                    && question.GroupId == answerContext.GroupId
+                select new
+                {
+                    answer.AnswerText,
+                    question.AnswerType
+                }
+            ).ToListAsync();
+
+            return peerAnswers
+                .Where(x => (x.AnswerType ?? string.Empty).Trim().Equals("SingleChoice", StringComparison.OrdinalIgnoreCase)
+                    || (x.AnswerType ?? string.Empty).Trim().Equals("Radio", StringComparison.OrdinalIgnoreCase))
+                .Select(x => (x.AnswerText ?? string.Empty).Trim())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.Ordinal)
+                .ToHashSet(StringComparer.Ordinal);
+        }
+
+        public async Task<bool> IsUniqueSelectionEnforcedForAnswerAsync(int answerId)
+        {
+            var context = await (
+                from answer in _context.Answer.AsNoTracking()
+                join question in _context.Question.AsNoTracking() on answer.QuestionId equals question.Id
+                where answer.Id == answerId
+                select new
+                {
+                    question.GroupId,
+                    question.AnswerType
+                }
+            ).FirstOrDefaultAsync();
+
+            if (context == null || !context.GroupId.HasValue)
+            {
+                return false;
+            }
+
+            var answerType = (context.AnswerType ?? string.Empty).Trim();
+            var isSingleChoiceType = answerType.Equals("SingleChoice", StringComparison.OrdinalIgnoreCase)
+                || answerType.Equals("Radio", StringComparison.OrdinalIgnoreCase);
+
+            if (!isSingleChoiceType)
+            {
+                return false;
+            }
+
+            return await _context.QuestionGroup
+                .AsNoTracking()
+                .Where(x => x.Id == context.GroupId.Value)
+                .Select(x => x.EnforceUniqueSelection)
+                .FirstOrDefaultAsync();
+        }
+
+        public async Task<bool> HasDuplicateUniqueSelectionAsync(int answerId, string? selectedValue)
+        {
+            var normalized = (selectedValue ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return false;
+            }
+
+            var usedValues = await GetUnavailableUniqueSelectionValuesAsync(answerId);
+            return usedValues.Contains(normalized);
         }
 
         public async Task<bool> UpdateAnswerAsync(AnswerEditInput input)
@@ -398,7 +509,9 @@ namespace TINWeb.Services
                     question.Multi5,
                     question.Multi6,
                     question.Multi7,
-                    question.Multi8
+                    question.Multi8,
+                    question.Multi9,
+                    question.Multi10
                 }
                 .Where(value => !string.IsNullOrWhiteSpace(value))
                 .Select(value => value!.Trim())
@@ -1886,6 +1999,8 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             public string? Multi6 { get; set; }
             public string? Multi7 { get; set; }
             public string? Multi8 { get; set; }
+            public string? Multi9 { get; set; }
+            public string? Multi10 { get; set; }
             public List<string> ChoiceOptions { get; set; } = new();
             public string? AnswerText { get; set; }
             public double? AnswerNumber { get; set; }

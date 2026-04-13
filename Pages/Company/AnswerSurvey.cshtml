@@ -1092,6 +1092,7 @@
     <script>
         (function () {
             const surveyIsLocked = @Model.IsLocked.ToString().ToLowerInvariant();
+            const enforceUniqueGroupIds = new Set([@Html.Raw(string.Join(",", Model.SurveyQuestionGroups.Where(g => g.EnforceUniqueSelection).Select(g => g.Id)))]);
 
             if (surveyIsLocked) {
                 const editableControls = Array.from(document.querySelectorAll('.survey-answer-row input, .survey-answer-row select, .survey-answer-row textarea'));
@@ -1176,6 +1177,168 @@
             function getAnswerTypeForRow(rowIndex) {
                 var input = document.getElementById('Rows_' + rowIndex + '__AnswerType');
                 return normalizeType(input ? input.value : '');
+            }
+
+            function getRowGroupingKey(rowIndex) {
+                var groupInput = document.getElementById('Rows_' + rowIndex + '__GroupId');
+                var subgroupInput = document.getElementById('Rows_' + rowIndex + '__SubgroupId');
+                var groupValue = (groupInput && groupInput.value ? groupInput.value : 'nogroup').trim();
+                var subgroupValue = (subgroupInput && subgroupInput.value ? subgroupInput.value : 'nosubgroup').trim();
+                return groupValue + '|' + subgroupValue;
+            }
+
+            function isSequentialNumericChoices(choiceValues) {
+                var values = Array.from(new Set((choiceValues || [])
+                    .map(function (value) { return (value || '').trim(); })
+                    .filter(function (value) { return value.length > 0; })));
+
+                if (values.length < 3) {
+                    return false;
+                }
+
+                var numbers = values
+                    .map(function (value) {
+                        var parsed = parseInt(value, 10);
+                        return Number.isInteger(parsed) ? parsed : NaN;
+                    })
+                    .sort(function (a, b) { return a - b; });
+
+                if (numbers.some(function (value) { return Number.isNaN(value); })) {
+                    return false;
+                }
+
+                for (var index = 0; index < numbers.length; index++) {
+                    if (numbers[index] !== index + 1) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            function getRankingControlDefinition(rowIndex) {
+                var answerType = getAnswerTypeForRow(rowIndex);
+                if (answerType !== 'singlechoice' && answerType !== 'radio') {
+                    return null;
+                }
+
+                var groupInput = document.getElementById('Rows_' + rowIndex + '__GroupId');
+                var groupIdText = (groupInput && groupInput.value ? groupInput.value : '').trim();
+                var groupId = parseInt(groupIdText, 10);
+                if (!Number.isInteger(groupId) || !enforceUniqueGroupIds.has(groupId)) {
+                    return null;
+                }
+
+                var select = document.getElementById('Rows_' + rowIndex + '__AnswerText');
+                if (answerType === 'singlechoice' && select && select.tagName === 'SELECT') {
+                    var selectOptions = Array.from(select.options)
+                        .map(function (option) { return (option.value || '').trim(); })
+                        .filter(function (value) { return value.length > 0; });
+
+                    if (!isSequentialNumericChoices(selectOptions)) {
+                        return null;
+                    }
+
+                    return {
+                        rowIndex: rowIndex,
+                        type: 'select',
+                        element: select,
+                        options: selectOptions,
+                        signature: selectOptions.map(function (value) { return parseInt(value, 10); }).sort(function (a, b) { return a - b; }).join(',')
+                    };
+                }
+
+                var radioSelector = "input[type='radio'][name='Rows[" + rowIndex + "].AnswerText']";
+                var radios = Array.from(document.querySelectorAll(radioSelector));
+                if (answerType === 'radio' && radios.length > 0) {
+                    var radioOptions = Array.from(new Set(radios
+                        .map(function (radio) { return (radio.value || '').trim(); })
+                        .filter(function (value) { return value.length > 0; })));
+
+                    if (!isSequentialNumericChoices(radioOptions)) {
+                        return null;
+                    }
+
+                    return {
+                        rowIndex: rowIndex,
+                        type: 'radio',
+                        elements: radios,
+                        options: radioOptions,
+                        signature: radioOptions.map(function (value) { return parseInt(value, 10); }).sort(function (a, b) { return a - b; }).join(',')
+                    };
+                }
+
+                return null;
+            }
+
+            function getCurrentRankingValue(controlDef) {
+                if (controlDef.type === 'select') {
+                    return (controlDef.element.value || '').trim();
+                }
+
+                if (controlDef.type === 'radio') {
+                    var checked = controlDef.elements.find(function (radio) { return radio.checked; });
+                    return checked ? (checked.value || '').trim() : '';
+                }
+
+                return '';
+            }
+
+            function applyRankingUniquenessRules() {
+                var rankingRows = Array.from(document.querySelectorAll('.survey-answer-row'))
+                    .map(function (row) { return (row.getAttribute('data-row-index') || '').trim(); })
+                    .filter(function (rowIndex) { return rowIndex.length > 0; })
+                    .map(function (rowIndex) { return getRankingControlDefinition(rowIndex); })
+                    .filter(function (def) { return !!def; });
+
+                var groups = new Map();
+
+                rankingRows.forEach(function (controlDef) {
+                    var key = getRowGroupingKey(controlDef.rowIndex) + '|' + controlDef.signature;
+                    if (!groups.has(key)) {
+                        groups.set(key, []);
+                    }
+
+                    groups.get(key).push(controlDef);
+                });
+
+                groups.forEach(function (controls) {
+                    var selectedByValue = new Map();
+
+                    controls.forEach(function (controlDef) {
+                        var selectedValue = getCurrentRankingValue(controlDef);
+                        if (selectedValue.length > 0 && !selectedByValue.has(selectedValue)) {
+                            selectedByValue.set(selectedValue, controlDef.rowIndex);
+                        }
+                    });
+
+                    controls.forEach(function (controlDef) {
+                        if (controlDef.type === 'select') {
+                            Array.from(controlDef.element.options).forEach(function (option) {
+                                var optionValue = (option.value || '').trim();
+                                if (optionValue.length === 0 || option.selected) {
+                                    option.disabled = false;
+                                    return;
+                                }
+
+                                option.disabled = selectedByValue.has(optionValue)
+                                    && selectedByValue.get(optionValue) !== controlDef.rowIndex;
+                            });
+                            return;
+                        }
+
+                        controlDef.elements.forEach(function (radio) {
+                            var radioValue = (radio.value || '').trim();
+                            if (radio.checked || radioValue.length === 0) {
+                                radio.disabled = false;
+                                return;
+                            }
+
+                            radio.disabled = selectedByValue.has(radioValue)
+                                && selectedByValue.get(radioValue) !== controlDef.rowIndex;
+                        });
+                    });
+                });
             }
 
             function getValueInputForRow(rowIndex, answerType) {
@@ -1473,9 +1636,22 @@
                 control.addEventListener('change', updateProgress);
             });
 
+            document.addEventListener('change', function (event) {
+                var target = event.target;
+                if (!target) {
+                    return;
+                }
+
+                if (target.matches("select[id^='Rows_'][id$='__AnswerText']")
+                    || target.matches("input[type='radio'][name^='Rows['][name$='].AnswerText']")) {
+                    applyRankingUniquenessRules();
+                }
+            });
+
             ensureSubgroupCopyButtons();
             showGroup(currentGroupIndex);
             updateProgress();
+            applyRankingUniquenessRules();
         })();
     </script>
 }

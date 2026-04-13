@@ -337,6 +337,10 @@ namespace TINWeb.Data
                     .HasColumnName("NewPage")
                     .HasColumnType("bit");
 
+                entity.Property(e => e.EnforceUniqueSelection)
+                    .HasColumnName("EnforceUniqueSelection")
+                    .HasColumnType("bit");
+
                 entity.Property(e => e.OrderNumber)
                     .HasColumnName("OrderNumber")
                     .HasColumnType("int");

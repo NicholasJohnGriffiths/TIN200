@@ -25,6 +25,7 @@
                     <th>Display Title/Desc</th>
                     <th>Table Format</th>
                     <th>New Page</th>
+                    <th>Unique Selection</th>
                     <th>Image1</th>
                     <th>Image2</th>
                     <th>Image3</th>
@@ -55,6 +56,7 @@
                         <td>@(record.DisplayTitleDesc ? "Yes" : "")</td>
                         <td>@(record.TableFormat ? "Yes" : "")</td>
                         <td>@(record.NewPage ? "Yes" : "")</td>
+                        <td>@(record.EnforceUniqueSelection ? "Yes" : "")</td>
                         <td>
                             @if (record.ImageId1.HasValue && Model.ImageDetailsById.TryGetValue(record.ImageId1.Value, out var image1))
                             {

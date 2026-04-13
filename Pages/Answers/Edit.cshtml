@@ -13,7 +13,17 @@
         <div class="mb-3">
             <div><strong>Company:</strong> @Model.Details.CompanyName</div>
             <div><strong>Financial Year:</strong> @Model.Details.FinancialYear</div>
-            <div><strong>Question:</strong> @Html.Raw(Model.Details.QuestionText ?? string.Empty)</div>
+            <div>
+                <strong>Question:</strong> @Html.Raw(Model.Details.QuestionText ?? string.Empty)
+                @if (Model.UniqueSelectionEnforced)
+                {
+                    <span class="badge text-bg-info ms-2">Unique selection enforced</span>
+                }
+            </div>
+            @if (Model.UniqueSelectionEnforced)
+            {
+                <div class="small text-muted mt-1">Only one answer in this group can use each ranking value.</div>
+            }
         </div>
     }
 
@@ -57,9 +67,16 @@
                     <option value="">Select an option</option>
                     @foreach (var option in Model.Input.ChoiceOptions)
                     {
-                        <option value="@option">@option</option>
+                        var normalizedOption = (option ?? string.Empty).Trim();
+                        var isSelected = string.Equals((Model.Input.AnswerText ?? string.Empty).Trim(), normalizedOption, StringComparison.Ordinal);
+                        var isUnavailable = !isSelected && Model.UnavailableUniqueSelectionValues.Contains(normalizedOption);
+                        <option value="@option" disabled="@(isUnavailable ? "disabled" : null)">@option</option>
                     }
                 </select>
+                @if (Model.UnavailableUniqueSelectionValues.Count > 0)
+                {
+                    <div class="form-text">Already used in this group: @string.Join(", ", Model.UnavailableUniqueSelectionValues.OrderBy(x => x))</div>
+                }
                 <span asp-validation-for="Input.AnswerText" class="text-danger"></span>
             </div>
 
@@ -79,8 +96,10 @@
                     for (var optionIndex = 0; optionIndex < Model.Input.ChoiceOptions.Count; optionIndex++)
                     {
                         var option = Model.Input.ChoiceOptions[optionIndex];
+                        var normalizedOption = (option ?? string.Empty).Trim();
                         var optionId = $"radio_{optionIndex}";
-                        var isChecked = string.Equals(Model.Input.AnswerText, option, StringComparison.Ordinal);
+                        var isChecked = string.Equals((Model.Input.AnswerText ?? string.Empty).Trim(), normalizedOption, StringComparison.Ordinal);
+                        var isUnavailable = !isChecked && Model.UnavailableUniqueSelectionValues.Contains(normalizedOption);
                         <div class="form-check">
                             <input
                                 class="form-check-input"
@@ -88,10 +107,15 @@
                                 name="Input.AnswerText"
                                 value="@option"
                                 id="@optionId"
+                                disabled="@(isUnavailable ? "disabled" : null)"
                                 @(isChecked ? "checked" : null) />
                             <label class="form-check-label" for="@optionId">@option</label>
                         </div>
                     }
+                }
+                @if (Model.UnavailableUniqueSelectionValues.Count > 0)
+                {
+                    <div class="form-text">Already used in this group: @string.Join(", ", Model.UnavailableUniqueSelectionValues.OrderBy(x => x))</div>
                 }
                 <span asp-validation-for="Input.AnswerText" class="text-danger"></span>
             </div>
