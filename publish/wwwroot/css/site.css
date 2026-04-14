@@ -1,0 +1,112 @@
+html {
+  font-size: 14px;
+}
+
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+}
+
+html {
+  position: relative;
+  min-height: 100%;
+}
+
+body {
+  margin-bottom: 60px;
+}
+
+.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
+  color: var(--bs-secondary-color);
+  text-align: end;
+}
+
+.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
+  text-align: start;
+}
+
+/* Wider centered container for company pages */
+.wider-container {
+  max-width: 1800px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+@media (max-width: 1200px) {
+  .wider-container { max-width: 1100px; }
+}
+
+/* Company table: smaller action buttons and tighter spacing */
+.company-table {
+  font-size: 0.8rem;
+}
+.company-table th,
+.company-table td {
+  padding: 0.35rem 0.45rem;
+}
+.company-table td .btn-sm {
+  padding: 0.15rem 0.35rem;
+  font-size: 0.72rem;
+  line-height: 1;
+}
+.company-table td .btn-sm + .btn-sm {
+  margin-left: 0.25rem;
+}
+.company-table td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.answers-table td .btn-sm {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.questions-table td .btn-sm {
+  padding: 0.2rem 0.45rem;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+.questions-table th:nth-child(2),
+.questions-table td:nth-child(2) {
+  min-width: 12rem;
+}
+
+.questions-table th:nth-child(4),
+.questions-table td:nth-child(4) {
+  min-width: 9rem;
+}
+
+.answers-table th:nth-child(1),
+.answers-table td:nth-child(1) {
+  min-width: 15rem;
+}
+
+.answers-table th:nth-child(2),
+.answers-table td:nth-child(2) {
+  min-width: 6rem;
+}
+
+.answers-table th:nth-child(7),
+.answers-table td:nth-child(7) {
+  min-width: 7.5rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .company-table {
+    font-size: 0.72rem;
+  }
+}
