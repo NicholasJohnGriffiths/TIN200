@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
 using TINWeb.Data;
 using TINWeb.Services;
 
@@ -34,6 +35,25 @@ namespace TINWeb.Pages.Company
 
         [BindProperty]
         public bool SendToAllClients { get; set; }
+
+        [BindProperty]
+        public bool EnableScheduleSettings { get; set; }
+
+        [BindProperty]
+        [DataType(DataType.DateTime)]
+        public DateTime? SendStartTime { get; set; }
+
+        [BindProperty]
+        [Range(1, 10000)]
+        public int SplitBulkIntoBatchesOf { get; set; } = 50;
+
+        [BindProperty]
+        [Range(typeof(decimal), "0", "168")]
+        public decimal BreakBetweenSendingGroupsHours { get; set; }
+
+        [BindProperty]
+        [Range(0, 3600)]
+        public int IntervalBetweenEachEmailSendSeconds { get; set; }
 
         [BindProperty(SupportsGet = true)]
         public bool IncludeTestCompanies { get; set; }
@@ -88,6 +108,34 @@ namespace TINWeb.Pages.Company
         {
             await LoadAvailableClientsAsync();
 
+            if (EnableScheduleSettings)
+            {
+                if (!SendStartTime.HasValue)
+                {
+                    ModelState.AddModelError(nameof(SendStartTime), "Send Start Time is required when Schedule Settings is enabled.");
+                }
+
+                if (SplitBulkIntoBatchesOf < 1)
+                {
+                    ModelState.AddModelError(nameof(SplitBulkIntoBatchesOf), "Split bulk into batches of must be at least 1.");
+                }
+
+                if (BreakBetweenSendingGroupsHours < 0)
+                {
+                    ModelState.AddModelError(nameof(BreakBetweenSendingGroupsHours), "Break Between sending Groups must be 0 or greater.");
+                }
+
+                if (IntervalBetweenEachEmailSendSeconds < 0)
+                {
+                    ModelState.AddModelError(nameof(IntervalBetweenEachEmailSendSeconds), "Interval Between Each Email Send must be 0 or greater.");
+                }
+
+                if (!ModelState.IsValid)
+                {
+                    return Page();
+                }
+            }
+
             var selected = SendToAllClients
                 ? AvailableClients
                 : AvailableClients.Where(c => SelectedClientIds.Contains(c.Id)).ToList();
@@ -105,12 +153,14 @@ namespace TINWeb.Pages.Company
             var failedCount = 0;
             string? firstFailureReason = null;
             var lockedCompanyIds = await GetLockedCompanyIdsForCurrentSurveyAsync();
-            var currentSurveyId = await _context.Survey
-                .Where(s => s.CurrentSurvey)
-                .OrderByDescending(s => s.FinancialYear)
-                .ThenByDescending(s => s.Id)
-                .Select(s => (int?)s.Id)
-                .FirstOrDefaultAsync();
+            var currentSurveyId = await GetCurrentOrLatestSurveyIdAsync();
+            var sendQueue = new List<SurveyClientRow>();
+
+            if (!currentSurveyId.HasValue)
+            {
+                ModelState.AddModelError(string.Empty, "No survey record exists. Unable to send survey emails.");
+                return Page();
+            }
 
             foreach (var clientRow in selected)
             {
@@ -132,24 +182,59 @@ namespace TINWeb.Pages.Company
                     continue;
                 }
 
+                sendQueue.Add(clientRow);
+            }
+
+            if (EnableScheduleSettings && SendStartTime.HasValue)
+            {
+                try
+                {
+                    await DelayUntilStartAsync(SendStartTime.Value, HttpContext.RequestAborted);
+                }
+                catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested)
+                {
+                    StatusMessage = "Bulk send was cancelled before sending started.";
+                    BulkSentCount = 0;
+                    BulkSkippedCount = skippedNoEmailCount + skippedLockedCount + skippedUnsubscribedCount;
+                    BulkFailedCount = 0;
+                    BulkLastRunAt = DateTime.Now.ToString("MMM d, yyyy h:mm tt");
+                    BulkSendSucceeded = false;
+                    return RedirectToPage(new { IncludeTestCompanies, SelectedLastTin200Year });
+                }
+            }
+
+            for (var index = 0; index < sendQueue.Count; index++)
+            {
+                var clientRow = sendQueue[index];
+                var recipientEmail = clientRow.Email!;
+
                 var surveyUrl = BuildSurveyUrl(clientRow.Id);
 
                 try
                 {
-                    await _surveyEmailService.SendSurveyLinkAsync(clientRow.Email, surveyUrl, clientRow.CompanyName, clientRow.Id);
+                    await _surveyEmailService.SendSurveyLinkAsync(recipientEmail, surveyUrl, clientRow.CompanyName, clientRow.Id);
                     sentCount++;
 
-                    // Update CompanySurvey with survey link if current survey exists
                     if (currentSurveyId.HasValue)
                     {
-                        var companySurvey = await _context.CompanySurvey
-                            .FirstOrDefaultAsync(cs => cs.CompanyId == clientRow.Id && cs.SurveyId == currentSurveyId.Value);
+                        var companySurvey = await EnsureCompanySurveyAsync(clientRow.Id, currentSurveyId.Value);
+
                         if (companySurvey != null)
                         {
+                            var sentAtLocal = DateTime.Now;
+                            var sentByUser = string.IsNullOrWhiteSpace(User?.Identity?.Name) ? "System" : User.Identity!.Name!;
+
                             companySurvey.SurveyLink = surveyUrl;
                             companySurvey.SurveyEmailSent = true;
-                            companySurvey.SurveyEmailSentLastDate = DateTime.UtcNow.Date;
+                            companySurvey.SurveyEmailSentLastDate = sentAtLocal; // local datetime
                             _context.CompanySurvey.Update(companySurvey);
+
+                            await AddCompanySurveyNoteAsync(
+                                companySurvey.Id,
+                                sentAtLocal,
+                                sentByUser,
+                                recipientEmail,
+                                surveyUrl);
                         }
                     }
                 }
@@ -157,6 +242,29 @@ namespace TINWeb.Pages.Company
                 {
                     failedCount++;
                     firstFailureReason ??= ex.Message;
+                }
+
+                if (EnableScheduleSettings && index < sendQueue.Count - 1)
+                {
+                    try
+                    {
+                        await ApplyScheduledDelayBetweenSendsAsync(index + 1, HttpContext.RequestAborted);
+                    }
+                    catch (OperationCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested)
+                    {
+                        if (sentCount > 0)
+                        {
+                            await _context.SaveChangesAsync();
+                        }
+
+                        StatusMessage = $"Bulk send was cancelled. Sent before cancellation: {sentCount}, Skipped (no email): {skippedNoEmailCount}, Skipped (locked): {skippedLockedCount}, Skipped (unsubscribed): {skippedUnsubscribedCount}, Failed: {failedCount}.";
+                        BulkSentCount = sentCount;
+                        BulkSkippedCount = skippedNoEmailCount + skippedLockedCount + skippedUnsubscribedCount;
+                        BulkFailedCount = failedCount;
+                        BulkLastRunAt = DateTime.Now.ToString("MMM d, yyyy h:mm tt");
+                        BulkSendSucceeded = false;
+                        return RedirectToPage(new { IncludeTestCompanies, SelectedLastTin200Year });
+                    }
                 }
             }
 
@@ -196,6 +304,30 @@ namespace TINWeb.Pages.Company
             BulkSendSucceeded = true;
 
             return RedirectToPage(new { IncludeTestCompanies, SelectedLastTin200Year });
+        }
+
+        private async Task DelayUntilStartAsync(DateTime sendStartTimeLocal, CancellationToken cancellationToken)
+        {
+            var initialDelay = sendStartTimeLocal - DateTime.Now;
+            if (initialDelay > TimeSpan.Zero)
+            {
+                await Task.Delay(initialDelay, cancellationToken);
+            }
+        }
+
+        private async Task ApplyScheduledDelayBetweenSendsAsync(int completedSends, CancellationToken cancellationToken)
+        {
+            var isBatchBoundary = SplitBulkIntoBatchesOf > 0 && completedSends % SplitBulkIntoBatchesOf == 0;
+            if (isBatchBoundary && BreakBetweenSendingGroupsHours > 0)
+            {
+                await Task.Delay(TimeSpan.FromHours((double)BreakBetweenSendingGroupsHours), cancellationToken);
+                return;
+            }
+
+            if (IntervalBetweenEachEmailSendSeconds > 0)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(IntervalBetweenEachEmailSendSeconds), cancellationToken);
+            }
         }
 
         private string BuildSurveyUrl(int id)
@@ -273,12 +405,7 @@ namespace TINWeb.Pages.Company
 
         private async Task<Dictionary<int, SurveyEmailStatus>> GetSurveyEmailStatusByCompanyIdForCurrentSurveyAsync()
         {
-            var currentSurveyId = await _context.Survey
-                .Where(s => s.CurrentSurvey)
-                .OrderByDescending(s => s.FinancialYear)
-                .ThenByDescending(s => s.Id)
-                .Select(s => (int?)s.Id)
-                .FirstOrDefaultAsync();
+            var currentSurveyId = await GetCurrentOrLatestSurveyIdAsync();
 
             if (!currentSurveyId.HasValue)
             {
@@ -314,12 +441,7 @@ namespace TINWeb.Pages.Company
 
         private async Task<HashSet<int>> GetLockedCompanyIdsForCurrentSurveyAsync()
         {
-            var currentSurveyId = await _context.Survey
-                .Where(s => s.CurrentSurvey)
-                .OrderByDescending(s => s.FinancialYear)
-                .ThenByDescending(s => s.Id)
-                .Select(s => (int?)s.Id)
-                .FirstOrDefaultAsync();
+            var currentSurveyId = await GetCurrentOrLatestSurveyIdAsync();
 
             if (!currentSurveyId.HasValue)
             {
@@ -332,6 +454,57 @@ namespace TINWeb.Pages.Company
                 .ToListAsync();
 
             return lockedIds.ToHashSet();
+        }
+
+        private async Task<Models.CompanySurvey?> EnsureCompanySurveyAsync(int companyId, int surveyId)
+        {
+            var companySurvey = await _context.CompanySurvey
+                .OrderByDescending(cs => cs.Id)
+                .FirstOrDefaultAsync(cs => cs.CompanyId == companyId && cs.SurveyId == surveyId);
+
+            if (companySurvey != null)
+            {
+                return companySurvey;
+            }
+
+            companySurvey = new Models.CompanySurvey
+            {
+                CompanyId = companyId,
+                SurveyId = surveyId,
+                Saved = false,
+                Submitted = false,
+                Requested = false,
+                Locked = false,
+                Estimate = false,
+                SavedDate = null,
+                SubmittedDate = null,
+                RequestedDate = null
+            };
+
+            _context.CompanySurvey.Add(companySurvey);
+            await _context.SaveChangesAsync();
+            return companySurvey;
+        }
+
+        private async Task<int?> GetCurrentOrLatestSurveyIdAsync()
+        {
+            var currentSurveyId = await _context.Survey
+                .Where(s => s.CurrentSurvey)
+                .OrderByDescending(s => s.FinancialYear)
+                .ThenByDescending(s => s.Id)
+                .Select(s => (int?)s.Id)
+                .FirstOrDefaultAsync();
+
+            if (currentSurveyId.HasValue)
+            {
+                return currentSurveyId;
+            }
+
+            return await _context.Survey
+                .OrderByDescending(s => s.FinancialYear)
+                .ThenByDescending(s => s.Id)
+                .Select(s => (int?)s.Id)
+                .FirstOrDefaultAsync();
         }
 
         public class SurveyClientRow
@@ -356,6 +529,29 @@ namespace TINWeb.Pages.Company
             public DateTime? SurveyEmailSentLastDate { get; set; }
             public bool Unsubscribed { get; set; }
             public DateTime? UnsubscribedDate { get; set; }
+        }
+
+        private async Task AddCompanySurveyNoteAsync(
+            int companySurveyId,
+            DateTime noteDateTimeLocal,
+            string userName,
+            string recipientEmail,
+            string surveyUrl)
+        {
+            var safeUser = string.IsNullOrWhiteSpace(userName) ? "System" : userName.Trim();
+            if (safeUser.Length > 255) safeUser = safeUser[..255];
+
+            var notes = $"Survey email sent to {recipientEmail}. Link: {surveyUrl}";
+
+            _context.CompanySurveyNotes.Add(new Models.CompanySurveyNote
+            {
+                CompanySurveyId = companySurveyId,
+                NoteDateTime = noteDateTimeLocal,
+                User = safeUser,
+                Notes = notes
+            });
+
+            await _context.SaveChangesAsync();
         }
     }
 }

@@ -145,9 +145,21 @@ public class SurveyEmailBounce
                     $"Status: {status ?? "Bounced"}. Reason: {reason}. Event ID {eventId}.";
 
                 var duplicateTask = await ActiveTaskExistsAsync(conn, tx, taskTitle, eventId);
+
+                _logger.LogInformation("Checking for duplicate task: Title={TaskTitle}, EventId={EventId}", taskTitle, eventId);
                 if (!duplicateTask)
                 {
-                    await InsertTaskAsync(conn, tx, taskTitle, taskDescription);
+                    _logger.LogInformation("Inserting new task: Title={TaskTitle}, Description={TaskDescription}", taskTitle, taskDescription);
+                    try
+                    {
+                        await InsertTaskAsync(conn, tx, taskTitle, taskDescription);
+                        _logger.LogInformation("Task inserted successfully: Title={TaskTitle}", taskTitle);
+                    }
+                    catch (Exception insertEx)
+                    {
+                        _logger.LogError(insertEx, "Failed to insert task: Title={TaskTitle}, Description={TaskDescription}", taskTitle, taskDescription);
+                        throw;
+                    }
                 }
 
                 await tx.CommitAsync();

@@ -229,6 +229,14 @@ namespace TINWeb.Data
                     .HasColumnName("SurveyEmailSentLastDate")
                     .HasColumnType("date");
 
+                entity.Property(e => e.SurveyReminderEmailSent)
+                    .HasColumnName("SurveyReminderEmailSent")
+                    .HasColumnType("bit");
+
+                entity.Property(e => e.SurveyReminderEmailSentLastDate)
+                    .HasColumnName("SurveyReminderEmailSentLastDate")
+                    .HasColumnType("date");
+
                 entity.HasOne<Tin200>()
                     .WithMany()
                     .HasForeignKey(e => e.CompanyId)
@@ -687,6 +695,11 @@ namespace TINWeb.Data
 
                 entity.Property(e => e.SurveyEmailTemplate)
                     .HasColumnName("SurveyEmailTemplate")
+                    .HasColumnType("text")
+                    .IsRequired(false);
+
+                entity.Property(e => e.SurveyReminderEmailTemplate)
+                    .HasColumnName("SurveyReminderEmailTemplate")
                     .HasColumnType("text")
                     .IsRequired(false);
 

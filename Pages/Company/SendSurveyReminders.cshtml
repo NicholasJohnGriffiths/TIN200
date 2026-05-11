@@ -1,15 +1,15 @@
 @page
-@model TINWeb.Pages.Company.SendSurveyModel
+@model TINWeb.Pages.Company.SendSurveyRemindersModel
 @{
-    ViewData["Title"] = "Send Company Survey";
+    ViewData["Title"] = "Send Survey Reminders";
 }
 
 <div class="container-fluid mt-4">
     <div class="row">
         <div class="col-12">
-            <h1>Send Company Survey</h1>
-            <p class="text-muted mb-1">Send a secure data update survey link to selected companies or all companies.</p>
-            <p class="small text-muted">Survey link expiry is controlled by the current application settings.</p>
+            <h1>Send Survey Reminders</h1>
+            <p class="text-muted mb-1">Send a reminder survey email to companies that have already been sent a survey.</p>
+            <p class="small text-muted">Only companies with a previously sent survey email are shown.</p>
             <hr />
 
             @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
@@ -29,7 +29,7 @@
                             <div><strong>Last run:</strong> @Model.BulkLastRunAt</div>
                         }
                         <div><strong>Sent:</strong> @(Model.BulkSentCount ?? 0)</div>
-                        <div><strong>Skipped (no email):</strong> @(Model.BulkSkippedCount ?? 0)</div>
+                        <div><strong>Skipped:</strong> @(Model.BulkSkippedCount ?? 0)</div>
                         <div><strong>Failed:</strong> @(Model.BulkFailedCount ?? 0)</div>
                     </div>
                 </div>
@@ -37,7 +37,7 @@
 
             <div id="bulkSendProgressContainer" class="mb-3" style="display:none;">
                 <div class="d-flex justify-content-between small mb-1">
-                    <span id="bulkSendProgressLabel">Sending survey emails...</span>
+                    <span id="bulkSendProgressLabel">Sending reminder emails...</span>
                     <span id="bulkSendProgressPercent">0%</span>
                 </div>
                 <div class="progress" role="progressbar" aria-label="Bulk send progress" aria-valuemin="0" aria-valuemax="100">
@@ -48,10 +48,10 @@
             <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
 
             <div class="card mb-3">
-                <div class="card-header">Bulk Send</div>
+                <div class="card-header">Bulk Send Reminders</div>
                 <div class="card-body">
                     <form method="get" class="mb-3">
-                        <input type="hidden" asp-for="SelectedLastTin200Year" />
+                        <input type="hidden" asp-for="SelectedSentYear" />
                         <div class="form-check">
                             <input asp-for="IncludeTestCompanies" class="form-check-input" onchange="this.form.submit()" />
                             <label asp-for="IncludeTestCompanies" class="form-check-label">Include Test Companies</label>
@@ -61,10 +61,10 @@
 
                     <form method="get" class="d-flex align-items-center gap-2 mb-3 flex-wrap">
                         <input type="hidden" asp-for="IncludeTestCompanies" />
-                        <label asp-for="SelectedLastTin200Year" class="form-label mb-0">Filter Last TIN200 Year:</label>
-                        <select asp-for="SelectedLastTin200Year" class="form-select" style="max-width: 160px;" aria-label="Last TIN200 Year">
-                            <option value="">All</option>
-                            @foreach (var y in Model.AvailableLastTin200Years)
+                        <label asp-for="SelectedSentYear" class="form-label mb-0">Year Survey Sent:</label>
+                        <select asp-for="SelectedSentYear" class="form-select" style="max-width: 160px;" aria-label="Year Survey Sent">
+                            <option value="">All Years</option>
+                            @foreach (var y in Model.AvailableSentYears)
                             {
                                 <option value="@y">@y</option>
                             }
@@ -74,11 +74,7 @@
 
                     <form id="bulkSendForm" method="post" asp-page-handler="Bulk">
                         <input type="hidden" asp-for="IncludeTestCompanies" />
-                        <input type="hidden" asp-for="SelectedLastTin200Year" />
-                        <div class="form-check mb-3">
-                            <input asp-for="SendToAllClients" class="form-check-input" />
-                            <label asp-for="SendToAllClients" class="form-check-label">Send to all clients with a contact email address</label>
-                        </div>
+                        <input type="hidden" asp-for="SelectedSentYear" />
 
                         <div class="mb-2">
                             <button type="button" id="selectAllClientsBtn" class="btn btn-outline-secondary btn-sm">Select All Listed</button>
@@ -90,18 +86,12 @@
                             <input id="clientSearchInput" class="form-control" type="text" placeholder="Search by ID, company, or contact email" />
                         </div>
 
-                        <div class="mb-3" role="group" aria-label="Client email filters">
-                            <button type="button" class="btn btn-outline-secondary btn-sm client-filter-btn active" data-filter="all">All</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm client-filter-btn" data-filter="has-email">Has Contact Email Only</button>
-                            <button type="button" class="btn btn-outline-secondary btn-sm client-filter-btn" data-filter="missing-email">Missing Contact Email</button>
-                        </div>
-
-                        <div class="mb-3 d-flex align-items-center" role="group" aria-label="Survey email sent filter">
-                            <label for="surveyEmailSentFilter" class="form-label me-2 mb-0">Survey Email Sent</label>
-                            <select id="surveyEmailSentFilter" class="form-select form-select-sm" style="max-width: 180px;">
+                        <div class="mb-3 d-flex align-items-center" role="group" aria-label="Reminder sent filter">
+                            <label for="reminderSentFilter" class="form-label me-2 mb-0">Reminder Sent</label>
+                            <select id="reminderSentFilter" class="form-select form-select-sm" style="max-width: 180px;">
                                 <option value="all">All</option>
                                 <option value="sent">Sent</option>
-                                <option value="not-sent">Not sent</option>
+                                <option value="not-sent" selected>Not sent</option>
                             </select>
                         </div>
 
@@ -129,8 +119,9 @@
                                         <th style="min-width: 170px;">Link Expiry</th>
                                         <th style="width: 120px;">Survey Locked</th>
                                         <th style="width: 120px;">Unsubscribed</th>
-                                        <th style="width: 140px;">Survey Email Sent</th>
-                                        <th style="width: 170px;">Survey Email Sent Last Date</th>
+                                        <th style="width: 160px;">Survey Email Sent</th>
+                                        <th style="width: 180px;">Reminder Sent</th>
+                                        <th style="width: 180px;">Reminder Sent Last Date</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -142,15 +133,15 @@
                                             ? "This company has unsubscribed from surveys."
                                             : clientRow.IsLocked
                                                 ? "Survey record is locked. Contact the Technology Investment Network."
-                                                : "Cannot send survey email because no contact email address is available.";
+                                                : "Cannot send reminder because no contact email address is available.";
                                         var searchText = $"{clientRow.Id} {clientRow.CompanyName} {clientRow.Email}".ToLowerInvariant();
                                         var companySort = (clientRow.CompanyName ?? string.Empty).ToLowerInvariant();
                                         var emailSort = (clientRow.Email ?? string.Empty).ToLowerInvariant();
-                                        <tr class="@(Model.SelectedClientIds.Contains(clientRow.Id) ? "preselected-client-row" : string.Empty)" data-search="@searchText" data-has-email="@(hasEmail ? "true" : "false")" data-id="@clientRow.Id" data-company="@companySort" data-email="@emailSort" data-survey-email-sent="@(clientRow.SurveyEmailSent ? "true" : "false")">
+                                        <tr data-search="@searchText" data-has-email="@(hasEmail ? "true" : "false")" data-id="@clientRow.Id" data-company="@companySort" data-email="@emailSort" data-reminder-sent="@(clientRow.SurveyReminderEmailSent ? "true" : "false")">
                                             <td>
                                                 @if (canSend)
                                                 {
-                                                    <input class="form-check-input client-selector" type="checkbox" name="SelectedClientIds" value="@clientRow.Id" checked="@Model.SelectedClientIds.Contains(clientRow.Id)" />
+                                                    <input class="form-check-input client-selector" type="checkbox" name="SelectedClientIds" value="@clientRow.Id" />
                                                 }
                                                 else
                                                 {
@@ -213,8 +204,18 @@
                                                     <span class="text-muted">No</span>
                                                 }
                                             </td>
-                                            <td>@(clientRow.SurveyEmailSent ? "Yes" : "No")</td>
-                                            <td>@(clientRow.SurveyEmailSentLastDate?.ToString("dd/MM/yyyy") ?? string.Empty)</td>
+                                            <td>@(clientRow.SurveyEmailSentLastDate?.ToString("dd/MM/yyyy") ?? "—")</td>
+                                            <td>
+                                                @if (clientRow.SurveyReminderEmailSent)
+                                                {
+                                                    <span class="badge bg-success">Yes</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">No</span>
+                                                }
+                                            </td>
+                                            <td>@(clientRow.SurveyReminderEmailSentLastDate?.ToString("dd/MM/yyyy") ?? "—")</td>
                                         </tr>
                                     }
                                 </tbody>
@@ -239,7 +240,7 @@
                                     <span asp-validation-for="SplitBulkIntoBatchesOf" class="text-danger"></span>
                                 </div>
                                 <div class="col-12 col-md-6">
-                                    <label asp-for="BreakBetweenSendingGroupsHours" class="form-label">Break Between sending Groups (hrs)</label>
+                                    <label asp-for="BreakBetweenSendingGroupsHours" class="form-label">Break Between Sending Groups (hrs)</label>
                                     <input asp-for="BreakBetweenSendingGroupsHours" type="number" min="0" step="0.1" class="form-control" />
                                     <span asp-validation-for="BreakBetweenSendingGroupsHours" class="text-danger"></span>
                                 </div>
@@ -255,7 +256,7 @@
                         <div id="bulkSendConfigInfo" class="alert alert-info mt-3 mb-0 small" role="status"></div>
 
                         <div class="d-flex gap-2 mt-3">
-                            <button type="submit" id="sendSurveyEmailsBtn" class="btn btn-primary">Send Survey Emails</button>
+                            <button type="submit" id="sendSurveyEmailsBtn" class="btn btn-primary">Send Reminder Emails</button>
                             <button type="button" id="stopScheduledSendBtn" class="btn btn-outline-danger" style="display:none;">Stop Scheduled Send</button>
                         </div>
                     </form>
@@ -271,17 +272,17 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="bulkSendWarningModalLabel">Confirm Bulk Email Send</h5>
+                <h5 class="modal-title" id="bulkSendWarningModalLabel">Confirm Bulk Reminder Send</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <div class="alert alert-warning mb-0" role="alert">
-                    You are about to send survey emails to <strong id="bulkSendWarningTarget">selected clients</strong>. Please confirm to continue.
+                    You are about to send survey reminder emails to <strong id="bulkSendWarningTarget">selected clients</strong>. Please confirm to continue.
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" id="confirmBulkSendBtn" class="btn btn-danger">Send Emails</button>
+                <button type="button" id="confirmBulkSendBtn" class="btn btn-danger">Send Reminder Emails</button>
             </div>
         </div>
     </div>
@@ -298,7 +299,7 @@
             const clearAllBtn = document.getElementById('clearAllClientsBtn');
             const sendToAllToggle = document.getElementById('SendToAllClients');
             const searchInput = document.getElementById('clientSearchInput');
-            const surveyEmailSentFilterSelect = document.getElementById('surveyEmailSentFilter');
+            const reminderSentFilterSelect = document.getElementById('reminderSentFilter');
             const displayedCompanyCount = document.getElementById('displayedCompanyCount');
             const selectedCompanyCount = document.getElementById('selectedCompanyCount');
             const filterButtons = Array.from(document.querySelectorAll('.client-filter-btn'));
@@ -327,16 +328,15 @@
                 ? new window.bootstrap.Modal(warningModalElement)
                 : null;
             const url = new URL(window.location.href);
-            const storageKey = 'tin200_send_survey_selected_clients';
+            const storageKey = 'tin200_send_survey_reminders_selected_clients';
             const clearSavedSelectionsAfterSend = @Model.BulkSendSucceeded.ToString().ToLowerInvariant();
-            const hasQueryPreselection = @Model.HasQueryPreselection.ToString().ToLowerInvariant();
             let bulkSendInProgress = false;
             let bulkSendAbortController = null;
             let searchParam = null;
             let filterParam = null;
             let activeFilter = 'all';
-            let surveyEmailSentFilterParam = null;
-            let activeSurveyEmailSentFilter = 'all';
+            let reminderSentFilterParam = null;
+            let activeReminderSentFilter = 'not-sent';
             let sortKey = 'company';
             let sortDir = 'asc';
             let bulkProgressTimerId = null;
@@ -356,7 +356,7 @@
 
             searchParam = url.searchParams.get('search');
             filterParam = url.searchParams.get('filter');
-            surveyEmailSentFilterParam = url.searchParams.get('surveyEmailSentFilter');
+            reminderSentFilterParam = url.searchParams.get('reminderSentFilter');
 
             const sortParam = (url.searchParams.get('sort') || '').toLowerCase();
             const sortDirParam = (url.searchParams.get('dir') || '').toLowerCase();
@@ -382,12 +382,10 @@
             };
 
             const getRecipientCount = () => {
-                const selectedCount = getCheckboxes().filter(cb => cb.checked).length;
                 if (sendToAllToggle && sendToAllToggle.checked) {
                     return getCheckboxes().length;
                 }
-
-                return selectedCount;
+                return getCheckboxes().filter(cb => cb.checked).length;
             };
 
             const formatDuration = (totalSeconds) => {
@@ -396,17 +394,9 @@
                 const minutes = Math.floor((seconds % 3600) / 60);
                 const remainingSeconds = seconds % 60;
                 const parts = [];
-
-                if (hours > 0) {
-                    parts.push(`${hours}h`);
-                }
-                if (minutes > 0) {
-                    parts.push(`${minutes}m`);
-                }
-                if (remainingSeconds > 0 || parts.length === 0) {
-                    parts.push(`${remainingSeconds}s`);
-                }
-
+                if (hours > 0) parts.push(`${hours}h`);
+                if (minutes > 0) parts.push(`${minutes}m`);
+                if (remainingSeconds > 0 || parts.length === 0) parts.push(`${remainingSeconds}s`);
                 return parts.join(' ');
             };
 
@@ -418,253 +408,121 @@
                 const breakHours = parseNonNegativeNumber(breakBetweenGroupsHoursInput ? breakBetweenGroupsHoursInput.value : '0');
                 const intervalSeconds = parseNonNegativeInt(intervalBetweenEmailsInput ? intervalBetweenEmailsInput.value : '0');
                 const recipientCount = getRecipientCount();
-
-                return {
-                    scheduleEnabled,
-                    startTime,
-                    batchSize,
-                    breakHours,
-                    intervalSeconds,
-                    recipientCount
-                };
+                return { scheduleEnabled, startTime, batchSize, breakHours, intervalSeconds, recipientCount };
             };
 
             const getEstimatedTotalSeconds = (config) => {
-                if (!config.scheduleEnabled) {
-                    return 0;
-                }
-
+                if (!config.scheduleEnabled) return 0;
                 let total = 0;
                 if (config.startTime && !Number.isNaN(config.startTime.getTime())) {
                     const now = new Date();
-                    const startDelaySeconds = Math.max(0, (config.startTime.getTime() - now.getTime()) / 1000);
-                    total += startDelaySeconds;
+                    total += Math.max(0, (config.startTime.getTime() - now.getTime()) / 1000);
                 }
-
                 const sends = Math.max(0, config.recipientCount);
                 const delayPoints = Math.max(0, sends - 1);
-                if (delayPoints === 0) {
-                    return total;
-                }
-
+                if (delayPoints === 0) return total;
                 const batchBreaks = Math.floor(delayPoints / config.batchSize);
                 const intervalDelays = Math.max(0, delayPoints - batchBreaks);
                 total += (batchBreaks * config.breakHours * 3600) + (intervalDelays * config.intervalSeconds);
-
                 return total;
             };
 
             const updateBulkSendConfigInfo = () => {
-                if (!bulkSendConfigInfo) {
-                    return;
-                }
-
+                if (!bulkSendConfigInfo) return;
                 const config = getCurrentScheduleConfig();
                 if (!config.scheduleEnabled) {
                     bulkSendConfigInfo.textContent = `Mode: Immediate send. Target recipients: ${config.recipientCount}.`;
                     return;
                 }
-
                 const startText = config.startTime && !Number.isNaN(config.startTime.getTime())
                     ? config.startTime.toLocaleString()
                     : 'Not set';
                 const estimated = getEstimatedTotalSeconds(config);
                 const estimatedText = estimated > 0 ? formatDuration(estimated) : 'No scheduled delay';
-
                 bulkSendConfigInfo.textContent = `Mode: Scheduled. Start: ${startText}. Batch size: ${config.batchSize}. Break between groups: ${config.breakHours}h. Interval per email: ${config.intervalSeconds}s. Target recipients: ${config.recipientCount}. Estimated duration: ${estimatedText}.`;
             };
 
             const updateScheduleSettingsVisibility = () => {
-                if (!scheduleSettingsToggle || !scheduleSettingsPanel) {
-                    return;
-                }
-
+                if (!scheduleSettingsToggle || !scheduleSettingsPanel) return;
                 scheduleSettingsPanel.style.display = scheduleSettingsToggle.checked ? '' : 'none';
             };
 
             const updateCounts = () => {
-                if (displayedCompanyCount) {
-                    displayedCompanyCount.textContent = String(getVisibleRows().length);
-                }
-
-                if (selectedCompanyCount) {
-                    selectedCompanyCount.textContent = String(getCheckboxes().filter(cb => cb.checked).length);
-                }
+                if (displayedCompanyCount) displayedCompanyCount.textContent = String(getVisibleRows().length);
+                if (selectedCompanyCount) selectedCompanyCount.textContent = String(getCheckboxes().filter(cb => cb.checked).length);
             };
 
             const saveSelections = () => {
-                const selectedIds = getCheckboxes()
-                    .filter(cb => cb.checked)
-                    .map(cb => cb.value);
+                const selectedIds = getCheckboxes().filter(cb => cb.checked).map(cb => cb.value);
                 localStorage.setItem(storageKey, JSON.stringify(selectedIds));
                 updateCounts();
             };
 
             const restoreSelections = () => {
                 const raw = localStorage.getItem(storageKey);
-                if (!raw) {
-                    return;
-                }
-
+                if (!raw) return;
                 let selectedIds;
-                try {
-                    selectedIds = JSON.parse(raw);
-                } catch {
-                    return;
-                }
-
-                if (!Array.isArray(selectedIds)) {
-                    return;
-                }
-
+                try { selectedIds = JSON.parse(raw); } catch { return; }
+                if (!Array.isArray(selectedIds)) return;
                 const selectedSet = new Set(selectedIds.map(String));
-                getCheckboxes().forEach(function (cb) {
-                    cb.checked = selectedSet.has(String(cb.value));
-                });
-            };
-
-            const revealPreselectedClient = () => {
-                if (!hasQueryPreselection) {
-                    return;
-                }
-
-                const selectedCheckbox = document.querySelector('tbody .client-selector:checked');
-                if (!selectedCheckbox) {
-                    return;
-                }
-
-                const selectedRow = selectedCheckbox.closest('tr');
-                if (!selectedRow || selectedRow.style.display === 'none') {
-                    return;
-                }
-
-                selectedRow.classList.add('table-warning');
-
-                if (clientListContainer) {
-                    const rowTop = selectedRow.offsetTop;
-                    const rowHeight = selectedRow.offsetHeight;
-                    const containerHeight = clientListContainer.clientHeight;
-                    const targetTop = Math.max(0, rowTop - (containerHeight / 2) + (rowHeight / 2));
-                    clientListContainer.scrollTop = targetTop;
-                    return;
-                }
-
-                selectedRow.scrollIntoView({ behavior: 'auto', block: 'center' });
+                getCheckboxes().forEach(cb => { cb.checked = selectedSet.has(String(cb.value)); });
             };
 
             const syncUrlState = () => {
                 const term = ((searchInput && searchInput.value) || '').trim();
-
-                if (term) {
-                    url.searchParams.set('search', term);
-                } else {
-                    url.searchParams.delete('search');
-                }
-
-                if (activeFilter && activeFilter !== 'all') {
-                    url.searchParams.set('filter', activeFilter);
-                } else {
-                    url.searchParams.delete('filter');
-                }
-
-                if (activeSurveyEmailSentFilter && activeSurveyEmailSentFilter !== 'all') {
-                    url.searchParams.set('surveyEmailSentFilter', activeSurveyEmailSentFilter);
-                } else {
-                    url.searchParams.delete('surveyEmailSentFilter');
-                }
-
-                if (sortKey !== 'company') {
-                    url.searchParams.set('sort', sortKey);
-                } else {
-                    url.searchParams.delete('sort');
-                }
-
-                if (sortDir !== 'asc') {
-                    url.searchParams.set('dir', sortDir);
-                } else {
-                    url.searchParams.delete('dir');
-                }
-
+                if (term) { url.searchParams.set('search', term); } else { url.searchParams.delete('search'); }
+                if (activeFilter && activeFilter !== 'all') { url.searchParams.set('filter', activeFilter); } else { url.searchParams.delete('filter'); }
+                if (activeReminderSentFilter && activeReminderSentFilter !== 'all') { url.searchParams.set('reminderSentFilter', activeReminderSentFilter); } else { url.searchParams.delete('reminderSentFilter'); }
+                if (sortKey !== 'company') { url.searchParams.set('sort', sortKey); } else { url.searchParams.delete('sort'); }
+                if (sortDir !== 'asc') { url.searchParams.set('dir', sortDir); } else { url.searchParams.delete('dir'); }
                 window.history.replaceState({}, '', url.toString());
             };
 
             const setSortButtonText = () => {
-                sortButtons.forEach(function (btn) {
+                sortButtons.forEach(btn => {
                     const key = btn.getAttribute('data-sort-key');
                     const baseLabel = (key || '').charAt(0).toUpperCase() + (key || '').slice(1);
-                    if (key === sortKey) {
-                        btn.textContent = `${baseLabel} ${sortDir === 'asc' ? '↑' : '↓'}`;
-                    } else {
-                        btn.textContent = baseLabel;
-                    }
+                    btn.textContent = key === sortKey ? `${baseLabel} ${sortDir === 'asc' ? '↑' : '↓'}` : baseLabel;
                 });
             };
 
             const startBulkSendProgress = (estimatedTotalSeconds) => {
-                if (!bulkSendProgressContainer || !bulkSendProgressBar || !bulkSendProgressPercent || !bulkSendProgressLabel) {
-                    return;
-                }
-
-                if (bulkProgressTimerId) {
-                    window.clearInterval(bulkProgressTimerId);
-                }
-
+                if (!bulkSendProgressContainer || !bulkSendProgressBar || !bulkSendProgressPercent || !bulkSendProgressLabel) return;
+                if (bulkProgressTimerId) window.clearInterval(bulkProgressTimerId);
                 bulkProgressStartedAtMs = Date.now();
                 bulkProgressTotalMs = Math.max(0, estimatedTotalSeconds) * 1000;
-                bulkSendProgressLabel.textContent = 'Sending survey emails...';
+                bulkSendProgressLabel.textContent = 'Sending reminder emails...';
                 bulkSendProgressContainer.style.display = '';
-
                 const render = (value) => {
                     bulkSendProgressBar.style.width = `${value}%`;
                     bulkSendProgressPercent.textContent = `${value}%`;
                 };
-
                 render(5);
-
                 bulkProgressTimerId = window.setInterval(() => {
                     if (bulkProgressTotalMs <= 0) {
-                        const elapsed = Date.now() - bulkProgressStartedAtMs;
-                        const value = Math.min(92, 5 + Math.floor(elapsed / 400));
-                        render(value);
+                        render(Math.min(92, 5 + Math.floor((Date.now() - bulkProgressStartedAtMs) / 400)));
                         return;
                     }
-
-                    const elapsedMs = Date.now() - bulkProgressStartedAtMs;
-                    const ratio = Math.max(0, Math.min(1, elapsedMs / bulkProgressTotalMs));
-                    const value = Math.min(95, Math.max(5, Math.round(ratio * 95)));
-                    render(value);
+                    const ratio = Math.max(0, Math.min(1, (Date.now() - bulkProgressStartedAtMs) / bulkProgressTotalMs));
+                    render(Math.min(95, Math.max(5, Math.round(ratio * 95))));
                 }, 300);
             };
 
             const stopBulkSendProgress = (label, percent) => {
-                if (!bulkSendProgressContainer || !bulkSendProgressBar || !bulkSendProgressPercent || !bulkSendProgressLabel) {
-                    return;
-                }
-
-                if (bulkProgressTimerId) {
-                    window.clearInterval(bulkProgressTimerId);
-                    bulkProgressTimerId = null;
-                }
-
+                if (!bulkSendProgressContainer || !bulkSendProgressBar || !bulkSendProgressPercent || !bulkSendProgressLabel) return;
+                if (bulkProgressTimerId) { window.clearInterval(bulkProgressTimerId); bulkProgressTimerId = null; }
                 if (typeof percent === 'number') {
-                    const boundedPercent = Math.max(0, Math.min(100, Math.round(percent)));
-                    bulkSendProgressBar.style.width = `${boundedPercent}%`;
-                    bulkSendProgressPercent.textContent = `${boundedPercent}%`;
+                    const bounded = Math.max(0, Math.min(100, Math.round(percent)));
+                    bulkSendProgressBar.style.width = `${bounded}%`;
+                    bulkSendProgressPercent.textContent = `${bounded}%`;
                 }
-
-                if (label) {
-                    bulkSendProgressLabel.textContent = label;
-                }
+                if (label) bulkSendProgressLabel.textContent = label;
             };
 
             const setBulkSendRunningState = (isRunning) => {
                 bulkSendInProgress = isRunning;
-                if (sendSurveyEmailsBtn) {
-                    sendSurveyEmailsBtn.disabled = isRunning;
-                }
-                if (confirmBulkSendBtn) {
-                    confirmBulkSendBtn.disabled = isRunning;
-                }
+                if (sendSurveyEmailsBtn) sendSurveyEmailsBtn.disabled = isRunning;
+                if (confirmBulkSendBtn) confirmBulkSendBtn.disabled = isRunning;
                 if (stopScheduledSendBtn) {
                     stopScheduledSendBtn.style.display = isRunning ? '' : 'none';
                     stopScheduledSendBtn.disabled = !isRunning;
@@ -672,36 +530,22 @@
             };
 
             const submitBulkSendAsync = async () => {
-                if (!bulkSendForm || bulkSendInProgress) {
-                    return;
-                }
-
+                if (!bulkSendForm || bulkSendInProgress) return;
                 const config = getCurrentScheduleConfig();
                 const estimatedTotalSeconds = getEstimatedTotalSeconds(config);
-
                 setBulkSendRunningState(true);
                 startBulkSendProgress(estimatedTotalSeconds);
-
                 const formData = new FormData(bulkSendForm);
                 bulkSendAbortController = new AbortController();
-
                 try {
                     const response = await fetch(bulkSendForm.action, {
                         method: 'POST',
                         body: formData,
                         signal: bulkSendAbortController.signal,
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest'
-                        }
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
                     });
-
                     stopBulkSendProgress('Bulk send completed.', 100);
-
-                    if (response.redirected) {
-                        window.location.href = response.url;
-                        return;
-                    }
-
+                    if (response.redirected) { window.location.href = response.url; return; }
                     const html = await response.text();
                     document.open();
                     document.write(html);
@@ -711,9 +555,8 @@
                         stopBulkSendProgress('Bulk send cancelled.', 0);
                         return;
                     }
-
                     stopBulkSendProgress('Bulk send failed.', 0);
-                    window.alert('An unexpected error occurred while sending survey emails. Please try again.');
+                    window.alert('An unexpected error occurred while sending reminder emails. Please try again.');
                 } finally {
                     bulkSendAbortController = null;
                     setBulkSendRunningState(false);
@@ -721,15 +564,10 @@
             };
 
             const applySort = () => {
-                if (!tbody) {
-                    return;
-                }
-
+                if (!tbody) return;
                 const rows = Array.from(tbody.querySelectorAll('tr[data-search]'));
-                rows.sort(function (a, b) {
-                    let aVal;
-                    let bVal;
-
+                rows.sort((a, b) => {
+                    let aVal, bVal;
                     if (sortKey === 'id') {
                         aVal = parseInt(a.getAttribute('data-id') || '0', 10);
                         bVal = parseInt(b.getAttribute('data-id') || '0', 10);
@@ -740,100 +578,71 @@
                         aVal = a.getAttribute('data-company') || '';
                         bVal = b.getAttribute('data-company') || '';
                     }
-
-                    if (aVal < bVal) {
-                        return sortDir === 'asc' ? -1 : 1;
-                    }
-                    if (aVal > bVal) {
-                        return sortDir === 'asc' ? 1 : -1;
-                    }
+                    if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+                    if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
                     return 0;
                 });
-
-                rows.forEach(function (row) {
-                    tbody.appendChild(row);
-                });
-
+                rows.forEach(row => tbody.appendChild(row));
                 setSortButtonText();
                 syncUrlState();
             };
 
             const setActiveFilterButton = () => {
-                filterButtons.forEach(function (btn) {
-                    const btnFilter = btn.getAttribute('data-filter') || 'all';
-                    btn.classList.toggle('active', btnFilter === activeFilter);
+                filterButtons.forEach(btn => {
+                    btn.classList.toggle('active', (btn.getAttribute('data-filter') || 'all') === activeFilter);
                 });
             };
 
             const applyFilters = () => {
                 const term = ((searchInput && searchInput.value) || '').toLowerCase().trim();
-                const rows = getSearchRows();
-
-                rows.forEach(function (row) {
+                getSearchRows().forEach(row => {
                     const haystack = row.getAttribute('data-search') || '';
                     const hasEmail = (row.getAttribute('data-has-email') || 'false') === 'true';
-                    const surveyEmailSent = (row.getAttribute('data-survey-email-sent') || 'false') === 'true';
+                    const reminderSent = (row.getAttribute('data-reminder-sent') || 'false') === 'true';
 
                     const matchesSearch = !term || haystack.includes(term);
                     const matchesEmailFilter =
                         activeFilter === 'all' ||
                         (activeFilter === 'has-email' && hasEmail) ||
                         (activeFilter === 'missing-email' && !hasEmail);
-                    const matchesSurveyEmailSentFilter =
-                        activeSurveyEmailSentFilter === 'all' ||
-                        (activeSurveyEmailSentFilter === 'sent' && surveyEmailSent) ||
-                        (activeSurveyEmailSentFilter === 'not-sent' && !surveyEmailSent);
+                    const matchesReminderSentFilter =
+                        activeReminderSentFilter === 'all' ||
+                        (activeReminderSentFilter === 'sent' && reminderSent) ||
+                        (activeReminderSentFilter === 'not-sent' && !reminderSent);
 
-                    row.style.display = matchesSearch && matchesEmailFilter && matchesSurveyEmailSentFilter ? '' : 'none';
+                    row.style.display = matchesSearch && matchesEmailFilter && matchesReminderSentFilter ? '' : 'none';
                 });
-
                 syncUrlState();
                 updateCounts();
             };
 
-            if (searchInput && searchParam) {
-                searchInput.value = searchParam;
-            }
-
-            if (filterParam && ['all', 'has-email', 'missing-email'].includes(filterParam)) {
-                activeFilter = filterParam;
-            }
-
-            if (surveyEmailSentFilterParam && ['all', 'sent', 'not-sent'].includes(surveyEmailSentFilterParam)) {
-                activeSurveyEmailSentFilter = surveyEmailSentFilterParam;
-            }
-
-            if (surveyEmailSentFilterSelect) {
-                surveyEmailSentFilterSelect.value = activeSurveyEmailSentFilter;
-            }
+            if (searchInput && searchParam) searchInput.value = searchParam;
+            if (filterParam && ['all', 'has-email', 'missing-email'].includes(filterParam)) activeFilter = filterParam;
+            if (reminderSentFilterParam && ['all', 'sent', 'not-sent'].includes(reminderSentFilterParam)) activeReminderSentFilter = reminderSentFilterParam;
+            if (reminderSentFilterSelect) reminderSentFilterSelect.value = activeReminderSentFilter;
 
             setActiveFilterButton();
-
             setSortButtonText();
 
-            if (searchInput) {
-                searchInput.addEventListener('input', function () {
-                    applyFilters();
-                });
-            }
+            if (searchInput) searchInput.addEventListener('input', applyFilters);
 
-            filterButtons.forEach(function (button) {
-                button.addEventListener('click', function () {
+            filterButtons.forEach(button => {
+                button.addEventListener('click', () => {
                     activeFilter = button.getAttribute('data-filter') || 'all';
                     setActiveFilterButton();
                     applyFilters();
                 });
             });
 
-            if (surveyEmailSentFilterSelect) {
-                surveyEmailSentFilterSelect.addEventListener('change', function () {
-                    activeSurveyEmailSentFilter = surveyEmailSentFilterSelect.value || 'all';
+            if (reminderSentFilterSelect) {
+                reminderSentFilterSelect.addEventListener('change', () => {
+                    activeReminderSentFilter = reminderSentFilterSelect.value || 'all';
                     applyFilters();
                 });
             }
 
-            sortButtons.forEach(function (button) {
-                button.addEventListener('click', function () {
+            sortButtons.forEach(button => {
+                button.addEventListener('click', () => {
                     const clickedKey = button.getAttribute('data-sort-key') || 'company';
                     if (sortKey === clickedKey) {
                         sortDir = sortDir === 'asc' ? 'desc' : 'asc';
@@ -846,54 +655,36 @@
             });
 
             applySort();
-
             applyFilters();
-
-            if (hasQueryPreselection) {
-                saveSelections();
-            } else {
-                restoreSelections();
-            }
-
-            revealPreselectedClient();
+            restoreSelections();
             updateCounts();
 
-            selectAllBtn.addEventListener('click', function () {
-                getVisibleRows().forEach(function (row) {
+            selectAllBtn.addEventListener('click', () => {
+                getVisibleRows().forEach(row => {
                     const checkbox = row.querySelector('.client-selector:not([disabled])');
-                    if (checkbox) {
-                        checkbox.checked = true;
-                    }
+                    if (checkbox) checkbox.checked = true;
                 });
                 saveSelections();
             });
 
-            clearAllBtn.addEventListener('click', function () {
+            clearAllBtn.addEventListener('click', () => {
                 getCheckboxes().forEach(cb => cb.checked = false);
-                if (sendToAllToggle) {
-                    sendToAllToggle.checked = false;
-                }
+                if (sendToAllToggle) sendToAllToggle.checked = false;
                 saveSelections();
             });
 
             if (sendToAllToggle) {
                 const applySendToAllSelection = () => {
-                    getCheckboxes().forEach(function (cb) {
-                        cb.checked = sendToAllToggle.checked;
-                    });
+                    getCheckboxes().forEach(cb => { cb.checked = sendToAllToggle.checked; });
                     saveSelections();
                     updateBulkSendConfigInfo();
                 };
-
                 sendToAllToggle.addEventListener('change', applySendToAllSelection);
-
-                if (sendToAllToggle.checked) {
-                    applySendToAllSelection();
-                }
+                if (sendToAllToggle.checked) applySendToAllSelection();
             }
 
             if (scheduleSettingsToggle) {
-                scheduleSettingsToggle.addEventListener('change', function () {
+                scheduleSettingsToggle.addEventListener('change', () => {
                     updateScheduleSettingsVisibility();
                     updateBulkSendConfigInfo();
                 });
@@ -904,73 +695,48 @@
 
             [sendStartTimeInput, splitBulkIntoBatchesInput, breakBetweenGroupsHoursInput, intervalBetweenEmailsInput]
                 .filter(Boolean)
-                .forEach(function (input) {
+                .forEach(input => {
                     input.addEventListener('input', updateBulkSendConfigInfo);
                     input.addEventListener('change', updateBulkSendConfigInfo);
                 });
 
-            selectableCheckboxes.forEach(function (checkbox) {
-                checkbox.addEventListener('change', function () {
+            selectableCheckboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', () => {
                     saveSelections();
                     updateBulkSendConfigInfo();
                 });
             });
 
             if (bulkSendForm) {
-                bulkSendForm.addEventListener('submit', function (event) {
-                    if (bulkSendInProgress) {
-                        return;
-                    }
-
+                bulkSendForm.addEventListener('submit', (event) => {
+                    if (bulkSendInProgress) return;
                     const selectedCount = getCheckboxes().filter(cb => cb.checked).length;
-                    const recipientCount = sendToAllToggle && sendToAllToggle.checked
-                        ? getCheckboxes().length
-                        : selectedCount;
+                    const recipientCount = sendToAllToggle && sendToAllToggle.checked ? getCheckboxes().length : selectedCount;
                     const selectedMessage = sendToAllToggle && sendToAllToggle.checked
-                        ? 'all clients with an email address'
+                        ? 'all listed clients with an email address'
                         : `${selectedCount} selected client${selectedCount === 1 ? '' : 's'}`;
-
                     event.preventDefault();
-
-                    if (warningTarget) {
-                        warningTarget.textContent = selectedMessage;
+                    if (warningTarget) warningTarget.textContent = selectedMessage;
+                    if (confirmBulkSendBtn) confirmBulkSendBtn.textContent = `Send to ${recipientCount} Client${recipientCount === 1 ? '' : 's'}`;
+                    if (warningModal) { warningModal.show(); return; }
+                    if (window.confirm(`Warning: You are about to send reminder emails to ${selectedMessage}. Do you want to continue?`)) {
+                        submitBulkSendAsync();
                     }
-
-                    if (confirmBulkSendBtn) {
-                        confirmBulkSendBtn.textContent = `Send to ${recipientCount} Client${recipientCount === 1 ? '' : 's'}`;
-                    }
-
-                    if (warningModal) {
-                        warningModal.show();
-                        return;
-                    }
-
-                    const confirmed = window.confirm(`Warning: You are about to send survey emails to ${selectedMessage}. Do you want to continue?`);
-                    if (!confirmed) {
-                        return;
-                    }
-
-                    submitBulkSendAsync();
                 });
             }
 
             if (confirmBulkSendBtn && bulkSendForm) {
-                confirmBulkSendBtn.addEventListener('click', function () {
-                    if (warningModal) {
-                        warningModal.hide();
-                    }
+                confirmBulkSendBtn.addEventListener('click', () => {
+                    if (warningModal) warningModal.hide();
                     submitBulkSendAsync();
                 });
             }
 
             if (stopScheduledSendBtn) {
-                stopScheduledSendBtn.addEventListener('click', function () {
-                    if (bulkSendAbortController) {
-                        bulkSendAbortController.abort();
-                    }
+                stopScheduledSendBtn.addEventListener('click', () => {
+                    if (bulkSendAbortController) bulkSendAbortController.abort();
                 });
             }
         })();
     </script>
 }
-

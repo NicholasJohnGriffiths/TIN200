@@ -62,6 +62,48 @@ namespace TINWeb.Services
             await SendEmailAsync(new[] { recipientEmail }, subject, plainTextBody, htmlBody);
         }
 
+        public async Task SendSurveyReminderLinkAsync(string recipientEmail, string surveyUrl, string? companyName, int clientId)
+        {
+            EnsureEmailConfigured();
+
+            var recipientName = string.IsNullOrWhiteSpace(companyName) ? "there" : companyName.Trim();
+            var senderDisplayName = GetSenderDisplayName();
+            var supportEmail = "tin100@tinetwork.com";
+            var defaultSubject = "TIN200 survey reminder: please review your company details";
+
+            var unsubscribeToken = GenerateUnsubscribeToken(clientId);
+            var baseUrl = (_surveyLinkSettings.BaseUrl ?? string.Empty).Trim().TrimEnd('/');
+            var unsubscribeUrl = $"{baseUrl}/Company/Unsubscribe?id={clientId}&token={Uri.EscapeDataString(unsubscribeToken)}";
+
+            var configuredEmailOptions = await _context.AppConfig
+                .AsNoTracking()
+                .OrderBy(c => c.Id)
+                .Select(c => new { c.SurveyEmailSubject, c.SurveyReminderEmailTemplate, c.SurveyEmailTemplate, c.EmailHeaderImageId })
+                .FirstOrDefaultAsync();
+
+            var emailHeaderImageUrl = BuildEmailHeaderImageUrl(configuredEmailOptions?.EmailHeaderImageId);
+
+            var subject = string.IsNullOrWhiteSpace(configuredEmailOptions?.SurveyEmailSubject)
+                ? defaultSubject
+                : configuredEmailOptions.SurveyEmailSubject.Trim();
+
+            // Use reminder template, falling back to the standard survey email template
+            var template = !string.IsNullOrWhiteSpace(configuredEmailOptions?.SurveyReminderEmailTemplate)
+                ? configuredEmailOptions.SurveyReminderEmailTemplate
+                : configuredEmailOptions?.SurveyEmailTemplate;
+
+            var (plainTextBody, htmlBody) = BuildSurveyEmailBodies(
+                template,
+                emailHeaderImageUrl,
+                recipientName,
+                surveyUrl,
+                unsubscribeUrl,
+                supportEmail,
+                senderDisplayName);
+
+            await SendEmailAsync(new[] { recipientEmail }, subject, plainTextBody, htmlBody);
+        }
+
         public async Task SendBounceNotificationAsync(
             string adminEmail,
             string companyName,

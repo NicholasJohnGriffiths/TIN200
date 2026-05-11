@@ -658,7 +658,7 @@
                                                                             {
                                                                                 <div class="survey-table-prev survey-table-prev-inline text-body-secondary" style="@prevInlineStyle">
                                                                                     <div class="survey-table-prev-label">Prev</div>
-                                                                                    <div class="survey-table-prev-value text-truncate">@Model.Rows[i].PreviousYearValue</div>
+                                                                                    <div class="survey-table-prev-value text-truncate">@Model.FormatPreviousYearValue(Model.Rows[i])</div>
                                                                                 </div>
                                                                             }
                                                                             <button
@@ -826,7 +826,7 @@
                                                                 {
                                                                     <div class="survey-table-prev survey-table-prev-inline text-body-secondary">
                                                                         <div class="survey-table-prev-label">Prev</div>
-                                                                        <div class="survey-table-prev-value text-truncate">@Model.Rows[i].PreviousYearValue</div>
+                                                                        <div class="survey-table-prev-value text-truncate">@Model.FormatPreviousYearValue(Model.Rows[i])</div>
                                                                     </div>
                                                                 }
                                                                 <button
@@ -890,7 +890,7 @@
                                                     <div class="mt-2">
                                                         @if (showPreviousYearLabel)
                                                         {
-                                                            <small class="text-body-secondary d-block mb-1">Previous year: @Model.Rows[i].PreviousYearValue</small>
+                                                            <small class="text-body-secondary d-block mb-1">Previous year: @Model.FormatPreviousYearValue(Model.Rows[i])</small>
                                                         }
                                                         <button
                                                             type="button"
@@ -1049,7 +1049,7 @@
                                             {
                                                 @if (showPreviousYearLabel)
                                                 {
-                                                    <div class="small text-body-secondary">prev year: @Model.Rows[i].PreviousYearValue</div>
+                                                    <div class="small text-body-secondary">prev year: @Model.FormatPreviousYearValue(Model.Rows[i])</div>
                                                 }
                                                 <button
                                                     type="button"

@@ -128,6 +128,17 @@ namespace TINWeb.Pages.Company
                 || !string.IsNullOrWhiteSpace(row.PreviousYearValue);
         }
 
+        public string FormatPreviousYearValue(AnswerEditRow row)
+        {
+            var raw = (row.PreviousYearValue ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return raw;
+            }
+
+            return NormalizeBooleanChoiceText(raw, row.AnswerType, row.ChoiceOptions);
+        }
+
         public bool HasCurrentAnswer(AnswerEditRow row)
         {
             var answerType = (row.AnswerType ?? string.Empty).Trim();
@@ -844,6 +855,7 @@ namespace TINWeb.Pages.Company
                     var effectivePreviousYearAnswer = displayPreviousYear ? previousYearAnswer : null;
                     groupsById.TryGetValue(question.GroupId ?? 0, out var group);
                     subgroupByQuestionId.TryGetValue(question.Id, out var subgroup);
+                    var choiceOptions = GetChoiceOptions(question);
 
                     return new AnswerEditRow
                     {
@@ -867,9 +879,9 @@ namespace TINWeb.Pages.Company
                         AnswerType = question.AnswerType,
                         DisplayPreviousYear = displayPreviousYear,
                         DecimalPoints = question.DecimalPoints,
-                        ChoiceOptions = GetChoiceOptions(question),
+                        ChoiceOptions = choiceOptions,
                         SelectedChoices = ParseMultiChoiceAnswer(answer?.AnswerText),
-                        PreviousYearValue = FormatAnswerPreview(effectivePreviousYearAnswer, question.AnswerType, question.DecimalPoints),
+                        PreviousYearValue = FormatAnswerPreview(effectivePreviousYearAnswer, question.AnswerType, question.DecimalPoints, choiceOptions),
                         PreviousYearAnswerText = effectivePreviousYearAnswer?.AnswerText,
                         PreviousYearAnswerNumber = ScaleNumberForDisplay(effectivePreviousYearAnswer?.AnswerNumber, question.DecimalPoints),
                         PreviousYearAnswerCurrency = ScaleCurrencyForDisplay(effectivePreviousYearAnswer?.AnswerCurrency, question.DecimalPoints),
@@ -1164,13 +1176,13 @@ namespace TINWeb.Pages.Company
 
             if (!string.IsNullOrWhiteSpace(row.AnswerText))
             {
-                return row.AnswerText;
+                return NormalizeBooleanChoiceText(row.AnswerText, normalizedType, row.ChoiceOptions);
             }
 
             return null;
         }
 
-        private static string? FormatAnswerPreview(Answer? answer, string? answerType, int? decimalPoints)
+        private static string? FormatAnswerPreview(Answer? answer, string? answerType, int? decimalPoints, IReadOnlyCollection<string>? choiceOptions = null)
         {
             if (answer == null)
             {
@@ -1193,7 +1205,7 @@ namespace TINWeb.Pages.Company
 
             if (!string.IsNullOrWhiteSpace(answer.AnswerText))
             {
-                return answer.AnswerText;
+                return NormalizeBooleanChoiceText(answer.AnswerText, normalizedType, choiceOptions);
             }
 
             if (answer.AnswerCurrency.HasValue)
@@ -1209,6 +1221,134 @@ namespace TINWeb.Pages.Company
             }
 
             return null;
+        }
+
+        private static string NormalizeBooleanChoiceText(string rawText, string? answerType, IReadOnlyCollection<string>? choiceOptions)
+        {
+            var candidate = (rawText ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(candidate))
+            {
+                return candidate;
+            }
+
+            var normalizedType = NormalizeAnswerTypeKey(answerType);
+            var isChoiceType = normalizedType is "singlechoice" or "radio" or "boolean" or "bool" or "yesno";
+            if (!isChoiceType)
+            {
+                return candidate;
+            }
+
+            var normalizedOptions = (choiceOptions ?? Array.Empty<string>())
+                .Select(x => (x ?? string.Empty).Trim().ToLowerInvariant())
+                .Where(x => x.Length > 0)
+                .Distinct()
+                .ToList();
+
+            var trueTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "1", "1.0", "true", "yes", "y", "t"
+            };
+            var falseTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "0", "0.0", "false", "no", "n", "f"
+            };
+
+            var hasTrueOption = normalizedOptions.Any(x => trueTokens.Contains(x));
+            var hasFalseOption = normalizedOptions.Any(x => falseTokens.Contains(x));
+            var isBooleanChoice = hasTrueOption && hasFalseOption && normalizedOptions.Count <= 6;
+
+            var isExplicitBooleanType = normalizedType is "boolean" or "bool" or "yesno";
+            var isTextBooleanValue = candidate.Equals("true", StringComparison.OrdinalIgnoreCase)
+                || candidate.Equals("false", StringComparison.OrdinalIgnoreCase)
+                || candidate.Equals("yes", StringComparison.OrdinalIgnoreCase)
+                || candidate.Equals("no", StringComparison.OrdinalIgnoreCase)
+                || candidate.Equals("y", StringComparison.OrdinalIgnoreCase)
+                || candidate.Equals("n", StringComparison.OrdinalIgnoreCase)
+                || candidate.Equals("t", StringComparison.OrdinalIgnoreCase)
+                || candidate.Equals("f", StringComparison.OrdinalIgnoreCase);
+
+            var shouldAttemptNumericBooleanMap = isBooleanChoice || isExplicitBooleanType;
+            var shouldAttemptMap = isTextBooleanValue || shouldAttemptNumericBooleanMap;
+
+            if (!shouldAttemptMap)
+            {
+                return candidate;
+            }
+
+            if (TryMapBooleanValue(candidate, shouldAttemptNumericBooleanMap, out var mapped))
+            {
+                return mapped;
+            }
+
+            return candidate;
+
+            static bool TryMapBooleanValue(string value, bool allowNumericMapping, out string mapped)
+            {
+                mapped = string.Empty;
+                var normalizedValue = (value ?? string.Empty).Trim();
+                if (string.IsNullOrWhiteSpace(normalizedValue))
+                {
+                    return false;
+                }
+
+                if (normalizedValue.Equals("1", StringComparison.OrdinalIgnoreCase)
+                    || normalizedValue.Equals("1.0", StringComparison.OrdinalIgnoreCase)
+                    || normalizedValue.Equals("true", StringComparison.OrdinalIgnoreCase)
+                    || normalizedValue.Equals("yes", StringComparison.OrdinalIgnoreCase)
+                    || normalizedValue.Equals("y", StringComparison.OrdinalIgnoreCase)
+                    || normalizedValue.Equals("t", StringComparison.OrdinalIgnoreCase))
+                {
+                    mapped = "Yes";
+                    return true;
+                }
+
+                if (normalizedValue.Equals("0", StringComparison.OrdinalIgnoreCase)
+                    || normalizedValue.Equals("0.0", StringComparison.OrdinalIgnoreCase)
+                    || normalizedValue.Equals("false", StringComparison.OrdinalIgnoreCase)
+                    || normalizedValue.Equals("no", StringComparison.OrdinalIgnoreCase)
+                    || normalizedValue.Equals("n", StringComparison.OrdinalIgnoreCase)
+                    || normalizedValue.Equals("f", StringComparison.OrdinalIgnoreCase))
+                {
+                    mapped = "No";
+                    return true;
+                }
+
+                if (!allowNumericMapping)
+                {
+                    return false;
+                }
+
+                if (double.TryParse(normalizedValue, NumberStyles.Float, CultureInfo.InvariantCulture, out var numeric)
+                    || double.TryParse(normalizedValue, NumberStyles.Float, CultureInfo.CurrentCulture, out numeric))
+                {
+                    if (Math.Abs(numeric - 1d) < 0.0000001d)
+                    {
+                        mapped = "Yes";
+                        return true;
+                    }
+
+                    if (Math.Abs(numeric) < 0.0000001d)
+                    {
+                        mapped = "No";
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            static string NormalizeAnswerTypeKey(string? input)
+            {
+                if (string.IsNullOrWhiteSpace(input))
+                {
+                    return string.Empty;
+                }
+
+                return new string(input
+                    .Where(char.IsLetterOrDigit)
+                    .Select(char.ToLowerInvariant)
+                    .ToArray());
+            }
         }
 
         private static double? ScaleNumberForDisplay(double? value, int? decimalPoints)

@@ -1,0 +1,166 @@
+@page
+@model TINWeb.Pages.CompanySurvey.ProgressModel
+@{
+    ViewData["Title"] = "Survey Progress";
+}
+
+@functions {
+    string SortHref(string column) => Url.Page(
+        "/CompanySurvey/Progress",
+        null,
+        new
+        {
+            financialYear = Model.FinancialYear,
+            lastTIN200Year = Model.LastTIN200Year,
+            includeTestCompanies = Model.IncludeTestCompanies,
+            progressStatusFilter = Model.ProgressStatusFilter,
+            sortBy = column,
+            sortDir = Model.GetNextSortDirection(column)
+        },
+        null) ?? "#";
+}
+
+<div class="container-fluid mt-4">
+    <div class="row mb-3">
+        <div class="col">
+            <h1>Survey Progress</h1>
+            <p class="text-muted mb-2">
+                @Model.SavedOrSubmittedCompanies of @Model.TotalCompanies companies have saved or submitted a survey
+                (@Model.ProgressPercent%).
+            </p>
+            <div class="progress" role="progressbar" aria-label="Survey progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@Model.ProgressPercent">
+                <div
+                    class="progress-bar bg-success"
+                    style="width: @Model.ProgressPercent.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%">
+                    @Model.ProgressPercent%
+                </div>
+            </div>
+            <p class="text-muted mt-3 mb-2">
+                @Model.SubmittedCompanies of @Model.TotalCompanies companies have submitted the survey
+                (@Model.SubmittedProgressPercent%).
+            </p>
+            <div class="progress" role="progressbar" aria-label="Submitted survey progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@Model.SubmittedProgressPercent">
+                <div
+                    class="progress-bar bg-primary"
+                    style="width: @Model.SubmittedProgressPercent.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%">
+                    @Model.SubmittedProgressPercent%
+                </div>
+            </div>
+            <p class="small text-muted mt-2 mb-0">
+                Legend:
+                <span class="badge bg-success">Saved or Submitted</span>
+                in-progress completion;
+                <span class="badge bg-primary">Submitted only</span>
+                final completion.
+            </p>
+            <p class="small text-muted mt-2 mb-0">
+                Saved: @Model.SavedCompanies | Submitted: @Model.SubmittedCompanies | Showing: @Model.Records.Count
+            </p>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-12">
+            <form id="progressFiltersForm" method="get" class="d-flex flex-wrap align-items-end gap-2">
+                <input type="hidden" name="sortBy" value="@Model.SortBy" />
+                <input type="hidden" name="sortDir" value="@Model.SortDir" />
+                <div>
+                    <label class="form-label mb-1">Survey Financial Year</label>
+                    <select name="financialYear" class="form-select" style="min-width: 180px;">
+                        @foreach (var year in Model.FinancialYears)
+                        {
+                            <option value="@year" selected="@(Model.FinancialYear == year ? "selected" : null)">@year</option>
+                        }
+                    </select>
+                </div>
+
+                <div>
+                    <label class="form-label mb-1">Company LastTIN200Year</label>
+                    <select name="lastTIN200Year" class="form-select" style="min-width: 180px;">
+                        @foreach (var year in Model.LastTIN200Years)
+                        {
+                            <option value="@year" selected="@(Model.LastTIN200Year == year ? "selected" : null)">@year</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="form-check mb-1 ms-1">
+                    <input class="form-check-input" type="checkbox" id="includeTestCompanies" name="includeTestCompanies" value="true" @(Model.IncludeTestCompanies ? "checked" : null) />
+                    <label class="form-check-label" for="includeTestCompanies">Include Test Companies</label>
+                </div>
+
+                <div>
+                    <label class="form-label mb-1">Progress Status</label>
+                    <select name="progressStatusFilter" class="form-select" style="min-width: 200px;">
+                        <option value="all" selected="@(Model.ProgressStatusFilter == "all" ? "selected" : null)">All</option>
+                        <option value="savedSubmitted" selected="@(Model.ProgressStatusFilter == "savedSubmitted" ? "selected" : null)">Saved/Submitted</option>
+                        <option value="notSavedSubmitted" selected="@(Model.ProgressStatusFilter == "notSavedSubmitted" ? "selected" : null)">Not Saved/Submitted</option>
+                    </select>
+                </div>
+
+                <button class="btn btn-outline-primary mb-0" type="submit">Apply</button>
+            </form>
+        </div>
+    </div>
+
+    @if (Model.Records.Any())
+    {
+        <table class="table table-striped table-hover company-table">
+            <thead class="table-dark">
+                <tr>
+                    <th><a class="link-light text-decoration-none" href="@SortHref("companyName")"><span>Company Name</span><span>@Model.GetSortIndicator("companyName")</span></a></th>
+                    <th>Contact Name</th>
+                    <th>Contact Email</th>
+                    <th>Survey Email Sent</th>
+                    <th>Survey Email Sent Date</th>
+                    <th>Saved</th>
+                    <th><a class="link-light text-decoration-none" href="@SortHref("savedDate")"><span>Saved Date</span><span>@Model.GetSortIndicator("savedDate")</span></a></th>
+                    <th>Submitted</th>
+                    <th><a class="link-light text-decoration-none" href="@SortHref("submittedDate")"><span>Submitted Date</span><span>@Model.GetSortIndicator("submittedDate")</span></a></th>
+                    <th>Unsubscribed</th>
+                    <th>Answers Count</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var record in Model.Records)
+                {
+                    <tr>
+                        <td>@record.CompanyName</td>
+                        <td>@Model.GetContactName(record)</td>
+                        <td>@record.ContactEmail</td>
+                        <td>@(record.SurveyEmailSent ? "True" : "False")</td>
+                        <td>@(record.SurveyEmailSentLastDate?.ToString("dd/MM/yyyy") ?? string.Empty)</td>
+                        <td>@(record.Saved ? "True" : "False")</td>
+                        <td>@(record.SavedDate?.ToString("dd/MM/yyyy") ?? string.Empty)</td>
+                        <td>@(record.Submitted ? "True" : "False")</td>
+                        <td>@(record.SubmittedDate?.ToString("dd/MM/yyyy") ?? string.Empty)</td>
+                        <td>
+                            @if (record.Unsubscribed.HasValue)
+                            {
+                                @(record.Unsubscribed.Value ? "True" : "False")
+                            }
+                        </td>
+                        <td>@record.AnswerCount</td>
+                        <td class="text-nowrap">
+                            @if (!string.IsNullOrWhiteSpace(record.SurveyLink))
+                            {
+                                <a href="@record.SurveyLink" target="_blank" rel="noopener" class="btn btn-sm btn-outline-info">Survey</a>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-info" disabled>Survey</button>
+                            }
+                            <a asp-page="/CompanySurvey/Notes" asp-route-companySurveyId="@record.Id" asp-route-financialYear="@record.FinancialYear" class="btn btn-sm btn-outline-dark">Notes</a>
+                            <a asp-page="/Answers/Index" asp-route-companySurveyId="@record.Id" asp-route-financialYear="@record.FinancialYear" class="btn btn-sm btn-primary">Answers</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <div class="alert alert-info">No survey progress records found.</div>
+    }
+</div>

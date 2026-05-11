@@ -132,6 +132,7 @@ namespace TINWeb.Services
                     FinancialYear = context.FinancialYear,
                     QuestionId = question.Id,
                     QuestionOrderNumber = question.OrderNumber,
+                    QuestionTitle = question.Title,
                     QuestionText = question.QuestionText,
                     AnswerType = question.AnswerType,
                     AnswerText = answer != null ? answer.AnswerText : null,
@@ -1974,6 +1975,7 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             public int FinancialYear { get; set; }
             public int QuestionId { get; set; }
             public int? QuestionOrderNumber { get; set; }
+            public string? QuestionTitle { get; set; }
             public string? QuestionText { get; set; }
             public string? AnswerType { get; set; }
             public string? AnswerText { get; set; }

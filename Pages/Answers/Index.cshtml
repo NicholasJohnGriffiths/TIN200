@@ -268,7 +268,15 @@
                 @foreach (var row in Model.Rows)
                 {
                     var answerType = (row.AnswerType ?? string.Empty).Trim();
-                    var displayedQuestionHtml = row.QuestionText ?? string.Empty;
+                    var questionTitle = (row.QuestionTitle ?? string.Empty).Trim();
+                    var questionText = row.QuestionText ?? string.Empty;
+                    var titleMatchesText = !string.IsNullOrWhiteSpace(questionTitle)
+                        && questionTitle.Equals(questionText, StringComparison.OrdinalIgnoreCase);
+                    var displayedQuestionHtml = string.IsNullOrWhiteSpace(questionTitle)
+                        ? questionText
+                        : string.IsNullOrWhiteSpace(questionText) || titleMatchesText
+                            ? System.Net.WebUtility.HtmlEncode(questionTitle)
+                            : $"{System.Net.WebUtility.HtmlEncode(questionTitle)} - {questionText}";
                     var isBoolean = answerType.Equals("Boolean", StringComparison.OrdinalIgnoreCase)
                         || answerType.Equals("Bool", StringComparison.OrdinalIgnoreCase);
 

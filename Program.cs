@@ -65,8 +65,10 @@ builder.Services.AddScoped<IImageStorageService, ImageStorageService>();
 builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("SmtpSettings"));
 builder.Services.Configure<AzureCommunicationEmailSettings>(builder.Configuration.GetSection("AzureCommunicationEmail"));
 builder.Services.Configure<SurveyLinkSettings>(builder.Configuration.GetSection("SurveyLinkSettings"));
+builder.Services.Configure<StripeSettings>(builder.Configuration.GetSection("Stripe"));
 builder.Services.AddScoped<ISurveyEmailService, SurveyEmailService>();
 builder.Services.AddScoped<ISurveyLinkTokenService, SurveyLinkTokenService>();
+builder.Services.AddScoped<StripeTransactionService>();
 builder.Services.Configure<FormOptions>(options =>
 {
     options.ValueCountLimit = 20000;

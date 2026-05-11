@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using TINWeb.Data;
-using TINWeb.Models;
 
 namespace TINWeb.Pages.Config;
 
@@ -12,21 +11,24 @@ public class IndexModel : PageModel
 {
     private readonly ApplicationDbContext _context;
 
-    public IList<AppConfig> Records { get; set; } = new List<AppConfig>();
-
-    [TempData]
-    public string? StatusMessage { get; set; }
-
     public IndexModel(ApplicationDbContext context)
     {
         _context = context;
     }
 
-    public async Task OnGetAsync()
+    public async Task<IActionResult> OnGetAsync()
     {
-        Records = await _context.AppConfig
+        var first = await _context.AppConfig
             .AsNoTracking()
             .OrderBy(c => c.Id)
-            .ToListAsync();
+            .Select(c => c.Id)
+            .FirstOrDefaultAsync();
+
+        if (first != 0)
+        {
+            return RedirectToPage("./Edit", new { id = first });
+        }
+
+        return RedirectToPage("./Create");
     }
 }

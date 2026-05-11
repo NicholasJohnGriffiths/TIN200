@@ -47,5 +47,9 @@ namespace TINWeb.Models
         public bool? Unsubscribed { get; set; }
 
         public DateTime? UnsubscribedDate { get; set; }
+
+        public bool? SurveyReminderEmailSent { get; set; }
+
+        public DateTime? SurveyReminderEmailSentLastDate { get; set; }
     }
 }

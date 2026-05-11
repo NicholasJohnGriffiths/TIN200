@@ -39,6 +39,10 @@ namespace TINWeb.Services
                     Id = companySurvey.Id,
                     CompanyId = companySurvey.CompanyId,
                     CompanyName = company.CompanyName,
+                    LastTIN200Year = company.LastTIN200Year,
+                    ContactFirstName = company.ContactFirstName,
+                    ContactLastName = company.ContactLastName,
+                    ContactEmail = company.ContactEmail,
                     ExternalId = company.ExternalId,
                     IsTestCompany = company.Test ?? false,
                     FinancialYear = survey.FinancialYear,
@@ -668,6 +672,10 @@ namespace TINWeb.Services
             public int Id { get; set; }
             public int CompanyId { get; set; }
             public string? CompanyName { get; set; }
+            public int? LastTIN200Year { get; set; }
+            public string? ContactFirstName { get; set; }
+            public string? ContactLastName { get; set; }
+            public string? ContactEmail { get; set; }
             public string? ExternalId { get; set; }
             public bool IsTestCompany { get; set; }
             public int FinancialYear { get; set; }
