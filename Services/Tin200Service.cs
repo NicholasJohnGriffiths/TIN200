@@ -490,7 +490,6 @@ VALUES (@externalId, @companyName, @test);";
                 EstimatedCompanySurveyCreatedCount = estimatedCompanySurveyCreatedCount,
                 PreviewRows = plan.Operations
                     .OrderBy(x => x.RowNumber)
-                    .Take(200)
                     .Select(x => new CompanyGlobalImportPreviewRow
                     {
                         RowNumber = x.RowNumber,
@@ -542,7 +541,12 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
 
         public async Task<CompanyContactImportPreviewResult> PreviewContactImportFromExcelAsync(Stream excelStream)
         {
-            var plan = await BuildCompanyContactImportPlanAsync(excelStream);
+            return await PreviewContactImportFromExcelAsync(excelStream, null);
+        }
+
+        public async Task<CompanyContactImportPreviewResult> PreviewContactImportFromExcelAsync(Stream excelStream, CompanyContactImportMapping? mapping)
+        {
+            var plan = await BuildCompanyContactImportPlanAsync(excelStream, mapping);
             var matchedHeaders = new[]
             {
                 plan.MatchedCompanyNameHeader,
@@ -591,9 +595,53 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             };
         }
 
+        public async Task<List<string>> GetExcelHeadersAsync(Stream excelStream)
+        {
+            using var workbook = new XLWorkbook(excelStream);
+            var worksheet = workbook.Worksheets.FirstOrDefault();
+            if (worksheet == null)
+            {
+                return new List<string>();
+            }
+
+            var headerRow = worksheet.FirstRowUsed();
+            if (headerRow == null)
+            {
+                return new List<string>();
+            }
+
+            var lastColumnNumber = worksheet.LastColumnUsed()?.ColumnNumber() ?? 0;
+            var headers = new List<string>();
+
+            for (var column = 1; column <= lastColumnNumber; column++)
+            {
+                var header = headerRow.Cell(column).GetString().Trim();
+                if (string.IsNullOrWhiteSpace(header))
+                {
+                    continue;
+                }
+
+                if (headers.Contains(header, StringComparer.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                headers.Add(header);
+            }
+
+            return headers
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
         public async Task<CompanyContactImportResult> ImportContactsFromExcelAsync(Stream excelStream)
         {
-            var plan = await BuildCompanyContactImportPlanAsync(excelStream);
+            return await ImportContactsFromExcelAsync(excelStream, null);
+        }
+
+        public async Task<CompanyContactImportResult> ImportContactsFromExcelAsync(Stream excelStream, CompanyContactImportMapping? mapping)
+        {
+            var plan = await BuildCompanyContactImportPlanAsync(excelStream, mapping);
             var result = new CompanyContactImportResult
             {
                 Errors = new List<string>(plan.Errors),
@@ -1434,7 +1482,7 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             return plan;
         }
 
-        private async Task<CompanyContactImportPlan> BuildCompanyContactImportPlanAsync(Stream excelStream)
+        private async Task<CompanyContactImportPlan> BuildCompanyContactImportPlanAsync(Stream excelStream, CompanyContactImportMapping? mapping = null)
         {
             var plan = new CompanyContactImportPlan();
 
@@ -1513,10 +1561,10 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                 return false;
             }
 
-            var companyNameAliases = new List<string> { "Company Name" };
-            var contactFirstNameAliases = new List<string> { "Contact Person - First Name" };
-            var contactLastNameAliases = new List<string> { "Contact Person - Last Name" };
-            var contactEmailAliases = new List<string> { "Contact Email" };
+            var companyNameAliases = BuildAliases(mapping?.CompanyNameHeader, "Company Name");
+            var contactFirstNameAliases = BuildAliases(mapping?.ContactFirstNameHeader, "Contact Person - First Name");
+            var contactLastNameAliases = BuildAliases(mapping?.ContactLastNameHeader, "Contact Person - Last Name");
+            var contactEmailAliases = BuildAliases(mapping?.ContactEmailHeader, "Contact Email");
 
             if (!TryGetColumn(companyNameAliases, out var companyNameColumn, out var matchedCompanyNameHeader))
             {
@@ -1645,6 +1693,22 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             }
 
             return plan;
+        }
+
+        private static List<string> BuildAliases(string? preferredHeader, string fallbackHeader)
+        {
+            var aliases = new List<string>();
+
+            if (!string.IsNullOrWhiteSpace(preferredHeader))
+            {
+                aliases.Add(preferredHeader.Trim());
+            }
+
+            aliases.Add(fallbackHeader);
+
+            return aliases
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
 
         private static List<string> BuildHeaderAliases(IEnumerable<string?> configuredValues, params string[] fallbackAliases)
@@ -1787,6 +1851,14 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             public int UnchangedCount { get; set; }
             public int NotFoundCount { get; set; }
             public List<string> Errors { get; set; } = new();
+        }
+
+        public class CompanyContactImportMapping
+        {
+            public string? CompanyNameHeader { get; set; }
+            public string? ContactFirstNameHeader { get; set; }
+            public string? ContactLastNameHeader { get; set; }
+            public string? ContactEmailHeader { get; set; }
         }
 
         private sealed class CompanyGlobalImportPlan

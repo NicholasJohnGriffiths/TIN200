@@ -69,6 +69,7 @@ public class EditModel : PageModel
         existing.UserName = Record.UserName;
         existing.Password = Record.Password;
         existing.UserType = Record.UserType;
+        existing.TransactionsVisible = Record.TransactionsVisible;
 
         await _context.SaveChangesAsync();
 

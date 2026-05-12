@@ -1,79 +1,145 @@
 @page
 @model TINWeb.Pages.Transactions.EventsModel
 @{
-    ViewData["Title"] = "Transaction Events";
+    ViewData["Title"] = "Transactions";
 }
 
 <div class="container mt-4">
-    <div class="row mb-3 align-items-end">
-        <div class="col-md-6">
-            <h1 class="mb-0">Transaction Events</h1>
-            <div class="text-muted small">Latest Stripe balance transactions (up to 100 records).</div>
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-end gap-3 mb-4">
+        <div>
+            <h1 class="mb-1">
+                Transactions
+                <span class="badge @(Model.IsStripeTestMode ? "text-bg-warning" : "text-bg-success") ms-2">Stripe @Model.StripeModeLabel Mode</span>
+            </h1>
+            <div class="text-muted small">Stripe charges ordered by latest first, with 20 transactions per page.</div>
+            @if (User.HasClaim("Role", "1"))
+            {
+                <div class="text-muted small">Secret Key: @Model.StripeSecretKeyType | Publishable Key: @Model.StripePublishableKeyType</div>
+                <div class="text-muted small">Env vars in use: Mode=@Model.StripeModeVariableName | Secret=@Model.StripeSecretVariableName | Publishable=@Model.StripePublishableVariableName | Webhook=@Model.StripeWebhookVariableName</div>
+                <div class="text-muted small">Raw config: Stripe:Testmode:TINWeb=@Model.StripeRawModeValue | Stripe:SecretKey=@Model.StripeRawLiveSecretType | Stripe:SecretKey:Test=@Model.StripeRawTestSecretType | Stripe:PublishableKey=@Model.StripeRawLivePublishableType | Stripe:PublishableKey:Test=@Model.StripeRawTestPublishableType</div>
+            }
         </div>
-        <div class="col-md-6">
-            <form method="get" class="d-flex justify-content-md-end align-items-end gap-2 flex-wrap">
-                <div>
-                    <label asp-for="Description" class="form-label mb-1">Description</label>
-                    <select asp-for="Description" class="form-select">
-                        <option value="">All descriptions</option>
-                        @foreach (var option in Model.DescriptionOptions)
-                        {
-                            <option value="@option">@option</option>
-                        }
-                    </select>
-                </div>
-                <div>
-                    <button type="submit" class="btn btn-primary">Apply</button>
-                    <a asp-page="./Events" class="btn btn-outline-secondary">Clear</a>
-                </div>
-            </form>
-        </div>
+        <form method="get" class="d-flex align-items-end gap-2 flex-wrap">
+            <div>
+                <label class="form-label mb-1">Year</label>
+                <select name="Year" class="form-select" style="width:auto">
+                    @foreach (var y in Model.AvailableYears)
+                    {
+                        <option value="@y" selected="@(y == Model.EffectiveYear ? "selected" : null)">@y</option>
+                    }
+                </select>
+            </div>
+            <div>
+                <label asp-for="Search" class="form-label mb-1">Search description</label>
+                <input asp-for="Search" class="form-control" placeholder="Type description text" />
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Search</button>
+                <a asp-page="./Events" class="btn btn-outline-secondary">Clear</a>
+                <a asp-page="./Events" asp-page-handler="Pdf" asp-route-search="@Model.Search" asp-route-year="@Model.EffectiveYear" target="_blank" class="btn btn-outline-dark">View PDF</a>
+            </div>
+        </form>
     </div>
 
     @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
     {
         <div class="alert alert-danger">@Model.ErrorMessage</div>
     }
-    else if (Model.Transactions.Any())
-    {
-        <div class="table-responsive">
-            <table class="table table-striped table-hover align-middle">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Created (UTC)</th>
-                        <th>Type</th>
-                        <th>Description</th>
-                        <th>Amount (minor)</th>
-                        <th>Fee (minor)</th>
-                        <th>Net (minor)</th>
-                        <th>Currency</th>
-                        <th>Status</th>
-                        <th>Source</th>
-                        <th>Stripe ID</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var row in Model.Transactions)
-                    {
-                        <tr>
-                            <td>@row.Created.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")</td>
-                            <td>@row.Type</td>
-                            <td>@(string.IsNullOrWhiteSpace(row.Description) ? "-" : row.Description)</td>
-                            <td>@row.Amount</td>
-                            <td>@row.Fee</td>
-                            <td>@row.Net</td>
-                            <td>@(row.Currency?.ToUpperInvariant())</td>
-                            <td>@row.Status</td>
-                            <td>@(string.IsNullOrWhiteSpace(row.SourceId) ? "-" : row.SourceId)</td>
-                            <td><span class="font-monospace">@row.Id</span></td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    }
     else
     {
-        <div class="alert alert-info">No Stripe transactions found for the selected filter.</div>
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="border rounded p-3 bg-light h-100">
+                    <div class="text-muted small text-uppercase">Transactions</div>
+                    <div class="fs-4 fw-semibold">@Model.TotalCount</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="border rounded p-3 bg-light h-100">
+                    <div class="text-muted small text-uppercase">Total Amount</div>
+                    <div class="fs-4 fw-semibold">@Model.TotalAmountDisplay</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="border rounded p-3 bg-light h-100">
+                    <div class="text-muted small text-uppercase">Refunded</div>
+                    <div class="fs-4 fw-semibold">@Model.RefundedCount</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="border rounded p-3 bg-light h-100">
+                    <div class="text-muted small text-uppercase">Disputed</div>
+                    <div class="fs-4 fw-semibold">@Model.DisputedCount</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="border rounded p-3 bg-light h-100">
+                    <div class="text-muted small text-uppercase">Failed</div>
+                    <div class="fs-4 fw-semibold">@Model.FailedCount</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="border rounded p-3 bg-light h-100">
+                    <div class="text-muted small text-uppercase">Uncaptured</div>
+                    <div class="fs-4 fw-semibold">@Model.UncapturedCount</div>
+                </div>
+            </div>
+        </div>
+
+        @if (Model.Transactions.Any())
+        {
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Date / Time (UTC)</th>
+                            <th>Amount</th>
+                            <th>Succeeded</th>
+                            <th>Payment Method</th>
+                            <th>Description</th>
+                            <th>Customer</th>
+                            <th>Refunded Date</th>
+                            <th>Decline Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var row in Model.Transactions)
+                        {
+                            <tr>
+                                <td>@row.Created.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                <td>@row.AmountDisplay</td>
+                                <td>@(row.Succeeded ? "Yes" : "No")</td>
+                                <td>@row.PaymentMethod</td>
+                                <td>@row.DescriptionDisplay</td>
+                                <td>@row.CustomerDisplay</td>
+                                <td>@(row.RefundedDate?.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "-")</td>
+                                <td>@(string.IsNullOrWhiteSpace(row.DeclineReason) ? "-" : row.DeclineReason)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <nav aria-label="Transactions pagination" class="mt-3">
+                <ul class="pagination mb-0 flex-wrap">
+                    <li class="page-item @(Model.PageNumber <= 1 ? "disabled" : null)">
+                        <a class="page-link" asp-page="./Events" asp-route-search="@Model.Search" asp-route-pageNumber="@(Model.PageNumber - 1)">Previous</a>
+                    </li>
+                    @for (var pageIndex = 1; pageIndex <= Model.TotalPages; pageIndex++)
+                    {
+                        <li class="page-item @(pageIndex == Model.PageNumber ? "active" : null)">
+                            <a class="page-link" asp-page="./Events" asp-route-search="@Model.Search" asp-route-pageNumber="@pageIndex">@pageIndex</a>
+                        </li>
+                    }
+                    <li class="page-item @(Model.PageNumber >= Model.TotalPages ? "disabled" : null)">
+                        <a class="page-link" asp-page="./Events" asp-route-search="@Model.Search" asp-route-pageNumber="@(Model.PageNumber + 1)">Next</a>
+                    </li>
+                </ul>
+            </nav>
+        }
+        else
+        {
+            <div class="alert alert-info">No Stripe transactions found for the selected filter.</div>
+        }
     }
 </div>

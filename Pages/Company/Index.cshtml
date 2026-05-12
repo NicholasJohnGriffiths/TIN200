@@ -1,7 +1,8 @@
 @page
 @model TINWeb.Pages.Company.IndexModel
 @{
-    ViewData["Title"] = "Companies";
+    var isImportMode = string.Equals(Model.ShowImportTool, "import", StringComparison.OrdinalIgnoreCase);
+    ViewData["Title"] = isImportMode ? "Companies Import" : "Companies";
 }
 
 <div class="container-fluid px-0 mt-3">
@@ -174,6 +175,8 @@
 
                 <form method="post" asp-page-handler="ApplyContactImport" class="d-inline" id="applyContactImportForm">
                     <input type="hidden" name="previewToken" value="@Model.PendingContactImportToken" />
+                    <input type="hidden" name="showImportTool" value="@(string.Equals(Model.ShowImportTool, "import", StringComparison.OrdinalIgnoreCase) ? "import" : "contacts")" />
+                    <input type="hidden" name="showImportTab" value="contacts" />
                     <button type="submit" class="btn btn-info text-white">Apply Contact Import</button>
                 </form>
             </div>
@@ -286,6 +289,8 @@
                 <form method="post" asp-page-handler="ApplyGlobalImport" class="d-inline" id="applyGlobalImportForm">
                     <input type="hidden" name="previewToken" value="@Model.PendingGlobalImportToken" />
                     <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
+                    <input type="hidden" name="showImportTool" value="@(string.Equals(Model.ShowImportTool, "import", StringComparison.OrdinalIgnoreCase) ? "import" : "global")" />
+                    <input type="hidden" name="showImportTab" value="global" />
                     <button type="submit" class="btn btn-dark">Apply Global Import</button>
                 </form>
             </div>
@@ -294,43 +299,146 @@
 
     <div class="row mb-4">
         <div class="col-md-8">
-            <h1>Companies (@Model.Records.Count)</h1>
+            <h1>@(isImportMode ? "Companies Import" : $"Companies ({Model.Records.Count})")</h1>
         </div>
         <div class="col-md-4 text-end">
             <div class="d-inline-flex align-items-center gap-2 flex-wrap justify-content-end">
-                <form method="post" asp-page-handler="PreviewContactImport" enctype="multipart/form-data" class="d-inline-flex align-items-center gap-2" id="contactImportForm">
-                    <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
-                    <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
-                    <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
-                    <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="max-width: 220px;" />
-                    <button type="submit" class="btn btn-outline-info btn-sm">Import - Contacts</button>
-                </form>
-                <form method="post" asp-page-handler="PreviewGlobalImport" enctype="multipart/form-data" class="d-inline-flex align-items-center gap-2" id="globalImportForm">
-                    <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
-                    <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
-                    <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
-                    <input type="number" name="importYear" value="@Model.SelectedImportYear" class="form-control form-control-sm" style="max-width: 120px;" placeholder="Import Year" min="1900" max="9999" />
-                    <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="max-width: 220px;" />
-                    <button type="submit" class="btn btn-outline-dark btn-sm">Import Global File</button>
-                </form>
-                <form method="post" asp-page-handler="PreviewResetFyeValues" class="d-inline">
-                    <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
-                    <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
-                    <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
-                    <button type="submit" class="btn btn-outline-secondary me-2" id="companyResetPreviewButton">Preview Summary</button>
-                </form>
-                <form method="post" asp-page-handler="ResetFyeValues" class="d-inline" onsubmit="return confirm('Update company info (CEO name, email, FYE Last Financial Year / Year-1 / Year-2) from survey answers? This will overwrite existing values.');">
-                    <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
-                    <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
-                    <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
-                    <button type="submit" class="btn btn-outline-warning me-2" id="companyResetButton">Update Company Info</button>
-                </form>
-                <a asp-page="./Create" class="btn btn-primary">
-                    <i class="bi bi-plus-circle"></i> Add New Record
-                </a>
+                @if (!isImportMode)
+                {
+                    <form method="post" asp-page-handler="PreviewResetFyeValues" class="d-inline">
+                        <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
+                        <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
+                        <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
+                        <button type="submit" class="btn btn-outline-secondary me-2" id="companyResetPreviewButton">Preview Summary</button>
+                    </form>
+                    <form method="post" asp-page-handler="ResetFyeValues" class="d-inline" onsubmit="return confirm('Update company info (CEO name, email, FYE Last Financial Year / Year-1 / Year-2) from survey answers? This will overwrite existing values.');">
+                        <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
+                        <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
+                        <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
+                        <button type="submit" class="btn btn-outline-warning me-2" id="companyResetButton">Update Company Info</button>
+                    </form>
+                    <a asp-page="./Create" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Add New Record
+                    </a>
+                }
             </div>
         </div>
     </div>
+
+    @{
+        var isCombinedImportMode = string.Equals(Model.ShowImportTool, "import", StringComparison.OrdinalIgnoreCase);
+        var activeImportTab = string.Equals(Model.ShowImportTab, "global", StringComparison.OrdinalIgnoreCase) ? "global" : "contacts";
+    }
+
+    @if (isCombinedImportMode)
+    {
+        <div class="card mb-3 border-secondary">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Import Companies</h5>
+                <ul class="nav nav-tabs" id="companyImportTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(activeImportTab == "contacts" ? "active" : null)" id="company-import-contacts-tab" data-bs-toggle="tab" data-bs-target="#company-import-contacts-pane" type="button" role="tab" aria-controls="company-import-contacts-pane" aria-selected="@(activeImportTab == "contacts" ? "true" : "false")">Contacts</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link @(activeImportTab == "global" ? "active" : null)" id="company-import-global-tab" data-bs-toggle="tab" data-bs-target="#company-import-global-pane" type="button" role="tab" aria-controls="company-import-global-pane" aria-selected="@(activeImportTab == "global" ? "true" : "false")">Global</button>
+                    </li>
+                </ul>
+
+                <div class="tab-content border border-top-0 rounded-bottom p-3" id="companyImportTabsContent">
+                    <div class="tab-pane fade @(activeImportTab == "contacts" ? "show active" : null)" id="company-import-contacts-pane" role="tabpanel" aria-labelledby="company-import-contacts-tab" tabindex="0">
+                        <form method="post" asp-page-handler="LoadContactImportHeaders" enctype="multipart/form-data" class="d-inline-flex align-items-center gap-2 flex-wrap" id="contactImportLoadForm">
+                            <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
+                            <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
+                            <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
+                            <input type="hidden" name="showImportTool" value="import" />
+                            <input type="hidden" name="showImportTab" value="contacts" />
+                            <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="max-width: 320px;" />
+                            <button type="submit" class="btn btn-info text-white btn-sm">Load Headers</button>
+                        </form>
+
+                        @if (Model.ContactImportHeaders.Any())
+                        {
+                            <hr class="my-3" />
+                            <p class="small text-muted mb-3">Map your Excel headers to Company contact fields, then preview the import. You can save the mapping as a JSON file and load it later.</p>
+
+                            <form method="post" asp-page-handler="PreviewContactImport" class="row g-2 align-items-end" id="contactImportForm">
+                                <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
+                                <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
+                                <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
+                                <input type="hidden" name="showImportTool" value="import" />
+                                <input type="hidden" name="showImportTab" value="contacts" />
+                                <input type="hidden" asp-for="ContactImportMappingToken" />
+
+                                <div class="col-md-3">
+                                    <label asp-for="ContactMapCompanyNameHeader" class="form-label">Company Name (required)</label>
+                                    <select asp-for="ContactMapCompanyNameHeader" class="form-select form-select-sm">
+                                        <option value="">Select header</option>
+                                        @foreach (var h in Model.ContactImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label asp-for="ContactMapFirstNameHeader" class="form-label">Contact First Name</label>
+                                    <select asp-for="ContactMapFirstNameHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.ContactImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label asp-for="ContactMapLastNameHeader" class="form-label">Contact Last Name</label>
+                                    <select asp-for="ContactMapLastNameHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.ContactImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label asp-for="ContactMapEmailHeader" class="form-label">Contact Email</label>
+                                    <select asp-for="ContactMapEmailHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.ContactImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-12 d-flex gap-2 flex-wrap mt-2">
+                                    <button type="submit" class="btn btn-info text-white btn-sm">Preview Contact Import</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="saveContactMappingBtn">Save Mapping File</button>
+                                    <input type="file" id="contactMappingFile" accept="application/json,.json" class="form-control form-control-sm" style="max-width: 240px;" />
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="loadContactMappingBtn">Load Mapping File</button>
+                                </div>
+                            </form>
+                        }
+                    </div>
+
+                    <div class="tab-pane fade @(activeImportTab == "global" ? "show active" : null)" id="company-import-global-pane" role="tabpanel" aria-labelledby="company-import-global-tab" tabindex="0">
+                        <form method="post" asp-page-handler="PreviewGlobalImport" enctype="multipart/form-data" class="d-inline-flex align-items-center gap-2 flex-wrap" id="globalImportForm">
+                            <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
+                            <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
+                            <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
+                            <input type="hidden" name="showImportTool" value="import" />
+                            <input type="hidden" name="showImportTab" value="global" />
+                            <input type="number" name="importYear" value="@Model.SelectedImportYear" class="form-control form-control-sm" style="max-width: 120px;" placeholder="Import Year" min="1900" max="9999" />
+                            <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="max-width: 320px;" />
+                            <button type="submit" class="btn btn-dark btn-sm">Preview Global Import</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
 
     <div class="row mb-3">
         <div class="col-12">
@@ -349,10 +457,13 @@
                     <label class="form-check-label" for="showTestCompanies">Show Test Companies</label>
                 </div>
                 <button class="btn btn-outline-primary" type="submit">Apply</button>
-                <button class="btn btn-success ms-2" id="companyExportButton" type="submit" formaction="@Url.Page("./Export")">Export</button>
-                <button class="btn btn-outline-success ms-2" id="companySmExportButton" type="submit" formaction="@Url.Page("./ExportSurveyMonkey")">SM Export</button>
-                <button class="btn btn-outline-info ms-2" type="submit" formaction="@Url.Page("./ExportMailerlite")">Export - Mailerlite</button>
-                <a class="btn btn-link ms-2" href="@Url.Page("./Index")">Clear</a>
+                @if (!isImportMode)
+                {
+                    <button class="btn btn-success ms-2" id="companyExportButton" type="submit" formaction="@Url.Page("./Export")">Export</button>
+                    <button class="btn btn-outline-success ms-2" id="companySmExportButton" type="submit" formaction="@Url.Page("./ExportSurveyMonkey")">SM Export</button>
+                    <button class="btn btn-outline-info ms-2" type="submit" formaction="@Url.Page("./ExportMailerlite")">Export - Mailerlite</button>
+                    <a class="btn btn-link ms-2" href="@Url.Page("./Index")">Clear</a>
+                }
             </form>
         </div>
     </div>
@@ -497,7 +608,7 @@
         const progressPercent = document.getElementById('companyExportProgressPercent');
         const progressLabel = document.getElementById('companyExportProgressLabel');
 
-        if (!form || !exportButton || !smExportButton || !progressContainer || !progressBar || !progressPercent || !progressLabel) {
+        if (!form || !progressContainer || !progressBar || !progressPercent || !progressLabel) {
             return;
         }
 
@@ -532,11 +643,11 @@
                 return;
             }
 
-            if (event.submitter.id === 'companyExportButton') {
+            if (exportButton && event.submitter.id === 'companyExportButton') {
                 startProgress('Exporting companies...');
             }
 
-            if (event.submitter.id === 'companySmExportButton') {
+            if (smExportButton && event.submitter.id === 'companySmExportButton') {
                 startProgress('Exporting SurveyMonkey file...');
             }
         });
@@ -560,10 +671,79 @@
             });
         }
 
+        var contactImportLoadForm = document.getElementById('contactImportLoadForm');
+        if (contactImportLoadForm) {
+            contactImportLoadForm.addEventListener('submit', function () {
+                startProgress('Reading contact import headers...');
+            });
+        }
+
+        var contactImportForm = document.getElementById('contactImportForm');
+        if (contactImportForm) {
+            contactImportForm.addEventListener('submit', function () {
+                startProgress('Building contact import preview...');
+            });
+        }
+
         var applyGlobalImportForm = document.getElementById('applyGlobalImportForm');
         if (applyGlobalImportForm) {
             applyGlobalImportForm.addEventListener('submit', function () {
                 startProgress('Applying global company import...');
+            });
+        }
+
+        var saveContactMappingBtn = document.getElementById('saveContactMappingBtn');
+        var loadContactMappingBtn = document.getElementById('loadContactMappingBtn');
+        var contactMappingFile = document.getElementById('contactMappingFile');
+        var companyField = document.getElementById('ContactMapCompanyNameHeader');
+        var firstField = document.getElementById('ContactMapFirstNameHeader');
+        var lastField = document.getElementById('ContactMapLastNameHeader');
+        var emailField = document.getElementById('ContactMapEmailHeader');
+
+        if (saveContactMappingBtn && companyField && firstField && lastField && emailField) {
+            saveContactMappingBtn.addEventListener('click', function () {
+                var payload = {
+                    mappingType: 'company-contact-import',
+                    version: 1,
+                    companyNameHeader: companyField.value || '',
+                    contactFirstNameHeader: firstField.value || '',
+                    contactLastNameHeader: lastField.value || '',
+                    contactEmailHeader: emailField.value || ''
+                };
+
+                var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = 'company-contact-import-mapping.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        if (loadContactMappingBtn && contactMappingFile && companyField && firstField && lastField && emailField) {
+            loadContactMappingBtn.addEventListener('click', function () {
+                var file = contactMappingFile.files && contactMappingFile.files.length ? contactMappingFile.files[0] : null;
+                if (!file) {
+                    alert('Select a mapping JSON file first.');
+                    return;
+                }
+
+                var reader = new FileReader();
+                reader.onload = function () {
+                    try {
+                        var data = JSON.parse(reader.result);
+                        companyField.value = data.companyNameHeader || '';
+                        firstField.value = data.contactFirstNameHeader || '';
+                        lastField.value = data.contactLastNameHeader || '';
+                        emailField.value = data.contactEmailHeader || '';
+                    } catch (error) {
+                        alert('Invalid mapping file. Please choose a valid JSON mapping file.');
+                    }
+                };
+                reader.readAsText(file);
             });
         }
     })();

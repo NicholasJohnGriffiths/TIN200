@@ -76,7 +76,8 @@ public class LoginModel : PageModel
             new(ClaimTypes.Email, email),
             new(ClaimTypes.Role, user.UserType.ToString(CultureInfo.InvariantCulture)),
             new("UserName", user.UserName),
-            new("UserType", user.UserType.ToString(CultureInfo.InvariantCulture))
+                new("UserType", user.UserType.ToString(CultureInfo.InvariantCulture)),
+                new("TransactionsVisible", (user.TransactionsVisible == true).ToString().ToLower())
         };
 
         var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);

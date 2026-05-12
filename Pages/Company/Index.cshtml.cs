@@ -17,11 +17,26 @@ namespace TINWeb.Pages.Company
         public int? FocusId { get; set; }
         public string CompanySearch { get; set; } = string.Empty;
         public bool ShowTestCompanies { get; set; }
+        [BindProperty(SupportsGet = true)]
+        public string? ShowImportTool { get; set; }
+        [BindProperty(SupportsGet = true)]
+        public string? ShowImportTab { get; set; }
         public CompanyService.ResetFyeValuesResult? PreviewSummary { get; set; }
         public CompanyService.CompanyGlobalImportPreviewResult? GlobalImportPreview { get; set; }
         public CompanyService.CompanyContactImportPreviewResult? ContactImportPreview { get; set; }
         public string? PendingGlobalImportToken { get; set; }
         public string? PendingContactImportToken { get; set; }
+        [BindProperty]
+        public string? ContactImportMappingToken { get; set; }
+        public List<string> ContactImportHeaders { get; set; } = new();
+        [BindProperty]
+        public string? ContactMapCompanyNameHeader { get; set; }
+        [BindProperty]
+        public string? ContactMapFirstNameHeader { get; set; }
+        [BindProperty]
+        public string? ContactMapLastNameHeader { get; set; }
+        [BindProperty]
+        public string? ContactMapEmailHeader { get; set; }
         public int? SelectedImportYear { get; set; }
 
         [TempData]
@@ -35,9 +50,23 @@ namespace TINWeb.Pages.Company
             _service = service;
         }
 
-        public async Task OnGetAsync(int? lastTin200Year, int? focusId, string? companySearch, bool showTestCompanies = false)
+        public async Task OnGetAsync(int? lastTin200Year, int? focusId, string? companySearch, bool showTestCompanies = false, string? showImportTool = null, string? showImportTab = null)
         {
             FocusId = focusId;
+            ShowImportTool = showImportTool;
+            ShowImportTab = showImportTab;
+
+            if (string.Equals(ShowImportTool, "contacts", StringComparison.OrdinalIgnoreCase))
+            {
+                ShowImportTool = "import";
+                ShowImportTab = "contacts";
+            }
+            else if (string.Equals(ShowImportTool, "global", StringComparison.OrdinalIgnoreCase))
+            {
+                ShowImportTool = "import";
+                ShowImportTab = "global";
+            }
+
             await LoadPageAsync(lastTin200Year, companySearch, showTestCompanies);
         }
 
@@ -62,25 +91,27 @@ namespace TINWeb.Pages.Company
             return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies });
         }
 
-        public async Task<IActionResult> OnPostPreviewGlobalImportAsync(IFormFile? importFile, int? lastTin200Year, int? importYear, string? companySearch, bool showTestCompanies = false)
+        public async Task<IActionResult> OnPostPreviewGlobalImportAsync(IFormFile? importFile, int? lastTin200Year, int? importYear, string? companySearch, bool showTestCompanies = false, string? showImportTool = null, string? showImportTab = null)
         {
+            ShowImportTool = showImportTool;
+            ShowImportTab = string.IsNullOrWhiteSpace(showImportTab) ? "global" : showImportTab;
             if (importFile == null || importFile.Length == 0)
             {
                 ErrorMessage = "Global company import failed: please select an Excel file.";
-                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies });
+                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
             }
 
             if (!importYear.HasValue || importYear.Value <= 0)
             {
                 ErrorMessage = "Global company import failed: please provide a valid Import Year.";
-                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies });
+                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
             }
 
             var fileName = importFile.FileName ?? string.Empty;
             if (!fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
             {
                 ErrorMessage = "Global company import failed: only .xlsx Excel files are supported.";
-                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies });
+                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
             }
 
             CleanupExpiredPendingImports();
@@ -109,7 +140,9 @@ namespace TINWeb.Pages.Company
                 LastTin200Year = lastTin200Year,
                 CompanySearch = companySearch,
                 ShowTestCompanies = showTestCompanies,
-                ImportYear = importYear.Value
+                ImportYear = importYear.Value,
+                ShowImportTool = showImportTool,
+                ShowImportTab = ShowImportTab
             };
 
             await LoadPageAsync(lastTin200Year, companySearch, showTestCompanies);
@@ -151,22 +184,121 @@ namespace TINWeb.Pages.Company
                 }
             }
 
-            return RedirectToPage(new { lastTin200Year = pendingImport.LastTin200Year, companySearch = pendingImport.CompanySearch, showTestCompanies = pendingImport.ShowTestCompanies });
+            return RedirectToPage(new { lastTin200Year = pendingImport.LastTin200Year, companySearch = pendingImport.CompanySearch, showTestCompanies = pendingImport.ShowTestCompanies, showImportTool = pendingImport.ShowImportTool, showImportTab = pendingImport.ShowImportTab });
         }
 
-        public async Task<IActionResult> OnPostPreviewContactImportAsync(IFormFile? importFile, int? lastTin200Year, string? companySearch, bool showTestCompanies = false)
+        public async Task<IActionResult> OnPostPreviewContactImportAsync(IFormFile? importFile, int? lastTin200Year, string? companySearch, bool showTestCompanies = false, string? showImportTool = null, string? showImportTab = null)
         {
-            if (importFile == null || importFile.Length == 0)
+            ShowImportTool = showImportTool;
+            ShowImportTab = string.IsNullOrWhiteSpace(showImportTab) ? "contacts" : showImportTab;
+            CleanupExpiredPendingImports();
+
+            PendingCompanyImport? sourceImport = null;
+            if (!string.IsNullOrWhiteSpace(ContactImportMappingToken)
+                && PendingImports.TryGetValue(ContactImportMappingToken, out var mappedPending)
+                && string.Equals(mappedPending.Kind, "ContactMapping", StringComparison.OrdinalIgnoreCase))
+            {
+                sourceImport = mappedPending;
+            }
+
+            if (sourceImport == null && (importFile == null || importFile.Length == 0))
             {
                 ErrorMessage = "Contact import failed: please select an Excel file.";
-                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies });
+                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
+            }
+
+            if (sourceImport == null)
+            {
+                var fileName = importFile?.FileName ?? string.Empty;
+                if (!fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+                {
+                    ErrorMessage = "Contact import failed: only .xlsx Excel files are supported.";
+                    return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
+                }
+
+                var token = Guid.NewGuid().ToString("N");
+                var tempDir = Path.Combine(Path.GetTempPath(), "tinweb-company-contact-import");
+                Directory.CreateDirectory(tempDir);
+                var tempFilePath = Path.Combine(tempDir, $"{token}.xlsx");
+
+                await using (var tempFileStream = System.IO.File.Create(tempFilePath))
+                {
+                    await importFile!.CopyToAsync(tempFileStream);
+                }
+
+                sourceImport = new PendingCompanyImport
+                {
+                    Token = token,
+                    TempFilePath = tempFilePath,
+                    CreatedUtc = DateTime.UtcNow,
+                    LastTin200Year = lastTin200Year,
+                    CompanySearch = companySearch,
+                    ShowTestCompanies = showTestCompanies,
+                    Kind = "ContactPreview",
+                    ShowImportTool = showImportTool,
+                    ShowImportTab = ShowImportTab
+                };
+            }
+
+            var selectedMapping = new CompanyService.CompanyContactImportMapping
+            {
+                CompanyNameHeader = ContactMapCompanyNameHeader,
+                ContactFirstNameHeader = ContactMapFirstNameHeader,
+                ContactLastNameHeader = ContactMapLastNameHeader,
+                ContactEmailHeader = ContactMapEmailHeader
+            };
+
+            CompanyService.CompanyContactImportPreviewResult preview;
+            await using (var readStream = System.IO.File.OpenRead(sourceImport.TempFilePath))
+            {
+                preview = await _service.PreviewContactImportFromExcelAsync(readStream, selectedMapping);
+            }
+
+            await using (var headerStream = System.IO.File.OpenRead(sourceImport.TempFilePath))
+            {
+                ContactImportHeaders = await _service.GetExcelHeadersAsync(headerStream);
+            }
+
+            sourceImport.CreatedUtc = DateTime.UtcNow;
+            sourceImport.LastTin200Year = lastTin200Year;
+            sourceImport.CompanySearch = companySearch;
+            sourceImport.ShowTestCompanies = showTestCompanies;
+            sourceImport.ShowImportTool = showImportTool;
+            sourceImport.ShowImportTab = ShowImportTab;
+            sourceImport.Kind = "ContactPreview";
+            sourceImport.MappedCompanyNameHeader = preview.MatchedFields.FirstOrDefault(x => x.StartsWith("Company Name ->", StringComparison.OrdinalIgnoreCase))?.Split("->", 2).ElementAtOrDefault(1)?.Trim();
+            sourceImport.MappedContactFirstNameHeader = preview.MatchedFields.FirstOrDefault(x => x.StartsWith("Contact First Name ->", StringComparison.OrdinalIgnoreCase))?.Split("->", 2).ElementAtOrDefault(1)?.Trim();
+            sourceImport.MappedContactLastNameHeader = preview.MatchedFields.FirstOrDefault(x => x.StartsWith("Contact Last Name ->", StringComparison.OrdinalIgnoreCase))?.Split("->", 2).ElementAtOrDefault(1)?.Trim();
+            sourceImport.MappedContactEmailHeader = preview.MatchedFields.FirstOrDefault(x => x.StartsWith("Contact Email ->", StringComparison.OrdinalIgnoreCase))?.Split("->", 2).ElementAtOrDefault(1)?.Trim();
+
+            PendingImports[sourceImport.Token] = sourceImport;
+
+            await LoadPageAsync(lastTin200Year, companySearch, showTestCompanies);
+            ContactImportPreview = preview;
+            PendingContactImportToken = sourceImport.Token;
+            ContactImportMappingToken = sourceImport.Token;
+            ContactMapCompanyNameHeader = sourceImport.MappedCompanyNameHeader;
+            ContactMapFirstNameHeader = sourceImport.MappedContactFirstNameHeader;
+            ContactMapLastNameHeader = sourceImport.MappedContactLastNameHeader;
+            ContactMapEmailHeader = sourceImport.MappedContactEmailHeader;
+            return Page();
+        }
+
+        public async Task<IActionResult> OnPostLoadContactImportHeadersAsync(IFormFile? importFile, int? lastTin200Year, string? companySearch, bool showTestCompanies = false, string? showImportTool = null, string? showImportTab = null)
+        {
+            ShowImportTool = showImportTool;
+            ShowImportTab = string.IsNullOrWhiteSpace(showImportTab) ? "contacts" : showImportTab;
+            if (importFile == null || importFile.Length == 0)
+            {
+                ErrorMessage = "Contact import mapping failed: please select an Excel file.";
+                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
             }
 
             var fileName = importFile.FileName ?? string.Empty;
             if (!fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
             {
-                ErrorMessage = "Contact import failed: only .xlsx Excel files are supported.";
-                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies });
+                ErrorMessage = "Contact import mapping failed: only .xlsx Excel files are supported.";
+                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
             }
 
             CleanupExpiredPendingImports();
@@ -181,10 +313,21 @@ namespace TINWeb.Pages.Company
                 await importFile.CopyToAsync(tempFileStream);
             }
 
-            CompanyService.CompanyContactImportPreviewResult preview;
+            List<string> headers;
             await using (var readStream = System.IO.File.OpenRead(tempFilePath))
             {
-                preview = await _service.PreviewContactImportFromExcelAsync(readStream);
+                headers = await _service.GetExcelHeadersAsync(readStream);
+            }
+
+            if (!headers.Any())
+            {
+                if (System.IO.File.Exists(tempFilePath))
+                {
+                    System.IO.File.Delete(tempFilePath);
+                }
+
+                ErrorMessage = "Contact import mapping failed: no header row was detected in the selected file.";
+                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
             }
 
             PendingImports[token] = new PendingCompanyImport
@@ -194,12 +337,20 @@ namespace TINWeb.Pages.Company
                 CreatedUtc = DateTime.UtcNow,
                 LastTin200Year = lastTin200Year,
                 CompanySearch = companySearch,
-                ShowTestCompanies = showTestCompanies
+                ShowTestCompanies = showTestCompanies,
+                Kind = "ContactMapping",
+                ShowImportTool = showImportTool,
+                ShowImportTab = ShowImportTab
             };
 
             await LoadPageAsync(lastTin200Year, companySearch, showTestCompanies);
-            ContactImportPreview = preview;
-            PendingContactImportToken = token;
+            ContactImportHeaders = headers;
+            ContactImportMappingToken = token;
+            ContactMapCompanyNameHeader = headers.FirstOrDefault(x => string.Equals(x.Trim(), "Company Name", StringComparison.OrdinalIgnoreCase));
+            ContactMapFirstNameHeader = headers.FirstOrDefault(x => string.Equals(x.Trim(), "Contact Person - First Name", StringComparison.OrdinalIgnoreCase));
+            ContactMapLastNameHeader = headers.FirstOrDefault(x => string.Equals(x.Trim(), "Contact Person - Last Name", StringComparison.OrdinalIgnoreCase));
+            ContactMapEmailHeader = headers.FirstOrDefault(x => string.Equals(x.Trim(), "Contact Email", StringComparison.OrdinalIgnoreCase));
+            StatusMessage = "Contact import file loaded. Review or adjust the header mappings, then preview the import.";
             return Page();
         }
 
@@ -216,7 +367,15 @@ namespace TINWeb.Pages.Company
             try
             {
                 await using var stream = System.IO.File.OpenRead(pendingImport.TempFilePath);
-                var result = await _service.ImportContactsFromExcelAsync(stream);
+                var mapping = new CompanyService.CompanyContactImportMapping
+                {
+                    CompanyNameHeader = pendingImport.MappedCompanyNameHeader,
+                    ContactFirstNameHeader = pendingImport.MappedContactFirstNameHeader,
+                    ContactLastNameHeader = pendingImport.MappedContactLastNameHeader,
+                    ContactEmailHeader = pendingImport.MappedContactEmailHeader
+                };
+
+                var result = await _service.ImportContactsFromExcelAsync(stream, mapping);
                 if (result.Errors.Any())
                 {
                     StatusMessage = $"Contact import completed with warnings. Updated: {result.UpdatedCount}, Unchanged: {result.UnchangedCount}, Not Found: {result.NotFoundCount}. Warnings: {string.Join(" ", result.Errors.Take(5))}";
@@ -235,7 +394,7 @@ namespace TINWeb.Pages.Company
                 }
             }
 
-            return RedirectToPage(new { lastTin200Year = pendingImport.LastTin200Year, companySearch = pendingImport.CompanySearch, showTestCompanies = pendingImport.ShowTestCompanies });
+            return RedirectToPage(new { lastTin200Year = pendingImport.LastTin200Year, companySearch = pendingImport.CompanySearch, showTestCompanies = pendingImport.ShowTestCompanies, showImportTool = pendingImport.ShowImportTool, showImportTab = pendingImport.ShowImportTab });
         }
 
         private async Task LoadPageAsync(int? lastTin200Year, string? companySearch, bool showTestCompanies = false)
@@ -296,6 +455,13 @@ namespace TINWeb.Pages.Company
             public string? CompanySearch { get; set; }
             public bool ShowTestCompanies { get; set; }
             public int ImportYear { get; set; }
+            public string Kind { get; set; } = "Global";
+            public string? ShowImportTool { get; set; }
+            public string? ShowImportTab { get; set; }
+            public string? MappedCompanyNameHeader { get; set; }
+            public string? MappedContactFirstNameHeader { get; set; }
+            public string? MappedContactLastNameHeader { get; set; }
+            public string? MappedContactEmailHeader { get; set; }
         }
     }
 }

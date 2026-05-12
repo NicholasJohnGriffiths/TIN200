@@ -17,6 +17,8 @@ namespace TINWeb.Pages.Answers
         public List<AnswerService.CompanySurveyOption> CompanySurveyOptions { get; set; } = new();
         public int? SelectedFinancialYear { get; set; }
         public int? SelectedCompanySurveyId { get; set; }
+        [BindProperty(SupportsGet = true)]
+        public string? ShowImportTool { get; set; }
         public int QuestionCount { get; set; }
         public int AnsweredCount { get; set; }
         public AnswerService.AnswerImportPreviewResult? ImportPreview { get; set; }
@@ -35,8 +37,9 @@ namespace TINWeb.Pages.Answers
             _answerService = answerService;
         }
 
-        public async Task OnGetAsync(int? financialYear, int? companySurveyId)
+        public async Task OnGetAsync(int? financialYear, int? companySurveyId, string? showImportTool = null)
         {
+            ShowImportTool = showImportTool;
             var hasExplicitFilters = Request.Query.ContainsKey("financialYear") || Request.Query.ContainsKey("companySurveyId");
             await LoadPageDataAsync(financialYear, companySurveyId, hasExplicitFilters);
         }
@@ -239,26 +242,27 @@ namespace TINWeb.Pages.Answers
             return RedirectToPage(new { financialYear = effectiveYear.Value });
         }
 
-        public async Task<IActionResult> OnPostPreviewImportAsync(IFormFile? importFile, int? financialYear)
+        public async Task<IActionResult> OnPostPreviewImportAsync(IFormFile? importFile, int? financialYear, string? showImportTool = null)
         {
+            ShowImportTool = showImportTool;
             if (importFile == null || importFile.Length == 0)
             {
                 ErrorMessage = "Import failed: please select an Excel file.";
-                return RedirectToPage(new { financialYear });
+                return RedirectToPage(new { financialYear, showImportTool = "qualtrics" });
             }
 
             var fileName = importFile.FileName ?? string.Empty;
             if (!fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
             {
                 ErrorMessage = "Import failed: only .xlsx Excel files are supported.";
-                return RedirectToPage(new { financialYear });
+                return RedirectToPage(new { financialYear, showImportTool = "qualtrics" });
             }
 
             var effectiveYear = financialYear ?? await _answerService.GetCurrentSurveyFinancialYearAsync();
             if (!effectiveYear.HasValue)
             {
                 ErrorMessage = "Import failed: no financial year is selected and no current survey year is configured.";
-                return RedirectToPage();
+                return RedirectToPage(new { showImportTool = "qualtrics" });
             }
 
             CleanupExpiredPendingImports();
@@ -285,7 +289,8 @@ namespace TINWeb.Pages.Answers
                 FinancialYear = effectiveYear.Value,
                 Kind = "Standard",
                 TempFilePath = tempFilePath,
-                CreatedUtc = DateTime.UtcNow
+                CreatedUtc = DateTime.UtcNow,
+                ShowImportTool = "qualtrics"
             };
 
             await LoadPageDataAsync(effectiveYear.Value, null);
@@ -294,26 +299,27 @@ namespace TINWeb.Pages.Answers
             return Page();
         }
 
-        public async Task<IActionResult> OnPostPreviewGlobalImportAsync(IFormFile? importFile, int? financialYear)
+        public async Task<IActionResult> OnPostPreviewGlobalImportAsync(IFormFile? importFile, int? financialYear, string? showImportTool = null)
         {
+            ShowImportTool = showImportTool;
             if (importFile == null || importFile.Length == 0)
             {
                 ErrorMessage = "Global import failed: please select an Excel file.";
-                return RedirectToPage(new { financialYear });
+                return RedirectToPage(new { financialYear, showImportTool = "global" });
             }
 
             var fileName = importFile.FileName ?? string.Empty;
             if (!fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
             {
                 ErrorMessage = "Global import failed: only .xlsx Excel files are supported.";
-                return RedirectToPage(new { financialYear });
+                return RedirectToPage(new { financialYear, showImportTool = "global" });
             }
 
             var effectiveYear = financialYear ?? await _answerService.GetCurrentSurveyFinancialYearAsync();
             if (!effectiveYear.HasValue)
             {
                 ErrorMessage = "Global import failed: no financial year is selected and no current survey year is configured.";
-                return RedirectToPage();
+                return RedirectToPage(new { showImportTool = "global" });
             }
 
             CleanupExpiredPendingImports();
@@ -340,7 +346,8 @@ namespace TINWeb.Pages.Answers
                 FinancialYear = effectiveYear.Value,
                 Kind = "Global",
                 TempFilePath = tempFilePath,
-                CreatedUtc = DateTime.UtcNow
+                CreatedUtc = DateTime.UtcNow,
+                ShowImportTool = "global"
             };
 
             await LoadPageDataAsync(effectiveYear.Value, null);
@@ -356,7 +363,7 @@ namespace TINWeb.Pages.Answers
             if (string.IsNullOrWhiteSpace(previewToken) || !PendingImports.TryGetValue(previewToken, out var pendingImport) || pendingImport.Kind != "Standard")
             {
                 ErrorMessage = "Apply import failed: preview session not found or expired. Please preview the file again.";
-                return RedirectToPage();
+                return RedirectToPage(new { showImportTool = "qualtrics" });
             }
 
             try
@@ -381,7 +388,7 @@ namespace TINWeb.Pages.Answers
                 }
             }
 
-            return RedirectToPage(new { financialYear = pendingImport.FinancialYear });
+            return RedirectToPage(new { financialYear = pendingImport.FinancialYear, showImportTool = pendingImport.ShowImportTool });
         }
 
         public async Task<IActionResult> OnPostApplyGlobalImportAsync(string? previewToken)
@@ -391,7 +398,7 @@ namespace TINWeb.Pages.Answers
             if (string.IsNullOrWhiteSpace(previewToken) || !PendingImports.TryGetValue(previewToken, out var pendingImport) || pendingImport.Kind != "Global")
             {
                 ErrorMessage = "Apply global import failed: preview session not found or expired. Please preview the file again.";
-                return RedirectToPage();
+                return RedirectToPage(new { showImportTool = "global" });
             }
 
             try
@@ -416,7 +423,7 @@ namespace TINWeb.Pages.Answers
                 }
             }
 
-            return RedirectToPage(new { financialYear = pendingImport.FinancialYear });
+            return RedirectToPage(new { financialYear = pendingImport.FinancialYear, showImportTool = pendingImport.ShowImportTool });
         }
 
         private static void CleanupExpiredPendingImports()
@@ -453,6 +460,7 @@ namespace TINWeb.Pages.Answers
             public string Kind { get; set; } = "Standard";
             public string TempFilePath { get; set; } = string.Empty;
             public DateTime CreatedUtc { get; set; }
+            public string? ShowImportTool { get; set; }
         }
     }
 }

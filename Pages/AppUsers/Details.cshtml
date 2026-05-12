@@ -22,6 +22,9 @@
 
         <dt class="col-sm-3">User Type</dt>
         <dd class="col-sm-9">@(Model.Record.UserType == 1 ? "Admin" : $"UserType {Model.Record.UserType}")</dd>
+
+            <dt class="col-sm-3">Transactions Visible</dt>
+            <dd class="col-sm-9">@(Model.Record.TransactionsVisible == true ? "Yes" : "No")</dd>
     </dl>
 
     <div class="d-flex gap-2">

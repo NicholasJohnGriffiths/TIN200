@@ -20,8 +20,10 @@ namespace TINWeb.Pages.Company
 
         public List<string>? Errors { get; set; }
 
-        public void OnGet()
+        public IActionResult OnGet()
         {
+            // Keep the old route for backward compatibility but route users to the menu-driven flow.
+            return RedirectToPage("/Company/Index", new { showImportTool = "import" });
         }
 
         public async Task<JsonResult> OnPostPreviewAsync(IFormFile? UploadFile)

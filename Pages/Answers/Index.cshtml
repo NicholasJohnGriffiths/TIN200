@@ -29,18 +29,6 @@
         </div>
         <div class="col-md-4 text-end">
             <div class="d-inline-flex align-items-center gap-2 flex-wrap justify-content-end">
-                <form method="post" asp-page-handler="PreviewImport" enctype="multipart/form-data" id="previewImportForm" class="d-inline-flex align-items-center gap-2">
-                    <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
-                    <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="max-width: 220px;" />
-                    <button type="submit" class="btn btn-outline-primary btn-sm">Qualtrics Import</button>
-                </form>
-
-                <form method="post" asp-page-handler="PreviewGlobalImport" enctype="multipart/form-data" id="previewGlobalImportForm" class="d-inline-flex align-items-center gap-2">
-                    <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
-                    <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="max-width: 220px;" />
-                    <button type="submit" class="btn btn-outline-dark btn-sm">Import Global File</button>
-                </form>
-
                 <form method="post" asp-page-handler="CreateMissingAnswers" id="createMissingAnswersForm" class="d-inline">
                     <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
                     <button type="submit" class="btn btn-outline-secondary btn-sm">Create Missing Answers</button>
@@ -58,6 +46,36 @@
             </div>
         </div>
     </div>
+
+    @if (string.Equals(Model.ShowImportTool, "qualtrics", StringComparison.OrdinalIgnoreCase))
+    {
+        <div class="card mb-3 border-primary">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Import Qualtrics File</h5>
+                <form method="post" asp-page-handler="PreviewImport" enctype="multipart/form-data" id="previewImportForm" class="d-inline-flex align-items-center gap-2">
+                    <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
+                    <input type="hidden" name="showImportTool" value="qualtrics" />
+                    <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="max-width: 260px;" />
+                    <button type="submit" class="btn btn-outline-primary btn-sm">Preview Qualtrics Import</button>
+                </form>
+            </div>
+        </div>
+    }
+
+    @if (string.Equals(Model.ShowImportTool, "global", StringComparison.OrdinalIgnoreCase))
+    {
+        <div class="card mb-3 border-dark">
+            <div class="card-body">
+                <h5 class="card-title mb-3">Import Global File</h5>
+                <form method="post" asp-page-handler="PreviewGlobalImport" enctype="multipart/form-data" id="previewGlobalImportForm" class="d-inline-flex align-items-center gap-2">
+                    <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
+                    <input type="hidden" name="showImportTool" value="global" />
+                    <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="max-width: 260px;" />
+                    <button type="submit" class="btn btn-outline-dark btn-sm">Preview Global Import</button>
+                </form>
+            </div>
+        </div>
+    }
 
     <div id="importProgressContainer" class="mb-3" style="display:none;">
         <div class="d-flex justify-content-between small mb-1">
@@ -134,6 +152,7 @@
 
                 <form method="post" asp-page-handler="ApplyImport" id="applyImportForm" class="d-inline">
                     <input type="hidden" name="previewToken" value="@Model.PendingImportToken" />
+                    <input type="hidden" name="showImportTool" value="qualtrics" />
                     <button type="submit" class="btn btn-primary">Apply Import</button>
                 </form>
             </div>
@@ -206,6 +225,7 @@
 
                 <form method="post" asp-page-handler="ApplyGlobalImport" id="applyGlobalImportForm" class="d-inline">
                     <input type="hidden" name="previewToken" value="@Model.PendingGlobalImportToken" />
+                    <input type="hidden" name="showImportTool" value="global" />
                     <button type="submit" class="btn btn-dark">Apply Global Import</button>
                 </form>
             </div>

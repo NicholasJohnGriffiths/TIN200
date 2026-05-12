@@ -6,6 +6,33 @@
 
 <h2>Import Companies</h2>
 
+<div class="card mb-4 border-info">
+    <div class="card-body">
+        <h5 class="card-title">Column Mapping Reference</h5>
+        <p class="card-text">Your tab-delimited file should contain columns that match the following field names (alternative names listed in parentheses):</p>
+        <div class="row">
+            <div class="col-md-6">
+                <strong>Required/Core Fields:</strong>
+                <ul class="small mb-3">
+                    <li><strong>External ID</strong> (ID, ExternalID)</li>
+                    <li><strong>Company Name</strong> (Name, CompanyName)</li>
+                    <li><strong>Company Description</strong> (Description, CompanyDescription)</li>
+                </ul>
+            </div>
+            <div class="col-md-6">
+                <strong>Optional Fields:</strong>
+                <ul class="small mb-3">
+                    <li>CEO First Name (CEOFirstName)</li>
+                    <li>CEO Last Name (CEOLastName)</li>
+                    <li>Email</li>
+                    <li>FYE 2025, FYE 2024, FYE 2023</li>
+                </ul>
+            </div>
+        </div>
+        <p class="small text-muted mb-0">Unmatched columns will be ignored. New companies are matched by External ID; if not found, Company Name is used.</p>
+    </div>
+</div>
+
 <div class="mb-3">
     <label for="UploadFile" class="form-label">Tab-delimited file</label>
     <input class="form-control" type="file" id="UploadFile" name="UploadFile" />

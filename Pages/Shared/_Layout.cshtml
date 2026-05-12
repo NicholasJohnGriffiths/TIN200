@@ -27,7 +27,7 @@
                             <a class="nav-link dropdown-toggle text-dark" href="#" id="companiesMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">Companies</a>
                             <ul class="dropdown-menu" aria-labelledby="companiesMenu">
                                 <li><a class="dropdown-item" asp-area="" asp-page="/Company/Index">Companies</a></li>
-                                <li><a class="dropdown-item" asp-area="" asp-page="/Company/Import">Import</a></li>
+                                <li><a class="dropdown-item" asp-area="" asp-page="/Company/Index" asp-route-showImportTool="import">Import Companies</a></li>
                             </ul>
                         </li>
                         <li class="nav-item dropdown">
@@ -43,6 +43,8 @@
                                     <a class="dropdown-item dropdown-toggle" href="#" data-bs-toggle="dropdown" aria-expanded="false">Survey Answers</a>
                                     <ul class="dropdown-menu">
                                         <li><a class="dropdown-item" asp-area="" asp-page="/Answers/Index">Answers</a></li>
+                                        <li><a class="dropdown-item" asp-area="" asp-page="/Answers/Index" asp-route-showImportTool="qualtrics">Import Qualtrics File</a></li>
+                                        <li><a class="dropdown-item" asp-area="" asp-page="/Answers/Index" asp-route-showImportTool="global">Import Global File</a></li>
                                         <li><a class="dropdown-item" asp-area="" asp-page="/Answers/ExportGlobal">Export Excel - Global</a></li>
                                     </ul>
                                 </li>
@@ -58,6 +60,12 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-page="/Tasks/Index">Tasks</a>
                         </li>
+                            @if (User.HasClaim("TransactionsVisible", "true"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link text-dark" asp-area="" asp-page="/Transactions/Events">Transactions</a>
+                                </li>
+                            }
                         @if (User.IsInRole("1"))
                         {
                             <li class="nav-item dropdown">
@@ -110,6 +118,14 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-page="/Privacy">Privacy</a>
                         </li>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <li class="nav-item">
+                                <form method="post" asp-page="/Logout" class="d-inline m-0 p-0">
+                                    <button type="submit" class="btn btn-link nav-link text-dark p-0 m-0 align-middle border-0">Logout</button>
+                                </form>
+                            </li>
+                        }
                     </ul>
                 </div>
             </div>
