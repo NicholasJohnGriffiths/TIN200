@@ -111,17 +111,64 @@ namespace TINWeb.Pages.Transactions
             AvailableYears = Enumerable.Range(2022, currentYear - 2022 + 1).OrderByDescending(y => y).ToList();
             try
             {
-                var result = await _stripeTransactionService.GetTransactionsAsync(Search, EffectiveYear, PageNumber, 20);
-                Transactions = result.Rows;
-                Search = result.ActiveDescriptionFilter;
-                PageNumber = result.PageNumber;
-                TotalPages = result.TotalPages;
-                TotalCount = result.TotalCount;
-                TotalAmountDisplay = result.TotalAmountDisplay;
-                RefundedCount = result.RefundedCount;
-                DisputedCount = result.DisputedCount;
-                FailedCount = result.FailedCount;
-                UncapturedCount = result.UncapturedCount;
+                var cacheKey = $"StripeYearData_v3_{EffectiveYear}";
+                string? cachedResult = null;
+
+                if (TempData.ContainsKey(cacheKey))
+                {
+                    cachedResult = TempData[cacheKey] as string;
+                }
+
+                if (string.IsNullOrEmpty(cachedResult))
+                {
+                    var fullYearResult = await _stripeTransactionService.GetTransactionsAsync(null, EffectiveYear, 1, int.MaxValue);
+                    cachedResult = System.Text.Json.JsonSerializer.Serialize(fullYearResult.Rows);
+                    TempData[cacheKey] = cachedResult;
+                    TempData.Keep(cacheKey);
+                }
+                else
+                {
+                    TempData.Keep(cacheKey);
+                }
+
+                if (string.IsNullOrWhiteSpace(Search) && TempData.ContainsKey("StripeSearch"))
+                {
+                    Search = TempData["StripeSearch"] as string;
+                }
+
+                var allRowsForYear = System.Text.Json.JsonSerializer.Deserialize<List<StripeTransactionRow>>(cachedResult) ?? new();
+
+                var filtered = allRowsForYear;
+                if (!string.IsNullOrWhiteSpace(Search))
+                {
+                    var searchTerm = Search.Trim().ToLowerInvariant();
+                    filtered = allRowsForYear.Where(row =>
+                        row.DescriptionDisplay.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        row.CustomerDisplay.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        row.MetaCompany.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        row.MetaReport.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
+                    TempData["StripeSearch"] = Search;
+                    TempData.Keep("StripeSearch");
+                }
+                else
+                {
+                    TempData.Remove("StripeSearch");
+                }
+
+                var pageSize = 20;
+                var totalPages = Math.Max(1, (int)Math.Ceiling(filtered.Count / (double)pageSize));
+                var normalizedPageNumber = Math.Clamp(PageNumber, 1, totalPages);
+                var pageData = filtered.Skip((normalizedPageNumber - 1) * pageSize).Take(pageSize).ToList();
+
+                Transactions = pageData;
+                PageNumber = normalizedPageNumber;
+                TotalPages = totalPages;
+                TotalCount = filtered.Count;
+                TotalAmountDisplay = FormatAmount(filtered.Sum(r => r.AmountMinor), filtered.FirstOrDefault()?.Currency);
+                RefundedCount = filtered.Count(r => r.IsRefunded);
+                DisputedCount = filtered.Count(r => r.IsDisputed);
+                FailedCount = filtered.Count(r => r.IsFailed);
+                UncapturedCount = filtered.Count(r => r.IsUncaptured);
             }
             catch (StripeException ex)
             {
@@ -137,7 +184,43 @@ namespace TINWeb.Pages.Transactions
         {
             try
             {
-                var pdf = await _stripeTransactionService.GenerateTransactionsPdfAsync(Search, EffectiveYear);
+                var cacheKey = $"StripeYearData_v3_{EffectiveYear}";
+                string? cachedResult = null;
+
+                if (TempData.ContainsKey(cacheKey))
+                {
+                    cachedResult = TempData[cacheKey] as string;
+                    TempData.Keep(cacheKey);
+                }
+
+                if (string.IsNullOrWhiteSpace(Search) && TempData.ContainsKey("StripeSearch"))
+                {
+                    Search = TempData["StripeSearch"] as string;
+                    TempData.Keep("StripeSearch");
+                }
+
+                if (string.IsNullOrEmpty(cachedResult))
+                {
+                    var fullYearResult = await _stripeTransactionService.GetTransactionsAsync(null, EffectiveYear, 1, int.MaxValue);
+                    cachedResult = System.Text.Json.JsonSerializer.Serialize(fullYearResult.Rows);
+                    TempData[cacheKey] = cachedResult;
+                    TempData.Keep(cacheKey);
+                }
+
+                var allRows = System.Text.Json.JsonSerializer.Deserialize<List<StripeTransactionRow>>(cachedResult) ?? new();
+
+                var filtered = allRows;
+                if (!string.IsNullOrWhiteSpace(Search))
+                {
+                    var searchTerm = Search.Trim().ToLowerInvariant();
+                    filtered = allRows.Where(row =>
+                        row.DescriptionDisplay.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        row.CustomerDisplay.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        row.MetaCompany.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                        row.MetaReport.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)).ToList();
+                }
+
+                var pdf = _stripeTransactionService.GenerateTransactionsPdfFromRows(filtered, Search);
                 return File(pdf, "application/pdf");
             }
             catch (StripeException ex)
@@ -152,6 +235,18 @@ namespace TINWeb.Pages.Transactions
                 await OnGetAsync();
                 return Page();
             }
+        }
+
+        private string FormatAmount(long amountMinor, string? currency)
+        {
+            var normalizedCurrency = string.IsNullOrWhiteSpace(currency)
+                ? null
+                : currency.Trim().ToUpperInvariant();
+
+            decimal amount = amountMinor / 100m;
+            return normalizedCurrency == null
+                ? amount.ToString("N2", System.Globalization.CultureInfo.InvariantCulture)
+                : $"{amount.ToString("N2", System.Globalization.CultureInfo.InvariantCulture)} {normalizedCurrency}";
         }
     }
 }

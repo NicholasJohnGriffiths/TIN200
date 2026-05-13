@@ -16,7 +16,7 @@
         <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
     }
 
-    @if (Model.PreviewSummary != null)
+    @if (Model.IsAdmin && Model.PreviewSummary != null)
     {
         if (!Model.PreviewSummary.HasCurrentSurvey)
         {
@@ -80,7 +80,7 @@
         }
     }
 
-    @if (Model.ContactImportPreview != null)
+    @if (Model.IsAdmin && Model.ContactImportPreview != null)
     {
         <div class="card mb-3 border-info">
             <div class="card-body">
@@ -183,7 +183,7 @@
         </div>
     }
 
-    @if (Model.GlobalImportPreview != null)
+    @if (Model.IsAdmin && Model.GlobalImportPreview != null)
     {
         <div class="card mb-3 border-dark">
             <div class="card-body">
@@ -305,18 +305,21 @@
             <div class="d-inline-flex align-items-center gap-2 flex-wrap justify-content-end">
                 @if (!isImportMode)
                 {
-                    <form method="post" asp-page-handler="PreviewResetFyeValues" class="d-inline">
-                        <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
-                        <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
-                        <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
-                        <button type="submit" class="btn btn-outline-secondary me-2" id="companyResetPreviewButton">Preview Summary</button>
-                    </form>
-                    <form method="post" asp-page-handler="ResetFyeValues" class="d-inline" onsubmit="return confirm('Update company info (CEO name, email, FYE Last Financial Year / Year-1 / Year-2) from survey answers? This will overwrite existing values.');">
-                        <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
-                        <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
-                        <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
-                        <button type="submit" class="btn btn-outline-warning me-2" id="companyResetButton">Update Company Info</button>
-                    </form>
+                    @if (Model.IsAdmin)
+                    {
+                        <form method="post" asp-page-handler="PreviewResetFyeValues" class="d-inline">
+                            <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
+                            <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
+                            <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
+                            <button type="submit" class="btn btn-outline-secondary me-2" id="companyResetPreviewButton">Preview Summary</button>
+                        </form>
+                        <form method="post" asp-page-handler="ResetFyeValues" class="d-inline" onsubmit="return confirm('Update company info (CEO name, email, FYE Last Financial Year / Year-1 / Year-2) from survey answers? This will overwrite existing values.');">
+                            <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
+                            <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
+                            <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
+                            <button type="submit" class="btn btn-outline-warning me-2" id="companyResetButton">Update Company Info</button>
+                        </form>
+                    }
                     <a asp-page="./Create" class="btn btn-primary">
                         <i class="bi bi-plus-circle"></i> Add New Record
                     </a>
@@ -332,29 +335,35 @@
 
     @if (isCombinedImportMode)
     {
-        <div class="card mb-3 border-secondary">
-            <div class="card-body">
-                <h5 class="card-title mb-3">Import Companies</h5>
-                <ul class="nav nav-tabs" id="companyImportTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link @(activeImportTab == "contacts" ? "active" : null)" id="company-import-contacts-tab" data-bs-toggle="tab" data-bs-target="#company-import-contacts-pane" type="button" role="tab" aria-controls="company-import-contacts-pane" aria-selected="@(activeImportTab == "contacts" ? "true" : "false")">Contacts</button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link @(activeImportTab == "global" ? "active" : null)" id="company-import-global-tab" data-bs-toggle="tab" data-bs-target="#company-import-global-pane" type="button" role="tab" aria-controls="company-import-global-pane" aria-selected="@(activeImportTab == "global" ? "true" : "false")">Global</button>
-                    </li>
-                </ul>
+        @if (!Model.IsAdmin)
+        {
+            <div class="alert alert-warning" role="alert">Companies import is available to admin users only.</div>
+        }
+        else
+        {
+            <div class="card mb-3 border-secondary">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Import Companies</h5>
+                    <ul class="nav nav-tabs" id="companyImportTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link @(activeImportTab == "contacts" ? "active" : null)" id="company-import-contacts-tab" data-bs-toggle="tab" data-bs-target="#company-import-contacts-pane" type="button" role="tab" aria-controls="company-import-contacts-pane" aria-selected="@(activeImportTab == "contacts" ? "true" : "false")">Contacts</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link @(activeImportTab == "global" ? "active" : null)" id="company-import-global-tab" data-bs-toggle="tab" data-bs-target="#company-import-global-pane" type="button" role="tab" aria-controls="company-import-global-pane" aria-selected="@(activeImportTab == "global" ? "true" : "false")">Global</button>
+                        </li>
+                    </ul>
 
-                <div class="tab-content border border-top-0 rounded-bottom p-3" id="companyImportTabsContent">
-                    <div class="tab-pane fade @(activeImportTab == "contacts" ? "show active" : null)" id="company-import-contacts-pane" role="tabpanel" aria-labelledby="company-import-contacts-tab" tabindex="0">
-                        <form method="post" asp-page-handler="LoadContactImportHeaders" enctype="multipart/form-data" class="d-inline-flex align-items-center gap-2 flex-wrap" id="contactImportLoadForm">
-                            <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
-                            <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
-                            <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
-                            <input type="hidden" name="showImportTool" value="import" />
-                            <input type="hidden" name="showImportTab" value="contacts" />
-                            <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="max-width: 320px;" />
-                            <button type="submit" class="btn btn-info text-white btn-sm">Load Headers</button>
-                        </form>
+                    <div class="tab-content border border-top-0 rounded-bottom p-3" id="companyImportTabsContent">
+                        <div class="tab-pane fade @(activeImportTab == "contacts" ? "show active" : null)" id="company-import-contacts-pane" role="tabpanel" aria-labelledby="company-import-contacts-tab" tabindex="0">
+                            <form method="post" asp-page-handler="LoadContactImportHeaders" enctype="multipart/form-data" class="d-inline-flex align-items-center gap-2 flex-wrap" id="contactImportLoadForm">
+                                <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
+                                <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
+                                <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
+                                <input type="hidden" name="showImportTool" value="import" />
+                                <input type="hidden" name="showImportTab" value="contacts" />
+                                <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="max-width: 320px;" />
+                                <button type="submit" class="btn btn-info text-white btn-sm">Load Headers</button>
+                            </form>
 
                         @if (Model.ContactImportHeaders.Any())
                         {
@@ -435,9 +444,10 @@
                             <button type="submit" class="btn btn-dark btn-sm">Preview Global Import</button>
                         </form>
                     </div>
-                </div>
+                    </div>
             </div>
         </div>
+        }
     }
 
     <div class="row mb-3">
@@ -462,7 +472,6 @@
                     <button class="btn btn-success ms-2" id="companyExportButton" type="submit" formaction="@Url.Page("./Export")">Export</button>
                     <button class="btn btn-outline-success ms-2" id="companySmExportButton" type="submit" formaction="@Url.Page("./ExportSurveyMonkey")">SM Export</button>
                     <button class="btn btn-outline-info ms-2" type="submit" formaction="@Url.Page("./ExportMailerlite")">Export - Mailerlite</button>
-                    <a class="btn btn-link ms-2" href="@Url.Page("./Index")">Clear</a>
                 }
             </form>
         </div>

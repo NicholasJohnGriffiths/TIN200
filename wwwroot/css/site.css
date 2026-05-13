@@ -65,6 +65,31 @@ body {
   overflow-wrap: anywhere;
 }
 
+.transactions-table {
+  font-size: 0.72rem;
+}
+
+.transactions-title {
+  font-size: 1.35rem;
+}
+
+.transactions-table th,
+.transactions-table td {
+  padding: 0.3rem 0.4rem;
+  vertical-align: top;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.transactions-pagination .page-link {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.78rem;
+}
+
+.transactions-summary .summary-value {
+  font-size: 1.05rem;
+}
+
 .answers-table td .btn-sm {
   padding: 0.25rem 0.5rem;
   font-size: 0.875rem;
@@ -108,5 +133,9 @@ body {
 @media (max-width: 768px) {
   .company-table {
     font-size: 0.72rem;
+  }
+
+  .transactions-table {
+    font-size: 0.68rem;
   }
 }

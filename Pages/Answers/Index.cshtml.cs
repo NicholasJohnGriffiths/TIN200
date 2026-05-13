@@ -15,6 +15,7 @@ namespace TINWeb.Pages.Answers
         public List<AnswerService.AnswerListRow> Rows { get; set; } = new();
         public List<int> FinancialYears { get; set; } = new();
         public List<AnswerService.CompanySurveyOption> CompanySurveyOptions { get; set; } = new();
+        public bool IsAdmin => User.IsInRole("1");
         public int? SelectedFinancialYear { get; set; }
         public int? SelectedCompanySurveyId { get; set; }
         [BindProperty(SupportsGet = true)]
@@ -209,6 +210,12 @@ namespace TINWeb.Pages.Answers
 
         public async Task<IActionResult> OnPostDeleteAllAnswersAsync(string? deleteConfirmation)
         {
+            if (!User.IsInRole("1"))
+            {
+                ErrorMessage = "Delete All Answers is only available to admin users.";
+                return RedirectToPage();
+            }
+
             if (!string.Equals(deleteConfirmation?.Trim(), "delete", StringComparison.Ordinal))
             {
                 ErrorMessage = "Delete cancelled. You must type 'delete' exactly to confirm.";

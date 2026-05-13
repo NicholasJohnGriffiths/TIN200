@@ -121,8 +121,8 @@
                         @if (User.Identity?.IsAuthenticated == true)
                         {
                             <li class="nav-item">
-                                <form method="post" asp-page="/Logout" class="d-inline m-0 p-0">
-                                    <button type="submit" class="btn btn-link nav-link text-dark p-0 m-0 align-middle border-0">Logout</button>
+                                <form method="post" asp-page="/Logout" class="m-0">
+                                    <button type="submit" class="btn btn-link nav-link text-dark border-0 bg-transparent">Logout</button>
                                 </form>
                             </li>
                         }

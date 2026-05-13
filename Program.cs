@@ -11,6 +11,7 @@ using TINWeb.Services;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+builder.Services.AddDistributedMemoryCache();
 builder.Services.AddRazorPages(options =>
 {
     options.Conventions.AuthorizeFolder("/");
@@ -32,6 +33,14 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AddPageRoute("/Company/SendSurvey", "/Tin200/SendSurvey");
     options.Conventions.AddPageRoute("/Company/SurveyUpdate", "/Tin200/SurveyUpdate/{id:int}");
     options.Conventions.AddPageRoute("/Company/SurveyLinkInvalid", "/Tin200/SurveyLinkInvalid");
+})
+    .AddSessionStateTempDataProvider();
+builder.Services.AddSession(options =>
+{
+    options.Cookie.Name = "TINWeb.Session";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
 });
 builder.Services.AddHealthChecks();
 
@@ -149,6 +158,7 @@ if (shouldUseHttpsRedirection)
 app.UseStaticFiles();
 
 app.UseRouting();
+app.UseSession();
 
 app.UseAuthentication();
 app.UseAuthorization();

@@ -2,6 +2,7 @@
 @model TINWeb.Pages.Survey.IndexModel
 @{
     ViewData["Title"] = "Survey Records";
+    var isAdmin = User.IsInRole("1");
 }
 
 <div class="container mt-4">
@@ -40,7 +41,10 @@
                         <td>
                             <a asp-page="./Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
                             <a asp-page="./Edit" asp-route-id="@record.Id" class="btn btn-sm btn-warning">Edit</a>
-                            <a asp-page="./Delete" asp-route-id="@record.Id" class="btn btn-sm btn-danger">Delete</a>
+                            @if (isAdmin)
+                            {
+                                <a asp-page="./Delete" asp-route-id="@record.Id" class="btn btn-sm btn-danger">Delete</a>
+                            }
                         </td>
                     </tr>
                 }

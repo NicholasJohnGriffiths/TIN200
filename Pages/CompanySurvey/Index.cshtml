@@ -149,7 +149,7 @@
                 <div>
                     <label class="form-label mb-1">Historical Year Data</label>
                     <div class="d-flex flex-column">
-                        <button class="btn btn-success" type="button" id="previewPopulatePriorYearDataBtn">@Model.PopulatePriorYearDataButtonLabel</button>
+                        <button class="btn btn-success" type="button" id="previewPopulatePriorYearDataBtn" disabled="@(!Model.IsAdmin)" title="@(!Model.IsAdmin ? "Admin only" : null)">@Model.PopulatePriorYearDataButtonLabel</button>
                         <small class="text-muted">Preview and fill blank <strong>Year-1</strong> / <strong>Year-2</strong> answers only. Existing values stay unchanged.</small>
                     </div>
                 </div>
@@ -223,7 +223,10 @@
                     <label class="form-check-label" for="includeTestCompanies">Include Test Companies</label>
                 </div>
                 <button class="btn btn-outline-primary mb-2" type="submit">Apply</button>
-                <a class="btn btn-link mb-2" asp-page="./Index" asp-route-financialYear="@Model.SelectedFinancialYear" asp-route-includeTestCompanies="@Model.IncludeTestCompanies">Clear</a>
+                @if (Model.IsAdmin)
+                {
+                    <a class="btn btn-link mb-2" asp-page="./Index" asp-route-financialYear="@Model.SelectedFinancialYear" asp-route-includeTestCompanies="@Model.IncludeTestCompanies">Clear</a>
+                }
             </form>
         </div>
     </div>

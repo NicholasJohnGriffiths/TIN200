@@ -19,7 +19,7 @@ namespace TINWeb.Services
         public async Task<StripeTransactionResult> GetTransactionsAsync(string? descriptionFilter, int year = 0, int pageNumber = 1, int pageSize = TransactionsPageSize)
         {
             var report = await BuildTransactionsReportAsync(descriptionFilter, year);
-            var normalizedPageSize = Math.Clamp(pageSize, 1, TransactionsPageSize);
+            var normalizedPageSize = pageSize > 0 ? pageSize : TransactionsPageSize;
             var totalPages = Math.Max(1, (int)Math.Ceiling(report.Rows.Count / (double)normalizedPageSize));
             var normalizedPageNumber = Math.Clamp(pageNumber, 1, totalPages);
 
@@ -46,15 +46,38 @@ namespace TINWeb.Services
         public async Task<byte[]> GenerateTransactionsPdfAsync(string? descriptionFilter, int year = 0)
         {
             var report = await BuildTransactionsReportAsync(descriptionFilter, year);
+            return GeneratePdfFromReport(report);
+        }
 
+        public byte[] GenerateTransactionsPdfFromRows(List<StripeTransactionRow> rows, string? searchFilter = null)
+        {
+            // Build a report object from pre-fetched rows
+            var report = new StripeTransactionReportData
+            {
+                Rows = rows,
+                ActiveDescriptionFilter = searchFilter,
+                TotalCount = rows.Count,
+                TotalAmountMinor = rows.Sum(r => r.AmountMinor),
+                TotalAmountDisplay = FormatMinorAmount(rows.Sum(r => r.AmountMinor), rows.FirstOrDefault()?.Currency),
+                RefundedCount = rows.Count(r => r.IsRefunded),
+                DisputedCount = rows.Count(r => r.IsDisputed),
+                FailedCount = rows.Count(r => r.IsFailed),
+                UncapturedCount = rows.Count(r => r.IsUncaptured)
+            };
+
+            return GeneratePdfFromReport(report);
+        }
+
+        private byte[] GeneratePdfFromReport(StripeTransactionReportData report)
+        {
             using var stream = new MemoryStream();
             var document = new PdfDocument();
             document.Info.Title = "Stripe Transactions";
 
-            var titleFont = new XFont("Arial", 16, XFontStyle.Bold);
-            var sectionFont = new XFont("Arial", 9, XFontStyle.Regular);
-            var headerFont = new XFont("Arial", 8, XFontStyle.Bold);
-            var cellFont = new XFont("Arial", 8, XFontStyle.Regular);
+            var titleFont = new XFont("Arial", 9, XFontStyle.Bold);
+            var sectionFont = new XFont("Arial", 5, XFontStyle.Regular);
+            var headerFont = new XFont("Arial", 5, XFontStyle.Bold);
+            var cellFont = new XFont("Arial", 5, XFontStyle.Regular);
             var brush = XBrushes.Black;
             var headerBrush = XBrushes.White;
             var headerBackground = new XSolidBrush(XColor.FromArgb(33, 37, 41));
@@ -69,7 +92,7 @@ namespace TINWeb.Services
             double contentWidth = page.Width - (margin * 2);
             var columns = new[]
             {
-                85d, 65d, 95d, 170d, 120d, 85d, 150d
+                80d, 55d, 60d, 90d, 115d, 100d, 75d, 75d, 85d, 115d
             };
 
             void AddNewPage()
@@ -85,7 +108,7 @@ namespace TINWeb.Services
             void DrawTableHeader()
             {
                 double x = margin;
-                var headers = new[] { "Date/Time", "Amount", "Succeeded", "Payment Method", "Description", "Customer", "Refunded / Decline" };
+                var headers = new[] { "Date/Time", "Amount", "Succeeded", "Payment Method", "Description", "Customer", "Company", "Report", "Purchase For", "Refunded / Decline" };
 
                 for (var index = 0; index < headers.Length; index++)
                 {
@@ -117,34 +140,79 @@ namespace TINWeb.Services
 
             DrawTableHeader();
 
+            const double lineHeight = 7.5d;
+            const double cellPadding = 3d;
+
+            List<string> WrapText(string text, double maxWidth)
+            {
+                var lines = new List<string>();
+                if (string.IsNullOrWhiteSpace(text)) { lines.Add("-"); return lines; }
+                var words = text.Split(' ');
+                var current = new System.Text.StringBuilder();
+                foreach (var word in words)
+                {
+                    var candidate = current.Length == 0 ? word : current + " " + word;
+                    var size = gfx.MeasureString(candidate, cellFont);
+                    if (size.Width > maxWidth - cellPadding * 2 && current.Length > 0)
+                    {
+                        lines.Add(current.ToString());
+                        current.Clear();
+                        current.Append(word);
+                    }
+                    else
+                    {
+                        if (current.Length > 0) current.Append(' ');
+                        current.Append(word);
+                    }
+                }
+                if (current.Length > 0) lines.Add(current.ToString());
+                return lines;
+            }
+
             foreach (var row in report.Rows)
             {
-                if (y > page.Height - margin - 18)
+                var nzTz = TimeZoneInfo.FindSystemTimeZoneById("New Zealand Standard Time");
+                var nzTime = TimeZoneInfo.ConvertTime(row.Created, TimeZoneInfo.Utc, nzTz);
+                var values = new[]
+                {
+                    nzTime.ToString("yyyy-MM-dd HH:mm"),
+                    row.AmountDisplay,
+                    row.Succeeded ? "Yes" : "No",
+                    row.PaymentMethod == "-" ? "-" : row.PaymentMethod,
+                    row.DescriptionDisplay,
+                    row.CustomerDisplay,
+                    row.MetaCompany,
+                    row.MetaReport,
+                    row.MetaPurchaseFor,
+                    BuildRefundDeclineSummary(row)
+                };
+
+                var wrappedCells = values.Select((v, i) => WrapText(v, columns[i])).ToArray();
+                var maxLines = wrappedCells.Max(l => l.Count);
+                var rowHeight = Math.Max(18d, maxLines * lineHeight + cellPadding * 2);
+
+                if (y + rowHeight > page.Height - margin)
                 {
                     AddNewPage();
                 }
 
                 double x = margin;
-                var values = new[]
+                for (var index = 0; index < wrappedCells.Length; index++)
                 {
-                    row.Created.ToUniversalTime().ToString("yyyy-MM-dd HH:mm"),
-                    row.AmountDisplay,
-                    row.Succeeded ? "Yes" : "No",
-                    Truncate(row.PaymentMethod, 24),
-                    Truncate(row.DescriptionDisplay, 42),
-                    Truncate(row.CustomerDisplay, 30),
-                    Truncate(BuildRefundDeclineSummary(row), 40)
-                };
-
-                for (var index = 0; index < values.Length; index++)
-                {
-                    var rect = new XRect(x, y, columns[index], 18);
+                    var rect = new XRect(x, y, columns[index], rowHeight);
                     gfx.DrawRectangle(XPens.LightGray, rect);
-                    gfx.DrawString(values[index], cellFont, brush, new XRect(rect.X + 3, rect.Y + 2, rect.Width - 6, rect.Height - 4), XStringFormats.TopLeft);
+                    var textY = y + cellPadding;
+                    foreach (var line in wrappedCells[index])
+                    {
+                        gfx.DrawString(line, cellFont, brush,
+                            new XRect(x + cellPadding, textY, columns[index] - cellPadding * 2, lineHeight),
+                            XStringFormats.TopLeft);
+                        textY += lineHeight;
+                    }
                     x += columns[index];
                 }
 
-                y += 18;
+                y += rowHeight;
             }
 
             document.Save(stream, false);
@@ -171,6 +239,7 @@ namespace TINWeb.Services
 
             listOptions.AddExpand("data.customer");
             listOptions.AddExpand("data.refunds.data");
+            listOptions.AddExpand("data.payment_intent");
 
             var rows = new List<StripeTransactionRow>();
 
@@ -186,7 +255,10 @@ namespace TINWeb.Services
             if (!string.IsNullOrWhiteSpace(normalizedFilter))
             {
                 rows = rows
-                    .Where(row => row.DescriptionDisplay.Contains(normalizedFilter, StringComparison.OrdinalIgnoreCase))
+                    .Where(row =>
+                        row.DescriptionDisplay.Contains(normalizedFilter, StringComparison.OrdinalIgnoreCase) ||
+                        row.MetaCompany.Contains(normalizedFilter, StringComparison.OrdinalIgnoreCase) ||
+                        row.MetaReport.Contains(normalizedFilter, StringComparison.OrdinalIgnoreCase))
                     .ToList();
             }
 
@@ -214,9 +286,7 @@ namespace TINWeb.Services
                 .OrderByDescending(refund => refund.Created)
                 .FirstOrDefault();
 
-            var description = string.IsNullOrWhiteSpace(charge.Description)
-                ? string.Empty
-                : charge.Description.Trim();
+            var description = BuildDescription(charge);
 
             return new StripeTransactionRow
             {
@@ -230,6 +300,9 @@ namespace TINWeb.Services
                 Succeeded = string.Equals(charge.Status, "succeeded", StringComparison.OrdinalIgnoreCase),
                 PaymentMethod = BuildPaymentMethod(charge),
                 CustomerDisplay = BuildCustomer(charge),
+                MetaCompany = charge.Metadata != null && charge.Metadata.TryGetValue("Company", out var metaCompany) && !string.IsNullOrWhiteSpace(metaCompany) ? metaCompany : "-",
+                MetaReport = charge.Metadata != null && charge.Metadata.TryGetValue("Report", out var metaReport) && !string.IsNullOrWhiteSpace(metaReport) ? metaReport : "-",
+                MetaPurchaseFor = charge.Metadata != null && charge.Metadata.TryGetValue("Purchase For", out var metaPurchaseFor) && !string.IsNullOrWhiteSpace(metaPurchaseFor) ? metaPurchaseFor : "-",
                 RefundedDate = latestRefund?.Created,
                 DeclineReason = BuildDeclineReason(charge),
                 IsRefunded = charge.Refunded || charge.AmountRefunded > 0,
@@ -261,24 +334,64 @@ namespace TINWeb.Services
             return "-";
         }
 
+        private static string BuildDescription(Charge charge)
+        {
+            var description = JoinNonEmpty(" | ",
+                charge.Description,
+                TryGetMetadataValue(charge.Metadata, "Purchase For"),
+                TryGetMetadataValue(charge.Metadata, "Report"));
+
+            if (!string.IsNullOrWhiteSpace(description))
+            {
+                return description;
+            }
+
+            if (!string.IsNullOrWhiteSpace(charge.PaymentIntent?.Description))
+            {
+                return charge.PaymentIntent.Description.Trim();
+            }
+
+            var entryId = TryGetMetadataValue(charge.Metadata, "Entry ID");
+            var product = TryGetMetadataValue(charge.Metadata, "Product");
+
+            if (!string.IsNullOrWhiteSpace(entryId) && !string.IsNullOrWhiteSpace(product))
+            {
+                return $"Entry ID: {entryId}, Product: {product}";
+            }
+
+            if (!string.IsNullOrWhiteSpace(product))
+            {
+                return $"Product: {product}";
+            }
+
+            if (!string.IsNullOrWhiteSpace(entryId))
+            {
+                return $"Entry ID: {entryId}";
+            }
+
+            if (!string.IsNullOrWhiteSpace(charge.CalculatedStatementDescriptor))
+            {
+                return charge.CalculatedStatementDescriptor.Trim();
+            }
+
+            if (!string.IsNullOrWhiteSpace(charge.StatementDescriptorSuffix))
+            {
+                return charge.StatementDescriptorSuffix.Trim();
+            }
+
+            return string.Empty;
+        }
+
         private static string BuildCustomer(Charge charge)
         {
             var customerName = charge.Customer?.Name;
             var customerEmail = charge.Customer?.Email;
+            var customerCompany = TryGetMetadataValue(charge.Metadata, "Company");
+            var composedCustomer = JoinNonEmpty(" | ", customerName, customerCompany, customerEmail);
 
-            if (!string.IsNullOrWhiteSpace(customerName) && !string.IsNullOrWhiteSpace(customerEmail))
+            if (!string.IsNullOrWhiteSpace(composedCustomer))
             {
-                return $"{customerName} ({customerEmail})";
-            }
-
-            if (!string.IsNullOrWhiteSpace(customerName))
-            {
-                return customerName;
-            }
-
-            if (!string.IsNullOrWhiteSpace(customerEmail))
-            {
-                return customerEmail;
+                return composedCustomer;
             }
 
             if (!string.IsNullOrWhiteSpace(charge.BillingDetails?.Name) && !string.IsNullOrWhiteSpace(charge.BillingDetails?.Email))
@@ -286,9 +399,19 @@ namespace TINWeb.Services
                 return $"{charge.BillingDetails.Name} ({charge.BillingDetails.Email})";
             }
 
+            if (!string.IsNullOrWhiteSpace(charge.BillingDetails?.Name))
+            {
+                return charge.BillingDetails.Name;
+            }
+
             if (!string.IsNullOrWhiteSpace(charge.BillingDetails?.Email))
             {
                 return charge.BillingDetails.Email;
+            }
+
+            if (!string.IsNullOrWhiteSpace(charge.ReceiptEmail))
+            {
+                return charge.ReceiptEmail;
             }
 
             if (!string.IsNullOrWhiteSpace(charge.CustomerId))
@@ -297,6 +420,26 @@ namespace TINWeb.Services
             }
 
             return "-";
+        }
+
+        private static string JoinNonEmpty(string separator, params string?[] values)
+        {
+            return string.Join(separator,
+                values
+                    .Where(value => !string.IsNullOrWhiteSpace(value))
+                    .Select(value => value!.Trim()));
+        }
+
+        private static string? TryGetMetadataValue(IDictionary<string, string>? metadata, string key)
+        {
+            if (metadata == null)
+            {
+                return null;
+            }
+
+            return metadata.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value)
+                ? value.Trim()
+                : null;
         }
 
         private static string? BuildDeclineReason(Charge charge)
@@ -395,6 +538,9 @@ namespace TINWeb.Services
         public bool Succeeded { get; set; }
         public string PaymentMethod { get; set; } = "-";
         public string CustomerDisplay { get; set; } = "-";
+        public string MetaCompany { get; set; } = "-";
+        public string MetaReport { get; set; } = "-";
+        public string MetaPurchaseFor { get; set; } = "-";
         public DateTime? RefundedDate { get; set; }
         public string? DeclineReason { get; set; }
         public bool IsRefunded { get; set; }

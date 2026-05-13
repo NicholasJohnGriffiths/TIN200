@@ -1,10 +1,12 @@
 using System.Globalization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Data.SqlClient;
 
 namespace TINWeb.Pages.Company
 {
+    [Authorize(Policy = "AdminOnly")]
     [IgnoreAntiforgeryToken]
     public class ImportModel : PageModel
     {

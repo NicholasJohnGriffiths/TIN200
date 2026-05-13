@@ -24,6 +24,7 @@ namespace TINWeb.Pages.Company
         public CompanyService.ResetFyeValuesResult? PreviewSummary { get; set; }
         public CompanyService.CompanyGlobalImportPreviewResult? GlobalImportPreview { get; set; }
         public CompanyService.CompanyContactImportPreviewResult? ContactImportPreview { get; set; }
+        public bool IsAdmin => User.IsInRole("1");
         public string? PendingGlobalImportToken { get; set; }
         public string? PendingContactImportToken { get; set; }
         [BindProperty]
@@ -72,6 +73,12 @@ namespace TINWeb.Pages.Company
 
         public async Task<IActionResult> OnPostPreviewResetFyeValuesAsync(int? lastTin200Year, string? companySearch, bool showTestCompanies = false)
         {
+            if (!User.IsInRole("1"))
+            {
+                ErrorMessage = "This action is only available to admin users.";
+                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies });
+            }
+
             PreviewSummary = await _service.PreviewResetFyeValuesFromSurveyAnswersAsync();
             await LoadPageAsync(lastTin200Year, companySearch, showTestCompanies);
             return Page();
@@ -79,6 +86,12 @@ namespace TINWeb.Pages.Company
 
         public async Task<IActionResult> OnPostResetFyeValuesAsync(int? lastTin200Year, string? companySearch, bool showTestCompanies = false)
         {
+            if (!User.IsInRole("1"))
+            {
+                ErrorMessage = "This action is only available to admin users.";
+                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies });
+            }
+
             var result = await _service.ResetFyeValuesFromSurveyAnswersAsync();
 
             if (!result.HasCurrentSurvey)
@@ -93,6 +106,12 @@ namespace TINWeb.Pages.Company
 
         public async Task<IActionResult> OnPostPreviewGlobalImportAsync(IFormFile? importFile, int? lastTin200Year, int? importYear, string? companySearch, bool showTestCompanies = false, string? showImportTool = null, string? showImportTab = null)
         {
+            if (!User.IsInRole("1"))
+            {
+                ErrorMessage = "Companies import is only available to admin users.";
+                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool = "import", showImportTab = "global" });
+            }
+
             ShowImportTool = showImportTool;
             ShowImportTab = string.IsNullOrWhiteSpace(showImportTab) ? "global" : showImportTab;
             if (importFile == null || importFile.Length == 0)
@@ -154,6 +173,12 @@ namespace TINWeb.Pages.Company
 
         public async Task<IActionResult> OnPostApplyGlobalImportAsync(string? previewToken)
         {
+            if (!User.IsInRole("1"))
+            {
+                ErrorMessage = "Companies import is only available to admin users.";
+                return RedirectToPage(new { showImportTool = "import", showImportTab = "global" });
+            }
+
             CleanupExpiredPendingImports();
 
             if (string.IsNullOrWhiteSpace(previewToken) || !PendingImports.TryGetValue(previewToken, out var pendingImport))
@@ -189,6 +214,12 @@ namespace TINWeb.Pages.Company
 
         public async Task<IActionResult> OnPostPreviewContactImportAsync(IFormFile? importFile, int? lastTin200Year, string? companySearch, bool showTestCompanies = false, string? showImportTool = null, string? showImportTab = null)
         {
+            if (!User.IsInRole("1"))
+            {
+                ErrorMessage = "Companies import is only available to admin users.";
+                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool = "import", showImportTab = "contacts" });
+            }
+
             ShowImportTool = showImportTool;
             ShowImportTab = string.IsNullOrWhiteSpace(showImportTab) ? "contacts" : showImportTab;
             CleanupExpiredPendingImports();
@@ -286,6 +317,12 @@ namespace TINWeb.Pages.Company
 
         public async Task<IActionResult> OnPostLoadContactImportHeadersAsync(IFormFile? importFile, int? lastTin200Year, string? companySearch, bool showTestCompanies = false, string? showImportTool = null, string? showImportTab = null)
         {
+            if (!User.IsInRole("1"))
+            {
+                ErrorMessage = "Companies import is only available to admin users.";
+                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool = "import", showImportTab = "contacts" });
+            }
+
             ShowImportTool = showImportTool;
             ShowImportTab = string.IsNullOrWhiteSpace(showImportTab) ? "contacts" : showImportTab;
             if (importFile == null || importFile.Length == 0)
@@ -356,6 +393,12 @@ namespace TINWeb.Pages.Company
 
         public async Task<IActionResult> OnPostApplyContactImportAsync(string? previewToken)
         {
+            if (!User.IsInRole("1"))
+            {
+                ErrorMessage = "Companies import is only available to admin users.";
+                return RedirectToPage(new { showImportTool = "import", showImportTab = "contacts" });
+            }
+
             CleanupExpiredPendingImports();
 
             if (string.IsNullOrWhiteSpace(previewToken) || !PendingImports.TryGetValue(previewToken, out var pendingImport))

@@ -18,6 +18,7 @@ namespace TINWeb.Pages.CompanySurvey
 
         public List<CompanySurveyService.CompanySurveyListRow> Records { get; set; } = new();
         public List<int> FinancialYears { get; set; } = new();
+        public bool IsAdmin => User.IsInRole("1");
         public int? SelectedFinancialYear { get; set; }
         public int TotalCompaniesWithAnswers { get; set; }
         public string CompanySearch { get; set; } = string.Empty;
@@ -70,6 +71,11 @@ namespace TINWeb.Pages.CompanySurvey
 
         public async Task<IActionResult> OnPostPreviewPopulatePriorYearDataAsync(int? financialYear, string? companySearch, string? surveyEmailSentFilter, bool includeTestCompanies = false, List<int>? selectedRecordIds = null)
         {
+            if (!User.IsInRole("1"))
+            {
+                return new JsonResult(new { success = false, message = "Populate data is available to admin users only." });
+            }
+
             await LoadPageDataAsync(financialYear, sortBy: null, sortDir: null, companySearch, surveyEmailSentFilter, includeTestCompanies, selectedLinkExpiryDateUtc: SelectedLinkExpiryDateUtc);
 
             if (!SelectedFinancialYear.HasValue)
@@ -121,6 +127,12 @@ namespace TINWeb.Pages.CompanySurvey
                 includeTestCompanies,
                 selectedLinkExpiryDateUtc = SelectedLinkExpiryDateUtc?.ToString("yyyy-MM-dd")
             };
+
+            if (!User.IsInRole("1"))
+            {
+                StatusMessage = "Error: Populate data is available to admin users only.";
+                return RedirectToPage(redirectValues);
+            }
 
             await LoadPageDataAsync(financialYear, sortBy: null, sortDir: null, companySearch, surveyEmailSentFilter, includeTestCompanies, selectedLinkExpiryDateUtc: SelectedLinkExpiryDateUtc);
 
