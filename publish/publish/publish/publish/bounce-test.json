@@ -1,0 +1,11 @@
+[
+  {
+    "id": "43b96088-68bb-4bb8-900b-1393437fcbd2",
+    "eventType": "Bounce",
+    "data": {
+      "recipient": "nick@griffinsolutions1.co.nz",
+      "status": "Bounced",
+      "reason": "Invalid address"
+    }
+  }
+]

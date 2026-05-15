@@ -1,0 +1,14 @@
+{
+  "ResourceGroup": "rg-tin200-260302144937",
+  "Location": "australiaeast",
+  "WebAppName": "tin200app260302144937",
+  "AppServicePlanName": "asp-tin200-260302144937",
+  "SqlServerName": "tin200sql260302144937",
+  "SqlDatabaseName": "tin200db",
+  "SqlAdminUser": "tin200",
+  "SqlAdminPassword": "",
+  "SurveyLinkSecretKey": "",
+  "SurveyLinkExpiryHours": 2160,
+  "SurveySupportEmail": "support@yourcompany.com",
+  "SurveyBaseUrl": "https://survey.tin100.com"
+}

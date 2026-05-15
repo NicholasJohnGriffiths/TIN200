@@ -1,0 +1,56 @@
+PS D:\Dev\TIN\TINWeb> az login
+
+login as ms griffinsolutions.co.nz work/school
+
+Retrieving tenants and subscriptions for the selection...
+
+[Tenant and subscription selection]
+
+No     Subscription name     Subscription ID                       Tenant
+-----  --------------------  ------------------------------------  ---------------------
+[1] *  Azure subscription 1  e8f54ba3-a8f1-464f-8ad4-9367e5b7a3aa  Griffin Solutions Ltd
+
+The default is marked with an *; the default tenant is 'Griffin Solutions Ltd' and subscription is 'Azure subscription 1' (e8f54ba3-a8f1-464f-8ad4-9367e5b7a3aa).
+
+Select a subscription and tenant (Type a number or Enter for no changes): 1
+
+Tenant: Griffin Solutions Ltd
+Subscription: Azure subscription 1 (e8f54ba3-a8f1-464f-8ad4-9367e5b7a3aa)
+
+
+
+PS D:\Dev\TIN\TINWeb> az account set --subscription "e8f54ba3-a8f1-464f-8ad4-9367e5b7a3aa"
+
+
+dotnet publish .\TINWeb.Functions\TINWeb.Functions.csproj -c Release -o .\publish-functions
+
+Compress-Archive -Path .\publish-functions\* -DestinationPath .\publish-functions.zip -Force
+
+az functionapp deployment source config-zip --name email-bounce-functions --resource-group email-bounce-functions_group --src .\publish-functions.zip
+
+result...
+Getting scm site credentials for zip deployment
+Starting zip deployment. This operation can take a while to complete ...
+Deployment endpoint responded with status code 202
+{
+  "active": true,
+  "author": "N/A",
+  "author_email": "N/A",
+  "complete": true,
+  "deployer": "az_cli_functions",
+  "end_time": "2026-04-14T23:16:53.672626Z",
+  "id": "68fe576d325848ed82dfba08a1fee264",
+  "is_readonly": true,
+  "is_temp": false,
+  "last_success_end_time": "2026-04-14T23:16:53.672626Z",
+  "log_url": "https://email-bounce-functions-f6cdf8emgtdchjbs.scm.newzealandnorth-01.azurewebsites.net/api/deployments/latest/log",
+  "message": "Created via a push deployment",
+  "progress": "",
+  "provisioningState": "Succeeded",
+  "received_time": "2026-04-14T23:16:53.4358861Z",
+  "site_name": "email-bounce-functions",
+  "start_time": "2026-04-14T23:16:53.516293Z",
+  "status": 4,
+  "status_text": "",
+  "url": "https://email-bounce-functions-f6cdf8emgtdchjbs.scm.newzealandnorth-01.azurewebsites.net/api/deployments/latest"
+}

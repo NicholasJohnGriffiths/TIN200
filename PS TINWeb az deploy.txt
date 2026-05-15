@@ -1,0 +1,66 @@
+PS D:\Dev\TIN\TINWeb> az login
+
+login as ms griffinsolutions.co.nz work/school
+
+Retrieving tenants and subscriptions for the selection...
+
+[Tenant and subscription selection]
+
+No     Subscription name     Subscription ID                       Tenant
+-----  --------------------  ------------------------------------  ---------------------
+[1] *  Azure subscription 1  e8f54ba3-a8f1-464f-8ad4-9367e5b7a3aa  Griffin Solutions Ltd
+
+The default is marked with an *; the default tenant is 'Griffin Solutions Ltd' and subscription is 'Azure subscription 1' (e8f54ba3-a8f1-464f-8ad4-9367e5b7a3aa).
+
+Select a subscription and tenant (Type a number or Enter for no changes): 1
+
+Tenant: Griffin Solutions Ltd
+Subscription: Azure subscription 1 (e8f54ba3-a8f1-464f-8ad4-9367e5b7a3aa)
+
+
+dotnet publish TINWeb.csproj -c Release -o .\publish
+
+Compress-Archive -Path .\publish\* -DestinationPath .\publish.zip -Force
+
+az webapp deploy --resource-group rg-tin200-260302144937 --name tin200app260302144937 --src-path ./publish.zip
+
+
+NOT SURE
+------------------------------------
+
+PS D:\Dev\TIN\TINWeb> az account set --subscription "e8f54ba3-a8f1-464f-8ad4-9367e5b7a3aa"
+dotnet publish TINWeb.csproj -c Release -o .\publish
+Compress-Archive -Path .\publish\* -DestinationPath .\TINWeb-publish.zip -Force
+OR
+dotnet publish TINWeb.csproj -c Release -o .\publish; Compress-Archive -Path .\publish\* -DestinationPath .\TINWeb-publish.zip -Force
+---------------------------------------------------------------
+
+
+Deployment type: zip. To override deployment type, please specify the --type parameter. Possible values: war, jar, ear, zip, startup, script, static
+Initiating deployment
+Deploying from local path: ./publish.zip
+Polling the status of sync deployment. Start Time: 2026-04-14 22:27:03.399361+00:00 UTC
+Deployment has completed successfully
+You can visit your app at: https://survey.tin100.com
+{
+  "active": true,
+  "author": "N/A",
+  "author_email": "N/A",
+  "complete": true,
+  "deployer": "OneDeploy",
+  "end_time": "2026-04-14T22:27:03.1091947Z",
+  "id": "aa4b6517c5664600bb835369a9c585c3",
+  "is_readonly": true,
+  "is_temp": false,
+  "last_success_end_time": "2026-04-14T22:27:03.1091947Z",
+  "log_url": "https://tin200app260302144937.scm.azurewebsites.net/api/deployments/latest/log",
+  "message": "OneDeploy",
+  "progress": "",
+  "provisioningState": "Succeeded",
+  "received_time": "2026-04-14T22:26:34.349799Z",
+  "site_name": "tin200app260302144937",
+  "start_time": "2026-04-14T22:26:34.8342154Z",
+  "status": 4,
+  "status_text": "",
+  "url": "https://tin200app260302144937.scm.azurewebsites.net/api/deployments/latest"
+}
