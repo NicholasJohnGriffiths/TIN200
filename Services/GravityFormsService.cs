@@ -166,6 +166,16 @@ namespace TINWeb.Services
                 _ => forms
             };
 
+            if (normalizedStatusFilter == "all")
+            {
+                // For ALL view, prioritize active forms, then date desc.
+                return forms
+                    .OrderByDescending(f => f.IsActive != false)
+                    .ThenByDescending(f => ParseSortableDate(f.DateCreated))
+                    .ThenByDescending(f => f.Id)
+                    .ToList();
+            }
+
             return forms
                 .OrderByDescending(f => ParseSortableDate(f.DateCreated))
                 .ThenByDescending(f => f.Id)
