@@ -196,7 +196,15 @@ namespace TINWeb.Services
             }
 
             const int chunkSize = 40;
-            var lookup = forms.ToDictionary(f => f.Id, f => f);
+            var lookup = forms
+                .GroupBy(f => f.Id)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g
+                        .OrderByDescending(x => x.IsActive.HasValue)
+                        .ThenByDescending(x => !string.IsNullOrWhiteSpace(x.DateCreated))
+                        .ThenByDescending(x => x.HasEntryCount)
+                        .First());
 
             for (var i = 0; i < targets.Count; i += chunkSize)
             {
