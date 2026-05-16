@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Net.Http.Headers;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http.Features;
@@ -129,6 +131,34 @@ builder.Services.AddOptions<StripeSettings>().Configure<IConfiguration>((setting
 builder.Services.AddScoped<ISurveyEmailService, SurveyEmailService>();
 builder.Services.AddScoped<ISurveyLinkTokenService, SurveyLinkTokenService>();
 builder.Services.AddScoped<StripeTransactionService>();
+builder.Services.Configure<GravityFormsSettings>(builder.Configuration.GetSection("WordPress"));
+builder.Services.AddHttpClient<GravityFormsService>((sp, client) =>
+{
+    var settings = sp.GetRequiredService<IOptions<GravityFormsSettings>>().Value;
+
+    if (!string.IsNullOrWhiteSpace(settings.BaseUrl))
+    {
+        var baseUrl = settings.BaseUrl.Trim();
+        if (!baseUrl.EndsWith("/", StringComparison.Ordinal))
+        {
+            baseUrl += "/";
+        }
+
+        client.BaseAddress = new Uri(baseUrl);
+    }
+
+    if (!string.IsNullOrWhiteSpace(settings.Username)
+        && !string.IsNullOrWhiteSpace(settings.ApplicationPassword))
+    {
+        var authBytes = Encoding.UTF8.GetBytes($"{settings.Username}:{settings.ApplicationPassword}");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Basic",
+            Convert.ToBase64String(authBytes));
+    }
+
+    client.DefaultRequestHeaders.Accept.Clear();
+    client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+});
 builder.Services.Configure<FormOptions>(options =>
 {
     options.ValueCountLimit = 20000;
