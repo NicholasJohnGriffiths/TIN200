@@ -54,8 +54,9 @@ if (-not (Get-Command az -ErrorAction SilentlyContinue)) {
 
 $scriptRoot = $PSScriptRoot
 $projectRoot = Split-Path -Parent $scriptRoot
-$publishDir = Join-Path $scriptRoot "publish"
-$publishZip = Join-Path $scriptRoot "publish.zip"
+$publishRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("tinweb-deploy-" + [System.Guid]::NewGuid().ToString("N"))
+$publishDir = Join-Path $publishRoot "publish"
+$publishZip = Join-Path $publishRoot "publish.zip"
 
 if ([string]::IsNullOrWhiteSpace($ConfigPath)) {
     $ConfigPath = Join-Path $scriptRoot "deploy-azure.settings.json"
@@ -83,6 +84,16 @@ function Resolve-Setting {
     }
 
     return $DefaultValue
+}
+
+function Assert-LastExitCode {
+    param(
+        [string]$Operation
+    )
+
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Operation failed with exit code $LASTEXITCODE."
+    }
 }
 
 $ResourceGroup = Resolve-Setting -CliValue $ResourceGroup -ConfigValue $config.ResourceGroup
@@ -125,9 +136,11 @@ if ($missing.Count -gt 0) {
 
 Write-Host "Checking Azure CLI login..."
 az account show | Out-Null
+Assert-LastExitCode "Azure CLI login check"
 
 Write-Host "Creating resource group..."
 az group create --name $ResourceGroup --location $Location | Out-Null
+Assert-LastExitCode "Create resource group"
 
 Write-Host "Creating Azure SQL logical server..."
 az sql server create `
@@ -136,6 +149,7 @@ az sql server create `
     --location $Location `
     --admin-user $SqlAdminUser `
     --admin-password $SqlAdminPassword | Out-Null
+Assert-LastExitCode "Create Azure SQL logical server"
 
 Write-Host "Creating Azure SQL database..."
 az sql db create `
@@ -143,6 +157,7 @@ az sql db create `
     --server $SqlServerName `
     --name $SqlDatabaseName `
     --service-objective Basic | Out-Null
+Assert-LastExitCode "Create Azure SQL database"
 
 Write-Host "Allowing Azure services to access SQL server..."
 az sql server firewall-rule create `
@@ -151,6 +166,7 @@ az sql server firewall-rule create `
     --name AllowAzureServices `
     --start-ip-address 0.0.0.0 `
     --end-ip-address 0.0.0.0 | Out-Null
+Assert-LastExitCode "Allow Azure services on SQL firewall"
 
 if ($AllowMyIp) {
     $myIp = (Invoke-RestMethod -Uri "https://api.ipify.org")
@@ -161,6 +177,7 @@ if ($AllowMyIp) {
         --name AllowMyCurrentIp `
         --start-ip-address $myIp `
         --end-ip-address $myIp | Out-Null
+    Assert-LastExitCode "Allow current IP on SQL firewall"
 }
 
 Write-Host "Creating App Service plan..."
@@ -169,6 +186,7 @@ az appservice plan create `
     --resource-group $ResourceGroup `
     --location $Location `
     --sku B1 | Out-Null
+Assert-LastExitCode "Create App Service plan"
 
 Write-Host "Creating Web App..."
 az webapp create `
@@ -176,6 +194,7 @@ az webapp create `
     --resource-group $ResourceGroup `
     --plan $AppServicePlanName `
     --runtime "dotnet:9" | Out-Null
+Assert-LastExitCode "Create Web App"
 
 $connectionString = "Server=tcp:$SqlServerName.database.windows.net,1433;Initial Catalog=$SqlDatabaseName;Persist Security Info=False;User ID=$SqlAdminUser;Password=$SqlAdminPassword;MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;"
 
@@ -207,31 +226,44 @@ az webapp config appsettings set `
     --resource-group $ResourceGroup `
     --name $WebAppName `
     --settings $appSettings | Out-Null
+Assert-LastExitCode "Configure app settings"
 
 az webapp config connection-string set `
     --resource-group $ResourceGroup `
     --name $WebAppName `
     --connection-string-type SQLAzure `
     --settings DefaultConnection="$connectionString" | Out-Null
+Assert-LastExitCode "Configure SQL connection string"
 
-Write-Host "Publishing application..."
-if (Test-Path $publishDir) {
-    Remove-Item $publishDir -Recurse -Force
+try {
+    Write-Host "Publishing application..."
+    if (Test-Path $publishRoot) {
+        Remove-Item $publishRoot -Recurse -Force
+    }
+
+    New-Item -ItemType Directory -Path $publishDir -Force | Out-Null
+    dotnet publish (Join-Path $projectRoot "TINWeb.csproj") -c Release -o $publishDir
+    Assert-LastExitCode "dotnet publish"
+
+    if (Test-Path $publishZip) {
+        Remove-Item $publishZip -Force
+    }
+
+    Compress-Archive -Path (Join-Path $publishDir "*") -DestinationPath $publishZip -Force
+
+    Write-Host "Deploying package to Azure Web App..."
+    az webapp deploy `
+        --resource-group $ResourceGroup `
+        --name $WebAppName `
+        --src-path $publishZip `
+        --type zip | Out-Null
+    Assert-LastExitCode "Deploy package to Azure Web App"
 }
-dotnet publish (Join-Path $projectRoot "TINWeb.csproj") -c Release -o $publishDir
-
-if (Test-Path $publishZip) {
-    Remove-Item $publishZip -Force
+finally {
+    if (Test-Path $publishRoot) {
+        Remove-Item $publishRoot -Recurse -Force
+    }
 }
-
-Compress-Archive -Path (Join-Path $publishDir "*") -DestinationPath $publishZip -Force
-
-Write-Host "Deploying package to Azure Web App..."
-az webapp deploy `
-    --resource-group $ResourceGroup `
-    --name $WebAppName `
-    --src-path $publishZip `
-    --type zip | Out-Null
 
 $webUrl = "https://$WebAppName.azurewebsites.net"
 Write-Host "Deployment complete."
