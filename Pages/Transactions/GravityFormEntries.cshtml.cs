@@ -55,12 +55,16 @@ namespace TINWeb.Pages.Transactions
             {
                 if (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
                 {
-                    ErrorMessage = "Unable to connect to WordPress: 401 Unauthorized. Check WP REST API username/token env vars (WP__RESTAPI__Username and WP__RESTAPI__Token).";
+                    ErrorMessage = "Unable to connect to WordPress: 401 Unauthorized. Check credentials in WordPress settings or env vars (WordPress__Username / WordPress__ApplicationPassword, or WP__RESTAPI__Username / WP__RESTAPI__Token).";
                 }
                 else
                 {
                     ErrorMessage = $"Unable to connect to WordPress: {ex.Message}";
                 }
+            }
+            catch (InvalidOperationException ex)
+            {
+                ErrorMessage = $"Unable to connect to WordPress: {ex.Message}";
             }
             catch (Exception ex)
             {

@@ -134,11 +134,18 @@ builder.Services.AddScoped<StripeTransactionService>();
 builder.Services.Configure<GravityFormsSettings>(builder.Configuration.GetSection("WordPress"));
 builder.Services.AddHttpClient<GravityFormsService>((sp, client) =>
 {
+    var configuration = sp.GetRequiredService<IConfiguration>();
     var settings = sp.GetRequiredService<IOptions<GravityFormsSettings>>().Value;
+    var baseUrlCandidate = !string.IsNullOrWhiteSpace(settings.BaseUrl)
+        ? settings.BaseUrl
+        : configuration["WP:RESTAPI:Url"]
+            ?? Environment.GetEnvironmentVariable("WP__RESTAPI__Url")
+            ?? configuration["WP:RESTAPI:BaseUrl"]
+            ?? Environment.GetEnvironmentVariable("WP__RESTAPI__BaseUrl");
 
-    if (!string.IsNullOrWhiteSpace(settings.BaseUrl))
+    if (!string.IsNullOrWhiteSpace(baseUrlCandidate))
     {
-        var baseUrl = settings.BaseUrl.Trim();
+        var baseUrl = baseUrlCandidate.Trim();
         if (!baseUrl.EndsWith("/", StringComparison.Ordinal))
         {
             baseUrl += "/";
@@ -147,10 +154,22 @@ builder.Services.AddHttpClient<GravityFormsService>((sp, client) =>
         client.BaseAddress = new Uri(baseUrl);
     }
 
-    if (!string.IsNullOrWhiteSpace(settings.Username)
-        && !string.IsNullOrWhiteSpace(settings.ApplicationPassword))
+    var username = !string.IsNullOrWhiteSpace(settings.Username)
+        ? settings.Username
+        : configuration["WP:RESTAPI:Username"]
+            ?? Environment.GetEnvironmentVariable("WP__RESTAPI__Username");
+
+    var applicationPassword = !string.IsNullOrWhiteSpace(settings.ApplicationPassword)
+        ? settings.ApplicationPassword
+        : configuration["WP:RESTAPI:Token"]
+            ?? Environment.GetEnvironmentVariable("WP__RESTAPI__Token")
+            ?? configuration["WP:RESTAPI:ApplicationPassword"]
+            ?? Environment.GetEnvironmentVariable("WP__RESTAPI__ApplicationPassword");
+
+    if (!string.IsNullOrWhiteSpace(username)
+        && !string.IsNullOrWhiteSpace(applicationPassword))
     {
-        var authBytes = Encoding.UTF8.GetBytes($"{settings.Username}:{settings.ApplicationPassword}");
+        var authBytes = Encoding.UTF8.GetBytes($"{username}:{applicationPassword}");
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
             "Basic",
             Convert.ToBase64String(authBytes));

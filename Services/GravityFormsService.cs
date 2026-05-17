@@ -102,6 +102,7 @@ namespace TINWeb.Services
 
         public async Task<List<GravityForm>> GetFormsAsync(string statusFilter = "active")
         {
+            EnsureBaseAddressConfigured();
             LastDiscoveryDiagnostics = new GravityFormsDiscoveryDiagnostics();
             var normalizedStatusFilter = NormalizeStatusFilter(statusFilter);
             var forms = await GetFormsFromEndpointAsync("wp-json/gf/v2/forms");
@@ -403,13 +404,24 @@ namespace TINWeb.Services
             return forms;
         }
 
+        private void EnsureBaseAddressConfigured()
+        {
+            if (_http.BaseAddress == null)
+            {
+                throw new InvalidOperationException(
+                    "WordPress BaseUrl is not configured. Set WordPress:BaseUrl or WP__RESTAPI__Url.");
+            }
+        }
+
             public async Task<decimal?> GetFormAmountTotalAsync(int formId)
             {
+                EnsureBaseAddressConfigured();
                 return await TryGetAmountTotalAsync(formId);
             }
 
         public async Task<GravityFormDetail> GetFormDetailAsync(int formId)
         {
+            EnsureBaseAddressConfigured();
             var response = await _http.GetAsync($"wp-json/gf/v2/forms/{formId}");
             await EnsureSuccessWithDetailsAsync(response);
             var json = await response.Content.ReadAsStringAsync();
@@ -419,6 +431,7 @@ namespace TINWeb.Services
 
         public async Task<GravityFormEntriesResult> GetEntriesAsync(int formId, int page = 1, int pageSize = 20)
         {
+            EnsureBaseAddressConfigured();
             var response = await _http.GetAsync(
                 $"wp-json/gf/v2/entries?form_ids={formId}&paging[page_size]={pageSize}&paging[current_page]={page}");
             await EnsureSuccessWithDetailsAsync(response);
