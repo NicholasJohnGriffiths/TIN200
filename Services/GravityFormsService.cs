@@ -357,6 +357,7 @@ namespace TINWeb.Services
             var response = await _http.GetAsync(endpoint);
             await EnsureSuccessWithDetailsAsync(response);
             var json = await response.Content.ReadAsStringAsync();
+            EnsureJsonPayload(endpoint, response, json);
             return ParseForms(json);
         }
 
@@ -425,6 +426,7 @@ namespace TINWeb.Services
             var response = await _http.GetAsync($"wp-json/gf/v2/forms/{formId}");
             await EnsureSuccessWithDetailsAsync(response);
             var json = await response.Content.ReadAsStringAsync();
+            EnsureJsonPayload($"wp-json/gf/v2/forms/{formId}", response, json);
             using var doc = JsonDocument.Parse(json);
             return ParseFormDetail(doc.RootElement);
         }
@@ -432,10 +434,12 @@ namespace TINWeb.Services
         public async Task<GravityFormEntriesResult> GetEntriesAsync(int formId, int page = 1, int pageSize = 20)
         {
             EnsureBaseAddressConfigured();
-            var response = await _http.GetAsync(
-                $"wp-json/gf/v2/entries?form_ids={formId}&paging[page_size]={pageSize}&paging[current_page]={page}");
+            var endpoint =
+                $"wp-json/gf/v2/entries?form_ids={formId}&paging[page_size]={pageSize}&paging[current_page]={page}";
+            var response = await _http.GetAsync(endpoint);
             await EnsureSuccessWithDetailsAsync(response);
             var json = await response.Content.ReadAsStringAsync();
+            EnsureJsonPayload(endpoint, response, json);
             using var doc = JsonDocument.Parse(json);
 
             var totalCount = GetIntProperty(doc.RootElement, "total_count");
@@ -456,6 +460,36 @@ namespace TINWeb.Services
                 PageSize = pageSize,
                 TotalPages = Math.Max(1, (int)Math.Ceiling(totalCount / (double)pageSize))
             };
+        }
+
+        private static void EnsureJsonPayload(string endpoint, HttpResponseMessage response, string body)
+        {
+            try
+            {
+                using var _ = JsonDocument.Parse(body);
+            }
+            catch (JsonException ex)
+            {
+                var contentType = response.Content.Headers.ContentType?.MediaType ?? "unknown";
+                var snippet = BuildResponseSnippet(body);
+                throw new InvalidOperationException(
+                    $"WordPress API returned non-JSON data for '{endpoint}' (Content-Type: {contentType}). " +
+                    $"Verify WordPress API URL/credentials and any security layer returning HTML. Response starts with: {snippet}",
+                    ex);
+            }
+        }
+
+        private static string BuildResponseSnippet(string? body)
+        {
+            if (string.IsNullOrWhiteSpace(body))
+            {
+                return "<empty>";
+            }
+
+            var snippet = body.Replace('\r', ' ').Replace('\n', ' ').Trim();
+            return snippet.Length <= 180
+                ? snippet
+                : snippet.Substring(0, 180) + "...";
         }
 
         private static GravityForm ParseForm(JsonElement el)
