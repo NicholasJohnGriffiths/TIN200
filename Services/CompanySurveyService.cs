@@ -183,6 +183,155 @@ namespace TINWeb.Services
             return rows.Count;
         }
 
+        private const string SurveyContactFirstNameTitle = "Survey Contact First Name";
+        private const string SurveyContactLastNameTitle = "Survey Contact Last Name";
+        private const string SurveyContactEmailTitle = "Survey Contact Email";
+
+        private static readonly string[] ContactAnswerTitles =
+        {
+            SurveyContactFirstNameTitle,
+            SurveyContactLastNameTitle,
+            SurveyContactEmailTitle
+        };
+
+        public async Task<CopyContactDetailsResult> CopyContactDetailsFromCompaniesAsync(IEnumerable<int> companySurveyIds)
+        {
+            var ids = companySurveyIds?
+                .Where(id => id > 0)
+                .Distinct()
+                .ToList() ?? new List<int>();
+
+            var result = new CopyContactDetailsResult();
+            if (!ids.Any())
+            {
+                return result;
+            }
+
+            var selectedSurveys = await (
+                from companySurvey in _context.CompanySurvey
+                join company in _context.Tin200 on companySurvey.CompanyId equals company.Id
+                where ids.Contains(companySurvey.Id)
+                select new
+                {
+                    CompanySurveyId = companySurvey.Id,
+                    companySurvey.CompanyId,
+                    company.CompanyName,
+                    company.ContactFirstName,
+                    company.ContactLastName,
+                    company.ContactEmail
+                })
+                .ToListAsync();
+
+            result.SelectedSurveyCount = selectedSurveys.Count;
+            if (!selectedSurveys.Any())
+            {
+                return result;
+            }
+
+            var contactQuestionIdsByTitle = (await _context.Question
+                    .AsNoTracking()
+                    .Select(q => new { q.Id, q.Title })
+                    .ToListAsync())
+                .Where(q => !string.IsNullOrWhiteSpace(q.Title))
+                .Select(q => new { q.Id, Title = q.Title!.Trim() })
+                .Where(q => ContactAnswerTitles.Contains(q.Title, StringComparer.OrdinalIgnoreCase))
+                .GroupBy(q => q.Title, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    group => group.Key,
+                    group => group.Select(q => q.Id).Distinct().ToList(),
+                    StringComparer.OrdinalIgnoreCase);
+
+            result.MissingQuestionTitles = ContactAnswerTitles
+                .Where(title => !contactQuestionIdsByTitle.ContainsKey(title))
+                .ToList();
+
+            var targetQuestionIds = contactQuestionIdsByTitle
+                .SelectMany(pair => pair.Value)
+                .Distinct()
+                .ToList();
+
+            if (!targetQuestionIds.Any())
+            {
+                return result;
+            }
+
+            var existingAnswers = await _context.Answer
+                .Where(a => ids.Contains(a.CompanySurveyId) && targetQuestionIds.Contains(a.QuestionId))
+                .ToListAsync();
+
+            var existingAnswerLookup = existingAnswers.ToLookup(a => (a.CompanySurveyId, a.QuestionId));
+            var affectedCompanyIds = new HashSet<int>();
+
+            foreach (var selectedSurvey in selectedSurveys)
+            {
+                var answerValues = new (string Title, string? Value)[]
+                {
+                    (SurveyContactFirstNameTitle, NullIfWhiteSpace(selectedSurvey.ContactFirstName)),
+                    (SurveyContactLastNameTitle, NullIfWhiteSpace(selectedSurvey.ContactLastName)),
+                    (SurveyContactEmailTitle, NullIfWhiteSpace(selectedSurvey.ContactEmail))
+                };
+
+                foreach (var answerValue in answerValues)
+                {
+                    if (!contactQuestionIdsByTitle.TryGetValue(answerValue.Title, out var questionIds))
+                    {
+                        continue;
+                    }
+
+                    foreach (var questionId in questionIds)
+                    {
+                        var matchingAnswers = existingAnswerLookup[(selectedSurvey.CompanySurveyId, questionId)].ToList();
+
+                        if (!matchingAnswers.Any())
+                        {
+                            if (answerValue.Value == null)
+                            {
+                                continue;
+                            }
+
+                            _context.Answer.Add(new Answer
+                            {
+                                CompanySurveyId = selectedSurvey.CompanySurveyId,
+                                QuestionId = questionId,
+                                AnswerText = answerValue.Value,
+                                AnswerNumber = null,
+                                AnswerCurrency = null
+                            });
+
+                            result.InsertedAnswerCount++;
+                            affectedCompanyIds.Add(selectedSurvey.CompanyId);
+                            continue;
+                        }
+
+                        foreach (var answer in matchingAnswers)
+                        {
+                            var currentValue = NullIfWhiteSpace(answer.AnswerText);
+                            if (string.Equals(currentValue, answerValue.Value, StringComparison.Ordinal)
+                                && !answer.AnswerNumber.HasValue
+                                && !answer.AnswerCurrency.HasValue)
+                            {
+                                continue;
+                            }
+
+                            answer.AnswerText = answerValue.Value;
+                            answer.AnswerNumber = null;
+                            answer.AnswerCurrency = null;
+                            result.UpdatedAnswerCount++;
+                            affectedCompanyIds.Add(selectedSurvey.CompanyId);
+                        }
+                    }
+                }
+            }
+
+            if (result.UpdatedAnswerCount > 0 || result.InsertedAnswerCount > 0)
+            {
+                await _context.SaveChangesAsync();
+            }
+
+            result.AffectedCompanyCount = affectedCompanyIds.Count;
+            return result;
+        }
+
         public async Task<PopulatePriorYearDataResult> PreviewPopulatePriorYearDataAsync(IEnumerable<int> companySurveyIds, int financialYear, int previewLimit = 20)
         {
             return await BuildPopulatePriorYearDataResultAsync(companySurveyIds, financialYear, applyUpdates: false, previewLimit: previewLimit);
@@ -651,6 +800,11 @@ namespace TINWeb.Services
             return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim();
         }
 
+        private static string? NullIfWhiteSpace(string? value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        }
+
         private sealed class TemporalQuestionDescriptor
         {
             public int QuestionId { get; set; }
@@ -717,6 +871,15 @@ namespace TINWeb.Services
             public int ExistingValueCount { get; set; }
             public int MissingSourceCount { get; set; }
             public string FieldsSummary { get; set; } = string.Empty;
+        }
+
+        public class CopyContactDetailsResult
+        {
+            public int SelectedSurveyCount { get; set; }
+            public int AffectedCompanyCount { get; set; }
+            public int UpdatedAnswerCount { get; set; }
+            public int InsertedAnswerCount { get; set; }
+            public List<string> MissingQuestionTitles { get; set; } = new();
         }
     }
 }

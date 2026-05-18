@@ -156,6 +156,21 @@
                 <div class="selected-record-inputs"></div>
             </form>
 
+            <form id="copyContactDetailsForm" method="post" asp-page-handler="CopyContactDetailsFromCompanies" class="d-flex flex-wrap align-items-end gap-2 mt-3">
+                <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
+                <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
+                <input type="hidden" name="surveyEmailSentFilter" value="@Model.SurveyEmailSentFilter" />
+                <input type="hidden" name="tinStatus" value="@Model.SelectedTinStatus" />
+                <div>
+                    <label class="form-label mb-1">Survey Contact Answers</label>
+                    <div class="d-flex flex-column">
+                        <button class="btn btn-outline-info" type="submit" id="copyContactDetailsBtn">Copy Contact Details From Companies</button>
+                        <small class="text-muted">Updates the selected surveys' Survey Contact First Name, Last Name, and Email answers from the Company contact fields.</small>
+                    </div>
+                </div>
+                <div class="selected-record-inputs"></div>
+            </form>
+
             <div id="populatePriorYearPreviewPanel" class="card mt-3 d-none" style="max-width: 980px;">
                 <div class="card-body">
                     <h6 class="card-title mb-2">Populate Historical Year Data Preview</h6>
@@ -391,7 +406,8 @@
         const selectedCount = document.getElementById('selectedSurveyCount');
         const targetForms = [
             document.getElementById('populateSurveyLinksForm'),
-            document.getElementById('populatePriorYearDataForm')
+            document.getElementById('populatePriorYearDataForm'),
+            document.getElementById('copyContactDetailsForm')
         ].filter(Boolean);
 
         if (!recordCheckboxes.length) {
@@ -474,6 +490,32 @@
 
         window.getSelectedSurveyCount = syncSelectedRecordInputs;
         syncSelectedRecordInputs();
+    })();
+
+    (function () {
+        const copyForm = document.getElementById('copyContactDetailsForm');
+        const copyButton = document.getElementById('copyContactDetailsBtn');
+
+        if (!copyForm || !copyButton) {
+            return;
+        }
+
+        copyForm.addEventListener('submit', function (event) {
+            if (typeof window.getSelectedSurveyCount === 'function' && window.getSelectedSurveyCount() === 0) {
+                event.preventDefault();
+                alert('Select at least one survey record first.');
+                return;
+            }
+
+            const confirmed = window.confirm('Copy Company contact details into the selected survey contact answers?');
+            if (!confirmed) {
+                event.preventDefault();
+                return;
+            }
+
+            copyButton.disabled = true;
+            copyButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Copying...';
+        });
     })();
 
     function startEstimatedProgress(progressContainer, progressBar, progressText, actionLabel) {

@@ -156,6 +156,35 @@ namespace TINWeb.Pages.CompanySurvey
             return RedirectToPage(redirectValues);
         }
 
+        public async Task<IActionResult> OnPostCopyContactDetailsFromCompaniesAsync(int? financialYear, string? companySearch, string? surveyEmailSentFilter, int? tinStatus = null, List<int>? selectedRecordIds = null)
+        {
+            var redirectValues = new
+            {
+                financialYear,
+                companySearch,
+                surveyEmailSentFilter,
+                tinStatus,
+                selectedLinkExpiryDateUtc = SelectedLinkExpiryDateUtc?.ToString("yyyy-MM-dd")
+            };
+
+            await LoadPageDataAsync(financialYear, sortBy: null, sortDir: null, companySearch, surveyEmailSentFilter, tinStatus, selectedLinkExpiryDateUtc: SelectedLinkExpiryDateUtc);
+
+            var targetRecordIds = ResolveSelectedRecordIds(selectedRecordIds);
+            if (targetRecordIds.Count == 0)
+            {
+                StatusMessage = "Error: Select at least one survey record first.";
+                return RedirectToPage(redirectValues);
+            }
+
+            var result = await _service.CopyContactDetailsFromCompaniesAsync(targetRecordIds);
+            var missingQuestionMessage = result.MissingQuestionTitles.Any()
+                ? $" Missing questions: {string.Join(", ", result.MissingQuestionTitles)}."
+                : string.Empty;
+
+            StatusMessage = $"Copied contact details from Companies for {result.SelectedSurveyCount} selected surveys. Updated answers: {result.UpdatedAnswerCount}. Created answers: {result.InsertedAnswerCount}. Companies affected: {result.AffectedCompanyCount}.{missingQuestionMessage}";
+            return RedirectToPage(redirectValues);
+        }
+
         public async Task<IActionResult> OnPostPreviewPopulateSurveyLinksAsync(int? financialYear, bool overwriteExisting, string? companySearch, string? surveyEmailSentFilter, int? tinStatus = null, List<int>? selectedRecordIds = null)
         {
             if (!TryGetSelectedExpiryAtUtc(SelectedLinkExpiryDateUtc, out var selectedExpiryAtUtc, out var expiryValidationMessage))

@@ -584,6 +584,8 @@ namespace TINWeb.Services
                 return 0;
             }
 
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+
             var companyIds = await _context.Tin200
                 .Select(c => c.Id)
                 .ToListAsync();
@@ -598,26 +600,28 @@ namespace TINWeb.Services
                 .Except(existingCompanySurveyCompanyIds)
                 .ToList();
 
-            foreach (var companyId in missingCompanySurveyCompanyIds)
+            const int companySurveyBatchSize = 500;
+            foreach (var companySurveyBatch in missingCompanySurveyCompanyIds.Chunk(companySurveyBatchSize))
             {
-                _context.CompanySurvey.Add(new CompanySurvey
+                foreach (var companyId in companySurveyBatch)
                 {
-                    CompanyId = companyId,
-                    SurveyId = surveyId.Value,
-                    Saved = false,
-                    Submitted = false,
-                    Requested = false,
-                    Locked = false,
-                    Estimate = false,
-                    SavedDate = null,
-                    SubmittedDate = null,
-                    RequestedDate = null
-                });
-            }
+                    _context.CompanySurvey.Add(new CompanySurvey
+                    {
+                        CompanyId = companyId,
+                        SurveyId = surveyId.Value,
+                        Saved = false,
+                        Submitted = false,
+                        Requested = false,
+                        Locked = false,
+                        Estimate = false,
+                        SavedDate = null,
+                        SubmittedDate = null,
+                        RequestedDate = null
+                    });
+                }
 
-            if (missingCompanySurveyCompanyIds.Any())
-            {
                 await _context.SaveChangesAsync();
+                _context.ChangeTracker.Clear();
             }
 
             var companySurveyIds = await _context.CompanySurvey
@@ -649,7 +653,9 @@ namespace TINWeb.Services
             var existingSet = new HashSet<(int CompanySurveyId, int QuestionId)>(
                 existingPairs.Select(x => (x.CompanySurveyId, x.QuestionId)));
 
-            var rowsToInsert = new List<Answer>();
+            const int answerBatchSize = 1000;
+            var rowsToInsert = new List<Answer>(answerBatchSize);
+            var insertedCount = 0;
 
             foreach (var companySurveyId in companySurveyIds)
             {
@@ -665,17 +671,27 @@ namespace TINWeb.Services
                         CompanySurveyId = companySurveyId,
                         QuestionId = questionId
                     });
+
+                    if (rowsToInsert.Count >= answerBatchSize)
+                    {
+                        _context.Answer.AddRange(rowsToInsert);
+                        await _context.SaveChangesAsync();
+                        insertedCount += rowsToInsert.Count;
+                        rowsToInsert.Clear();
+                        _context.ChangeTracker.Clear();
+                    }
                 }
             }
 
-            if (!rowsToInsert.Any())
+            if (rowsToInsert.Any())
             {
-                return 0;
+                _context.Answer.AddRange(rowsToInsert);
+                await _context.SaveChangesAsync();
+                insertedCount += rowsToInsert.Count;
             }
 
-            _context.Answer.AddRange(rowsToInsert);
-            await _context.SaveChangesAsync();
-            return rowsToInsert.Count;
+            await transaction.CommitAsync();
+            return insertedCount;
         }
 
         public async Task RecreateAnswerTableAsync()

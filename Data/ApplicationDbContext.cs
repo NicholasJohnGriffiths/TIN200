@@ -38,7 +38,7 @@ namespace TINWeb.Data
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Id)
                     .HasColumnName("Id")
-                    .ValueGeneratedNever();
+                    .ValueGeneratedOnAdd();
                 
                 entity.Property(e => e.CeoFirstName)
                     .HasColumnName("CEOFirstName")
