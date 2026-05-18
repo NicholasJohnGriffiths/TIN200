@@ -18,6 +18,15 @@ deploy/publish/
 deploy/publish.zip
 deploy/publish-live/
 deploy/publish-live.zip
+publish/
+publish.zip
+publish-functions/
 deploy/webapplogs/
+deploy/webapplogs-latest/
+deploy/webapplogs-latest2/
 deploy/deploy-azure.settings.json
 deploy/*.zip
+_deploy_out/
+_deploy_out.zip
+build_errors.csv
+webapp_logs.zip

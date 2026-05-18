@@ -9,13 +9,15 @@ on:
 env:
   DOTNET_VERSION: '9.0.x'
   PROJECT_PATH: 'TINWeb.csproj'
-  AZURE_WEBAPP_NAME: 'tin200app260302144937'
-  AZURE_WEBAPP_PUBLISH_PROFILE_SECRET: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-  AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+  PUBLISH_OUTPUT: './publish'
+  HEALTH_PATH: '/health'
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Checkout
@@ -33,46 +35,62 @@ jobs:
         run: dotnet build --configuration Release --no-restore
 
       - name: Publish
-        run: dotnet publish ${{ env.PROJECT_PATH }} --configuration Release --no-build --output ./publish
-
-      - name: Resolve deploy inputs
-        shell: bash
-        run: |
-          if [ -n "${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_SECRET }}" ]; then
-            echo "AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE=${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_SECRET }}" >> "$GITHUB_ENV"
-          else
-            echo "AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE=" >> "$GITHUB_ENV"
-          fi
+        run: dotnet publish ${{ env.PROJECT_PATH }} --configuration Release --no-build --output ${{ env.PUBLISH_OUTPUT }}
 
       - name: Validate deploy credentials
+        shell: bash
         run: |
-          if [ -z "${{ env.AZURE_WEBAPP_NAME }}" ]; then
+          if [ -z "${{ vars.AZURE_WEBAPP_NAME }}" ]; then
             echo "Missing required repository variable: AZURE_WEBAPP_NAME"
             exit 1
           fi
 
-          if [ -z "${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE }}" ] && [ -z "${{ env.AZURE_CREDENTIALS }}" ]; then
+          if [ -z "${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}" ] && [ -z "${{ secrets.AZURE_CREDENTIALS }}" ]; then
             echo "No deploy credentials found. Configure AZURE_WEBAPP_PUBLISH_PROFILE or AZURE_CREDENTIALS in GitHub repository Secrets."
             exit 1
           fi
 
       - name: Azure Login (Service Principal)
-        if: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE == '' && env.AZURE_CREDENTIALS != '' }}
+        if: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE == '' && secrets.AZURE_CREDENTIALS != '' }}
         uses: azure/login@v2
         with:
-          creds: ${{ env.AZURE_CREDENTIALS }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Deploy to Azure Web App (Publish Profile)
-        if: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE != '' }}
+        if: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE != '' }}
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE }}
-          package: ./publish
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ${{ env.PUBLISH_OUTPUT }}
 
       - name: Deploy to Azure Web App (Azure Login)
-        if: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE_EFFECTIVE == '' && env.AZURE_CREDENTIALS != '' }}
+        if: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE == '' && secrets.AZURE_CREDENTIALS != '' }}
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          package: ./publish
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          package: ${{ env.PUBLISH_OUTPUT }}
+
+      - name: Smoke test health endpoint
+        shell: bash
+        run: |
+          HEALTH_URL="${{ vars.AZURE_WEBAPP_HEALTHCHECK_URL }}"
+          if [ -z "$HEALTH_URL" ]; then
+            HEALTH_URL="https://${{ vars.AZURE_WEBAPP_NAME }}.azurewebsites.net${{ env.HEALTH_PATH }}"
+          fi
+
+          echo "Health URL: $HEALTH_URL"
+
+          for i in {1..10}; do
+            status=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" || true)
+            if [ "$status" = "200" ]; then
+              echo "Health check passed."
+              exit 0
+            fi
+
+            echo "Attempt $i/10 failed with HTTP $status. Retrying in 10s..."
+            sleep 10
+          done
+
+          echo "Health check failed after 10 attempts."
+          exit 1

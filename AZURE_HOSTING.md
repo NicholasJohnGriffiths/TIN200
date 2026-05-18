@@ -106,6 +106,7 @@ Configure these in GitHub:
 
 - **Repository Variable**
   - `AZURE_WEBAPP_NAME` = your Azure Web App name (e.g. `tin200-app-prod-001`)
+  - `AZURE_WEBAPP_HEALTHCHECK_URL` (optional) = full URL to health endpoint if not using default `https://<webapp>.azurewebsites.net/health`
 
 - **Repository Secret (choose one auth option)**
   - `AZURE_WEBAPP_PUBLISH_PROFILE` = publish profile XML from Azure Portal
