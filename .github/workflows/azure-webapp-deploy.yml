@@ -53,13 +53,13 @@ jobs:
           fi
 
       - name: Azure Login (Service Principal)
-        if: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE == '' && env.AZURE_CREDENTIALS != '' }}
+        if: ${{ env.AZURE_CREDENTIALS != '' }}
         uses: azure/login@v2
         with:
           creds: ${{ env.AZURE_CREDENTIALS }}
 
       - name: Deploy to Azure Web App (Publish Profile)
-        if: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE != '' }}
+        if: ${{ env.AZURE_CREDENTIALS == '' && env.AZURE_WEBAPP_PUBLISH_PROFILE != '' }}
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ vars.AZURE_WEBAPP_NAME }}
@@ -67,7 +67,7 @@ jobs:
           package: ${{ env.PUBLISH_OUTPUT }}
 
       - name: Deploy to Azure Web App (Azure Login)
-        if: ${{ env.AZURE_WEBAPP_PUBLISH_PROFILE == '' && env.AZURE_CREDENTIALS != '' }}
+        if: ${{ env.AZURE_CREDENTIALS != '' }}
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ vars.AZURE_WEBAPP_NAME }}
