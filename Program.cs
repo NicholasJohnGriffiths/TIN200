@@ -154,17 +154,20 @@ builder.Services.AddHttpClient<GravityFormsService>((sp, client) =>
         client.BaseAddress = new Uri(baseUrl);
     }
 
-    var username = !string.IsNullOrWhiteSpace(settings.Username)
+    var usernameCandidate = !string.IsNullOrWhiteSpace(settings.Username)
         ? settings.Username
         : configuration["WP:RESTAPI:Username"]
             ?? Environment.GetEnvironmentVariable("WP__RESTAPI__Username");
 
-    var applicationPassword = !string.IsNullOrWhiteSpace(settings.ApplicationPassword)
+    var applicationPasswordCandidate = !string.IsNullOrWhiteSpace(settings.ApplicationPassword)
         ? settings.ApplicationPassword
         : configuration["WP:RESTAPI:Token"]
             ?? Environment.GetEnvironmentVariable("WP__RESTAPI__Token")
             ?? configuration["WP:RESTAPI:ApplicationPassword"]
             ?? Environment.GetEnvironmentVariable("WP__RESTAPI__ApplicationPassword");
+
+    var username = usernameCandidate?.Trim();
+    var applicationPassword = applicationPasswordCandidate?.Trim();
 
     if (!string.IsNullOrWhiteSpace(username)
         && !string.IsNullOrWhiteSpace(applicationPassword))
@@ -177,6 +180,8 @@ builder.Services.AddHttpClient<GravityFormsService>((sp, client) =>
 
     client.DefaultRequestHeaders.Accept.Clear();
     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+    client.DefaultRequestHeaders.UserAgent.Clear();
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("TINWeb/1.0 (+https://survey.tin100.com)");
 });
 builder.Services.Configure<FormOptions>(options =>
 {

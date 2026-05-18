@@ -81,9 +81,8 @@ namespace TINWeb.Models
         [Display(Name = "Last TIN200 Year")]
         public int? LastTIN200Year { get; set; }
 
-        [Display(Name = "Test Company")]
-        public bool? Test { get; set; }
-
-        // TIN200 identity/data column intentionally not exposed in the model
+        [Display(Name = "TIN Status")]
+        [Column("TINStatus")]
+        public int? TinStatus { get; set; }
     }
 }

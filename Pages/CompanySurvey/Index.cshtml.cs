@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Options;
 using TINWeb.Data;
+using TINWeb.Models;
 using TINWeb.Services;
 
 namespace TINWeb.Pages.CompanySurvey
@@ -25,7 +26,7 @@ namespace TINWeb.Pages.CompanySurvey
         public string SurveyEmailSentFilter { get; set; } = "all";
 
         [BindProperty(SupportsGet = true)]
-        public bool IncludeTestCompanies { get; set; }
+        public int SelectedTinStatus { get; set; } = (int)TinStatus.Tin200;
 
         public string SortBy { get; set; } = "CompanyName";
         public string SortDir { get; set; } = "asc";
@@ -58,25 +59,25 @@ namespace TINWeb.Pages.CompanySurvey
             _environment = environment;
         }
 
-        public async Task OnGetAsync(int? financialYear, string? sortBy, string? sortDir, string? companySearch, string? surveyEmailSentFilter, bool includeTestCompanies, DateTime? selectedLinkExpiryDateUtc)
+        public async Task OnGetAsync(int? financialYear, string? sortBy, string? sortDir, string? companySearch, string? surveyEmailSentFilter, int? tinStatus, DateTime? selectedLinkExpiryDateUtc)
         {
-            await LoadPageDataAsync(financialYear, sortBy, sortDir, companySearch, surveyEmailSentFilter, includeTestCompanies, selectedLinkExpiryDateUtc);
+            await LoadPageDataAsync(financialYear, sortBy, sortDir, companySearch, surveyEmailSentFilter, tinStatus, selectedLinkExpiryDateUtc);
         }
 
-        public async Task<IActionResult> OnPostBulkSubmitWithAnswersAsync(int? financialYear, string? companySearch, string? surveyEmailSentFilter, bool includeTestCompanies = false)
+        public async Task<IActionResult> OnPostBulkSubmitWithAnswersAsync(int? financialYear, string? companySearch, string? surveyEmailSentFilter, int? tinStatus = null)
         {
             await _service.BulkSubmitWithAnswersAsync(financialYear);
-            return RedirectToPage(new { financialYear, companySearch, surveyEmailSentFilter, includeTestCompanies });
+            return RedirectToPage(new { financialYear, companySearch, surveyEmailSentFilter, tinStatus });
         }
 
-        public async Task<IActionResult> OnPostPreviewPopulatePriorYearDataAsync(int? financialYear, string? companySearch, string? surveyEmailSentFilter, bool includeTestCompanies = false, List<int>? selectedRecordIds = null)
+        public async Task<IActionResult> OnPostPreviewPopulatePriorYearDataAsync(int? financialYear, string? companySearch, string? surveyEmailSentFilter, int? tinStatus = null, List<int>? selectedRecordIds = null)
         {
             if (!User.IsInRole("1"))
             {
                 return new JsonResult(new { success = false, message = "Populate data is available to admin users only." });
             }
 
-            await LoadPageDataAsync(financialYear, sortBy: null, sortDir: null, companySearch, surveyEmailSentFilter, includeTestCompanies, selectedLinkExpiryDateUtc: SelectedLinkExpiryDateUtc);
+            await LoadPageDataAsync(financialYear, sortBy: null, sortDir: null, companySearch, surveyEmailSentFilter, tinStatus, selectedLinkExpiryDateUtc: SelectedLinkExpiryDateUtc);
 
             if (!SelectedFinancialYear.HasValue)
             {
@@ -117,14 +118,14 @@ namespace TINWeb.Pages.CompanySurvey
             });
         }
 
-        public async Task<IActionResult> OnPostPopulatePriorYearDataAsync(int? financialYear, string? companySearch, string? surveyEmailSentFilter, bool includeTestCompanies = false, List<int>? selectedRecordIds = null)
+        public async Task<IActionResult> OnPostPopulatePriorYearDataAsync(int? financialYear, string? companySearch, string? surveyEmailSentFilter, int? tinStatus = null, List<int>? selectedRecordIds = null)
         {
             var redirectValues = new
             {
                 financialYear,
                 companySearch,
                 surveyEmailSentFilter,
-                includeTestCompanies,
+                tinStatus,
                 selectedLinkExpiryDateUtc = SelectedLinkExpiryDateUtc?.ToString("yyyy-MM-dd")
             };
 
@@ -134,7 +135,7 @@ namespace TINWeb.Pages.CompanySurvey
                 return RedirectToPage(redirectValues);
             }
 
-            await LoadPageDataAsync(financialYear, sortBy: null, sortDir: null, companySearch, surveyEmailSentFilter, includeTestCompanies, selectedLinkExpiryDateUtc: SelectedLinkExpiryDateUtc);
+            await LoadPageDataAsync(financialYear, sortBy: null, sortDir: null, companySearch, surveyEmailSentFilter, tinStatus, selectedLinkExpiryDateUtc: SelectedLinkExpiryDateUtc);
 
             if (!SelectedFinancialYear.HasValue)
             {
@@ -155,14 +156,14 @@ namespace TINWeb.Pages.CompanySurvey
             return RedirectToPage(redirectValues);
         }
 
-        public async Task<IActionResult> OnPostPreviewPopulateSurveyLinksAsync(int? financialYear, bool overwriteExisting, string? companySearch, string? surveyEmailSentFilter, bool includeTestCompanies = false, List<int>? selectedRecordIds = null)
+        public async Task<IActionResult> OnPostPreviewPopulateSurveyLinksAsync(int? financialYear, bool overwriteExisting, string? companySearch, string? surveyEmailSentFilter, int? tinStatus = null, List<int>? selectedRecordIds = null)
         {
             if (!TryGetSelectedExpiryAtUtc(SelectedLinkExpiryDateUtc, out var selectedExpiryAtUtc, out var expiryValidationMessage))
             {
                 return new JsonResult(new { success = false, message = expiryValidationMessage });
             }
 
-            await LoadPageDataAsync(financialYear, sortBy: null, sortDir: null, companySearch, surveyEmailSentFilter, includeTestCompanies, selectedLinkExpiryDateUtc: SelectedLinkExpiryDateUtc);
+            await LoadPageDataAsync(financialYear, sortBy: null, sortDir: null, companySearch, surveyEmailSentFilter, tinStatus, selectedLinkExpiryDateUtc: SelectedLinkExpiryDateUtc);
 
             var targetRecordIds = ResolveSelectedRecordIds(selectedRecordIds);
             if (targetRecordIds.Count == 0)
@@ -233,14 +234,14 @@ namespace TINWeb.Pages.CompanySurvey
             });
         }
 
-        public async Task<IActionResult> OnPostPopulateSurveyLinksAsync(int? financialYear, bool overwriteExisting, string? companySearch, string? surveyEmailSentFilter, bool includeTestCompanies = false, List<int>? selectedRecordIds = null)
+        public async Task<IActionResult> OnPostPopulateSurveyLinksAsync(int? financialYear, bool overwriteExisting, string? companySearch, string? surveyEmailSentFilter, int? tinStatus = null, List<int>? selectedRecordIds = null)
         {
             var redirectValues = new
             {
                 financialYear,
                 companySearch,
                 surveyEmailSentFilter,
-                includeTestCompanies,
+                tinStatus,
                 selectedLinkExpiryDateUtc = SelectedLinkExpiryDateUtc?.ToString("yyyy-MM-dd")
             };
 
@@ -250,7 +251,7 @@ namespace TINWeb.Pages.CompanySurvey
                 return RedirectToPage(redirectValues);
             }
 
-            await LoadPageDataAsync(financialYear, sortBy: null, sortDir: null, companySearch, surveyEmailSentFilter, includeTestCompanies, selectedLinkExpiryDateUtc: SelectedLinkExpiryDateUtc);
+            await LoadPageDataAsync(financialYear, sortBy: null, sortDir: null, companySearch, surveyEmailSentFilter, tinStatus, selectedLinkExpiryDateUtc: SelectedLinkExpiryDateUtc);
 
             var targetRecordIds = ResolveSelectedRecordIds(selectedRecordIds);
             if (targetRecordIds.Count == 0)
@@ -323,25 +324,21 @@ namespace TINWeb.Pages.CompanySurvey
                 .ToList();
         }
 
-        private async Task LoadPageDataAsync(int? financialYear, string? sortBy, string? sortDir, string? companySearch, string? surveyEmailSentFilter, bool includeTestCompanies, DateTime? selectedLinkExpiryDateUtc)
+        private async Task LoadPageDataAsync(int? financialYear, string? sortBy, string? sortDir, string? companySearch, string? surveyEmailSentFilter, int? tinStatus, DateTime? selectedLinkExpiryDateUtc)
         {
             FinancialYears = await _service.GetAvailableFinancialYearsAsync();
 
             SelectedFinancialYear = financialYear ?? await _service.GetCurrentSurveyFinancialYearAsync();
             CompanySearch = (companySearch ?? string.Empty).Trim();
             SurveyEmailSentFilter = NormalizeSurveyEmailSentFilter(surveyEmailSentFilter);
-            IncludeTestCompanies = includeTestCompanies;
+            SelectedTinStatus = NormalizeTinStatusFilter(tinStatus);
             SortBy = NormalizeSortBy(sortBy);
             SortDir = NormalizeSortDir(sortDir);
             SelectedLinkExpiryDateUtc = selectedLinkExpiryDateUtc?.Date ?? GetDefaultLinkExpiryDateUtc();
 
             Records = await _service.GetListRowsAsync(SelectedFinancialYear);
             NormalizeSurveyLinksForCurrentHost();
-
-            if (!IncludeTestCompanies)
-            {
-                Records = Records.Where(x => !x.IsTestCompany).ToList();
-            }
+            Records = Records.Where(x => x.TinStatus == SelectedTinStatus).ToList();
 
             if (string.Equals(SurveyEmailSentFilter, "sent", StringComparison.OrdinalIgnoreCase))
             {
@@ -363,6 +360,23 @@ namespace TINWeb.Pages.CompanySurvey
 
             Records = ApplySorting(Records, SortBy, SortDir).ToList();
             TotalCompaniesWithAnswers = Records.Count(r => r.AnswerCount > 0);
+        }
+
+        private static int NormalizeTinStatusFilter(int? tinStatus)
+        {
+            if (!tinStatus.HasValue)
+            {
+                return (int)TinStatus.Tin200;
+            }
+
+            return tinStatus.Value switch
+            {
+                (int)TinStatus.Tin200 => (int)TinStatus.Tin200,
+                (int)TinStatus.Tin200Potential => (int)TinStatus.Tin200Potential,
+                (int)TinStatus.Tin1000 => (int)TinStatus.Tin1000,
+                (int)TinStatus.TinTest => (int)TinStatus.TinTest,
+                _ => (int)TinStatus.Tin200
+            };
         }
 
         private DateTime GetDefaultLinkExpiryDateUtc()

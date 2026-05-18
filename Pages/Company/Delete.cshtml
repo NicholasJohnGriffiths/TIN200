@@ -27,7 +27,7 @@
                             <strong>Contact:</strong> @(string.IsNullOrWhiteSpace(Model.Record.ContactFirstName) && string.IsNullOrWhiteSpace(Model.Record.ContactLastName) ? "N/A" : $"{Model.Record.ContactFirstName} {Model.Record.ContactLastName}".Trim())<br />
                             <strong>Email:</strong> @Model.Record.Email<br />
                             <strong>Contact Email:</strong> @(Model.Record.ContactEmail ?? "N/A")<br />
-                            <strong>Test Company:</strong> @(Model.Record.Test == true ? "Yes" : "No")
+                            <strong>Test Company:</strong> @(TINWeb.Models.TinStatusHelper.IsTestCompany(Model.Record.TinStatus) ? "Yes" : "No")
                         </p>
                     </div>
                 </div>

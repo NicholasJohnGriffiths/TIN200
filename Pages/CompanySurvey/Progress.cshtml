@@ -12,7 +12,7 @@
         {
             financialYear = Model.FinancialYear,
             lastTIN200Year = Model.LastTIN200Year,
-            includeTestCompanies = Model.IncludeTestCompanies,
+            selectedTinStatus = Model.SelectedTinStatus,
             progressStatusFilter = Model.ProgressStatusFilter,
             sortBy = column,
             sortDir = Model.GetNextSortDirection(column)
@@ -84,9 +84,14 @@
                     </select>
                 </div>
 
-                <div class="form-check mb-1 ms-1">
-                    <input class="form-check-input" type="checkbox" id="includeTestCompanies" name="includeTestCompanies" value="true" @(Model.IncludeTestCompanies ? "checked" : null) />
-                    <label class="form-check-label" for="includeTestCompanies">Include Test Companies</label>
+                <div>
+                    <label class="form-label mb-1">TIN Status</label>
+                    <select name="selectedTinStatus" class="form-select" style="min-width: 180px;">
+                        @foreach (var option in TINWeb.Models.TinStatusHelper.DropdownOptions)
+                        {
+                            <option value="@option.Value" selected="@(Model.SelectedTinStatus == option.Value ? "selected" : null)">@option.Label</option>
+                        }
+                    </select>
                 </div>
 
                 <div>

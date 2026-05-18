@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using TINWeb.Data;
+using TINWeb.Models;
 using TINWeb.Services;
 
 namespace TINWeb.Pages.Company
@@ -24,7 +25,7 @@ namespace TINWeb.Pages.Company
 
             if (!showTestCompanies)
             {
-                records = records.Where(x => x.Test != true).ToList();
+                records = records.Where(x => !TinStatusHelper.IsTestCompany(x.TinStatus)).ToList();
             }
 
             if (!string.IsNullOrWhiteSpace(companySearch))

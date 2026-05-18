@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using TINWeb.Services;
+using TINWeb.Models;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
@@ -18,6 +19,8 @@ namespace TINWeb.Pages.Answers
         public bool IsAdmin => User.IsInRole("1");
         public int? SelectedFinancialYear { get; set; }
         public int? SelectedCompanySurveyId { get; set; }
+        [BindProperty(SupportsGet = true)]
+        public int SelectedTinStatus { get; set; } = (int)TinStatus.Tin200;
         [BindProperty(SupportsGet = true)]
         public string? ShowImportTool { get; set; }
         public int QuestionCount { get; set; }
@@ -38,11 +41,12 @@ namespace TINWeb.Pages.Answers
             _answerService = answerService;
         }
 
-        public async Task OnGetAsync(int? financialYear, int? companySurveyId, string? showImportTool = null)
+        public async Task OnGetAsync(int? financialYear, int? companySurveyId, int selectedTinStatus = (int)TinStatus.Tin200, string? showImportTool = null)
         {
             ShowImportTool = showImportTool;
+            SelectedTinStatus = NormalizeTinStatusFilter(selectedTinStatus);
             var hasExplicitFilters = Request.Query.ContainsKey("financialYear") || Request.Query.ContainsKey("companySurveyId");
-            await LoadPageDataAsync(financialYear, companySurveyId, hasExplicitFilters);
+            await LoadPageDataAsync(financialYear, companySurveyId, SelectedTinStatus, hasExplicitFilters);
         }
 
         public async Task<IActionResult> OnGetExportAsync(int? financialYear)
@@ -138,14 +142,15 @@ namespace TINWeb.Pages.Answers
             return string.Empty;
         }
 
-        private async Task LoadPageDataAsync(int? financialYear, int? companySurveyId, bool preserveExplicitFilters = false)
+        private async Task LoadPageDataAsync(int? financialYear, int? companySurveyId, int selectedTinStatus, bool preserveExplicitFilters = false)
         {
+            SelectedTinStatus = NormalizeTinStatusFilter(selectedTinStatus);
             QuestionCount = await _answerService.GetQuestionCountAsync();
             FinancialYears = await _answerService.GetAvailableFinancialYearsAsync();
 
             if (!financialYear.HasValue && companySurveyId.HasValue)
             {
-                var selectedCompanySurvey = (await _answerService.GetCompanySurveyOptionsAsync(null))
+                var selectedCompanySurvey = (await _answerService.GetCompanySurveyOptionsAsync(null, null))
                     .FirstOrDefault(x => x.CompanySurveyId == companySurveyId.Value);
                 financialYear = selectedCompanySurvey?.FinancialYear;
             }
@@ -164,12 +169,12 @@ namespace TINWeb.Pages.Answers
                 }
             }
 
-            CompanySurveyOptions = await _answerService.GetCompanySurveyOptionsAsync(SelectedFinancialYear);
+            CompanySurveyOptions = await _answerService.GetCompanySurveyOptionsAsync(SelectedFinancialYear, SelectedTinStatus);
             SelectedCompanySurveyId = companySurveyId;
 
             if (SelectedCompanySurveyId.HasValue && !CompanySurveyOptions.Any(x => x.CompanySurveyId == SelectedCompanySurveyId.Value))
             {
-                var allOptions = await _answerService.GetCompanySurveyOptionsAsync(null);
+                var allOptions = await _answerService.GetCompanySurveyOptionsAsync(null, null);
                 var previouslySelected = allOptions.FirstOrDefault(x => x.CompanySurveyId == SelectedCompanySurveyId.Value);
 
                 if (previouslySelected != null)
@@ -213,13 +218,13 @@ namespace TINWeb.Pages.Answers
             if (!User.IsInRole("1"))
             {
                 ErrorMessage = "Delete All Answers is only available to admin users.";
-                return RedirectToPage();
+                return RedirectToPage(new { selectedTinStatus = SelectedTinStatus });
             }
 
             if (!string.Equals(deleteConfirmation?.Trim(), "delete", StringComparison.Ordinal))
             {
                 ErrorMessage = "Delete cancelled. You must type 'delete' exactly to confirm.";
-                return RedirectToPage();
+                return RedirectToPage(new { selectedTinStatus = SelectedTinStatus });
             }
 
             try
@@ -232,44 +237,46 @@ namespace TINWeb.Pages.Answers
                 ErrorMessage = $"Delete all answers failed: {ex.Message}";
             }
 
-            return RedirectToPage();
+            return RedirectToPage(new { selectedTinStatus = SelectedTinStatus });
         }
 
-        public async Task<IActionResult> OnPostCreateMissingAnswersAsync(int? financialYear)
+        public async Task<IActionResult> OnPostCreateMissingAnswersAsync(int? financialYear, int selectedTinStatus = (int)TinStatus.Tin200)
         {
+            selectedTinStatus = NormalizeTinStatusFilter(selectedTinStatus);
             var effectiveYear = financialYear ?? await _answerService.GetCurrentSurveyFinancialYearAsync();
             if (!effectiveYear.HasValue)
             {
                 ErrorMessage = "Create missing answers failed: no financial year is selected and no current survey year is configured.";
-                return RedirectToPage();
+                return RedirectToPage(new { selectedTinStatus });
             }
 
             var createdCount = await _answerService.CreateMissingAnswersForYearAsync(effectiveYear.Value);
             StatusMessage = $"Create Missing Answers complete for FY {effectiveYear.Value}. New answer rows created: {createdCount}.";
-            return RedirectToPage(new { financialYear = effectiveYear.Value });
+            return RedirectToPage(new { financialYear = effectiveYear.Value, selectedTinStatus });
         }
 
-        public async Task<IActionResult> OnPostPreviewImportAsync(IFormFile? importFile, int? financialYear, string? showImportTool = null)
+        public async Task<IActionResult> OnPostPreviewImportAsync(IFormFile? importFile, int? financialYear, int selectedTinStatus = (int)TinStatus.Tin200, string? showImportTool = null)
         {
+            selectedTinStatus = NormalizeTinStatusFilter(selectedTinStatus);
             ShowImportTool = showImportTool;
             if (importFile == null || importFile.Length == 0)
             {
                 ErrorMessage = "Import failed: please select an Excel file.";
-                return RedirectToPage(new { financialYear, showImportTool = "qualtrics" });
+                return RedirectToPage(new { financialYear, selectedTinStatus, showImportTool = "qualtrics" });
             }
 
             var fileName = importFile.FileName ?? string.Empty;
             if (!fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
             {
                 ErrorMessage = "Import failed: only .xlsx Excel files are supported.";
-                return RedirectToPage(new { financialYear, showImportTool = "qualtrics" });
+                return RedirectToPage(new { financialYear, selectedTinStatus, showImportTool = "qualtrics" });
             }
 
             var effectiveYear = financialYear ?? await _answerService.GetCurrentSurveyFinancialYearAsync();
             if (!effectiveYear.HasValue)
             {
                 ErrorMessage = "Import failed: no financial year is selected and no current survey year is configured.";
-                return RedirectToPage(new { showImportTool = "qualtrics" });
+                return RedirectToPage(new { selectedTinStatus, showImportTool = "qualtrics" });
             }
 
             CleanupExpiredPendingImports();
@@ -300,33 +307,34 @@ namespace TINWeb.Pages.Answers
                 ShowImportTool = "qualtrics"
             };
 
-            await LoadPageDataAsync(effectiveYear.Value, null);
+            await LoadPageDataAsync(effectiveYear.Value, null, selectedTinStatus);
             ImportPreview = preview;
             PendingImportToken = token;
             return Page();
         }
 
-        public async Task<IActionResult> OnPostPreviewGlobalImportAsync(IFormFile? importFile, int? financialYear, string? showImportTool = null)
+        public async Task<IActionResult> OnPostPreviewGlobalImportAsync(IFormFile? importFile, int? financialYear, int selectedTinStatus = (int)TinStatus.Tin200, string? showImportTool = null)
         {
+            selectedTinStatus = NormalizeTinStatusFilter(selectedTinStatus);
             ShowImportTool = showImportTool;
             if (importFile == null || importFile.Length == 0)
             {
                 ErrorMessage = "Global import failed: please select an Excel file.";
-                return RedirectToPage(new { financialYear, showImportTool = "global" });
+                return RedirectToPage(new { financialYear, selectedTinStatus, showImportTool = "global" });
             }
 
             var fileName = importFile.FileName ?? string.Empty;
             if (!fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
             {
                 ErrorMessage = "Global import failed: only .xlsx Excel files are supported.";
-                return RedirectToPage(new { financialYear, showImportTool = "global" });
+                return RedirectToPage(new { financialYear, selectedTinStatus, showImportTool = "global" });
             }
 
             var effectiveYear = financialYear ?? await _answerService.GetCurrentSurveyFinancialYearAsync();
             if (!effectiveYear.HasValue)
             {
                 ErrorMessage = "Global import failed: no financial year is selected and no current survey year is configured.";
-                return RedirectToPage(new { showImportTool = "global" });
+                return RedirectToPage(new { selectedTinStatus, showImportTool = "global" });
             }
 
             CleanupExpiredPendingImports();
@@ -357,20 +365,21 @@ namespace TINWeb.Pages.Answers
                 ShowImportTool = "global"
             };
 
-            await LoadPageDataAsync(effectiveYear.Value, null);
+            await LoadPageDataAsync(effectiveYear.Value, null, selectedTinStatus);
             GlobalImportPreview = preview;
             PendingGlobalImportToken = token;
             return Page();
         }
 
-        public async Task<IActionResult> OnPostApplyImportAsync(string? previewToken)
+        public async Task<IActionResult> OnPostApplyImportAsync(string? previewToken, int selectedTinStatus = (int)TinStatus.Tin200)
         {
+            selectedTinStatus = NormalizeTinStatusFilter(selectedTinStatus);
             CleanupExpiredPendingImports();
 
             if (string.IsNullOrWhiteSpace(previewToken) || !PendingImports.TryGetValue(previewToken, out var pendingImport) || pendingImport.Kind != "Standard")
             {
                 ErrorMessage = "Apply import failed: preview session not found or expired. Please preview the file again.";
-                return RedirectToPage(new { showImportTool = "qualtrics" });
+                return RedirectToPage(new { selectedTinStatus, showImportTool = "qualtrics" });
             }
 
             try
@@ -395,17 +404,18 @@ namespace TINWeb.Pages.Answers
                 }
             }
 
-            return RedirectToPage(new { financialYear = pendingImport.FinancialYear, showImportTool = pendingImport.ShowImportTool });
+            return RedirectToPage(new { financialYear = pendingImport.FinancialYear, selectedTinStatus, showImportTool = pendingImport.ShowImportTool });
         }
 
-        public async Task<IActionResult> OnPostApplyGlobalImportAsync(string? previewToken)
+        public async Task<IActionResult> OnPostApplyGlobalImportAsync(string? previewToken, int selectedTinStatus = (int)TinStatus.Tin200)
         {
+            selectedTinStatus = NormalizeTinStatusFilter(selectedTinStatus);
             CleanupExpiredPendingImports();
 
             if (string.IsNullOrWhiteSpace(previewToken) || !PendingImports.TryGetValue(previewToken, out var pendingImport) || pendingImport.Kind != "Global")
             {
                 ErrorMessage = "Apply global import failed: preview session not found or expired. Please preview the file again.";
-                return RedirectToPage(new { showImportTool = "global" });
+                return RedirectToPage(new { selectedTinStatus, showImportTool = "global" });
             }
 
             try
@@ -430,7 +440,19 @@ namespace TINWeb.Pages.Answers
                 }
             }
 
-            return RedirectToPage(new { financialYear = pendingImport.FinancialYear, showImportTool = pendingImport.ShowImportTool });
+            return RedirectToPage(new { financialYear = pendingImport.FinancialYear, selectedTinStatus, showImportTool = pendingImport.ShowImportTool });
+        }
+
+        private static int NormalizeTinStatusFilter(int tinStatus)
+        {
+            return tinStatus switch
+            {
+                (int)TinStatus.Tin200 => (int)TinStatus.Tin200,
+                (int)TinStatus.Tin200Potential => (int)TinStatus.Tin200Potential,
+                (int)TinStatus.Tin1000 => (int)TinStatus.Tin1000,
+                (int)TinStatus.TinTest => (int)TinStatus.TinTest,
+                _ => (int)TinStatus.Tin200
+            };
         }
 
         private static void CleanupExpiredPendingImports()

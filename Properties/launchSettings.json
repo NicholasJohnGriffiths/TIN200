@@ -7,7 +7,11 @@
       "launchBrowser": true,
       "applicationUrl": "http://localhost:5120",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Stripe__Testmode__TINWeb": "false",
+        "Stripe__PublishableKey__TINWeb": "",
+        "Stripe__SecretKey__TINWeb": "",
+        "Stripe__WebhookSecret__TINWeb": ""
       }
     },
     "https": {
@@ -17,7 +21,11 @@
       "applicationUrl": "https://localhost:7025;http://localhost:5120",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
-        "ASPNETCORE_HTTPS_PORT": "7025"
+        "ASPNETCORE_HTTPS_PORT": "7025",
+        "Stripe__Testmode__TINWeb": "false",
+        "Stripe__PublishableKey__TINWeb": "",
+        "Stripe__SecretKey__TINWeb": "",
+        "Stripe__WebhookSecret__TINWeb": ""
       }
     }
   }

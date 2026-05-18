@@ -42,7 +42,7 @@ namespace TINWeb.Services
                 .FirstOrDefaultAsync();
         }
 
-        public async Task<List<CompanySurveyOption>> GetCompanySurveyOptionsAsync(int? financialYear)
+        public async Task<List<CompanySurveyOption>> GetCompanySurveyOptionsAsync(int? financialYear, int? tinStatus = null)
         {
             var answerCounts =
                 from answer in _context.Answer.AsNoTracking()
@@ -65,6 +65,7 @@ namespace TINWeb.Services
                     CompanyId = company.Id,
                     CompanyName = company.CompanyName,
                     ExternalId = company.ExternalId,
+                    TinStatus = company.TinStatus,
                     FinancialYear = survey.FinancialYear,
                     AnswerCount = answerCount != null ? answerCount.AnswerCount : 0,
                     Saved = companySurvey.Saved,
@@ -79,6 +80,11 @@ namespace TINWeb.Services
             if (financialYear.HasValue)
             {
                 query = query.Where(x => x.FinancialYear == financialYear.Value);
+            }
+
+            if (tinStatus.HasValue)
+            {
+                query = query.Where(x => x.TinStatus == tinStatus.Value);
             }
 
             return await query
@@ -2043,6 +2049,7 @@ ALTER TABLE [dbo].[Answer] CHECK CONSTRAINT [FK_Answer_Question];
             public int CompanyId { get; set; }
             public string? CompanyName { get; set; }
             public string? ExternalId { get; set; }
+            public int? TinStatus { get; set; }
             public int FinancialYear { get; set; }
             public int AnswerCount { get; set; }
             public bool Saved { get; set; }

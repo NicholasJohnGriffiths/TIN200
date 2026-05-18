@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using TINWeb.Data;
+using TINWeb.Models;
 using TINWeb.Services;
 
 namespace TINWeb.Pages.Company
@@ -56,7 +57,7 @@ namespace TINWeb.Pages.Company
         public int IntervalBetweenEachEmailSendSeconds { get; set; }
 
         [BindProperty(SupportsGet = true)]
-        public bool IncludeTestCompanies { get; set; }
+        public int SelectedTinStatus { get; set; } = (int)TinStatus.Tin200;
 
         [BindProperty(SupportsGet = true)]
         public int? SelectedSentYear { get; set; }
@@ -84,6 +85,7 @@ namespace TINWeb.Pages.Company
 
         public async Task<IActionResult> OnGetAsync()
         {
+            SelectedTinStatus = NormalizeTinStatusFilter(SelectedTinStatus);
             await LoadAvailableClientsAsync();
             return Page();
         }
@@ -154,7 +156,7 @@ namespace TINWeb.Pages.Company
                     BulkFailedCount = 0;
                     BulkLastRunAt = DateTime.Now.ToString("MMM d, yyyy h:mm tt");
                     BulkSendSucceeded = false;
-                    return RedirectToPage(new { IncludeTestCompanies, SelectedSentYear });
+                    return RedirectToPage(new { SelectedTinStatus, SelectedSentYear });
                 }
             }
 
@@ -207,7 +209,7 @@ namespace TINWeb.Pages.Company
                         BulkFailedCount = failedCount;
                         BulkLastRunAt = DateTime.Now.ToString("MMM d, yyyy h:mm tt");
                         BulkSendSucceeded = false;
-                        return RedirectToPage(new { IncludeTestCompanies, SelectedSentYear });
+                        return RedirectToPage(new { SelectedTinStatus, SelectedSentYear });
                     }
                 }
             }
@@ -240,7 +242,7 @@ namespace TINWeb.Pages.Company
             }
 
             BulkSendSucceeded = true;
-            return RedirectToPage(new { IncludeTestCompanies, SelectedSentYear });
+            return RedirectToPage(new { SelectedTinStatus, SelectedSentYear });
         }
 
         private async Task LoadAvailableClientsAsync()
@@ -277,11 +279,7 @@ namespace TINWeb.Pages.Company
 
             var companies = await _companyService.GetAllCompaniesAsync(null);
             companies = companies.Where(c => companyIds.Contains(c.Id)).ToList();
-
-            if (!IncludeTestCompanies)
-            {
-                companies = companies.Where(c => c.Test != true).ToList();
-            }
+            companies = companies.Where(c => c.TinStatus == SelectedTinStatus).ToList();
 
             var lockedCompanyIds = await GetLockedCompanyIdsForCurrentSurveyAsync();
 
@@ -310,6 +308,18 @@ namespace TINWeb.Pages.Company
                     };
                 })
                 .ToList();
+        }
+
+        private static int NormalizeTinStatusFilter(int tinStatus)
+        {
+            return tinStatus switch
+            {
+                (int)TinStatus.Tin200 => (int)TinStatus.Tin200,
+                (int)TinStatus.Tin200Potential => (int)TinStatus.Tin200Potential,
+                (int)TinStatus.Tin1000 => (int)TinStatus.Tin1000,
+                (int)TinStatus.TinTest => (int)TinStatus.TinTest,
+                _ => (int)TinStatus.Tin200
+            };
         }
 
         private async Task<HashSet<int>> GetLockedCompanyIdsForCurrentSurveyAsync()

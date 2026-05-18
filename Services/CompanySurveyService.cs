@@ -44,7 +44,8 @@ namespace TINWeb.Services
                     ContactLastName = company.ContactLastName,
                     ContactEmail = company.ContactEmail,
                     ExternalId = company.ExternalId,
-                    IsTestCompany = company.Test ?? false,
+                    TinStatus = company.TinStatus,
+                    IsTestCompany = company.TinStatus == (int)TinStatus.TinTest,
                     FinancialYear = survey.FinancialYear,
                     Saved = companySurvey.Saved,
                     Submitted = companySurvey.Submitted,
@@ -677,6 +678,7 @@ namespace TINWeb.Services
             public string? ContactLastName { get; set; }
             public string? ContactEmail { get; set; }
             public string? ExternalId { get; set; }
+            public int? TinStatus { get; set; }
             public bool IsTestCompany { get; set; }
             public int FinancialYear { get; set; }
             public bool Saved { get; set; }

@@ -461,11 +461,15 @@
                         <option value="@y" selected="@(Model.SelectedLastTin200Year == y ? "selected" : null)">@y</option>
                     }
                 </select>
+                <label class="me-2 align-self-center">TIN Status:</label>
+                <select name="tinStatus" class="form-select me-2" aria-label="TIN Status" style="max-width: 220px;">
+                    <option value="" selected="@(!Model.SelectedTinStatus.HasValue ? "selected" : null)">Blank</option>
+                    @foreach (var option in TINWeb.Models.TinStatusHelper.DropdownOptions)
+                    {
+                        <option value="@option.Value" selected="@(Model.SelectedTinStatus.HasValue && Model.SelectedTinStatus.Value == option.Value ? "selected" : null)">@option.Label</option>
+                    }
+                </select>
                 <input type="text" name="companySearch" value="@Model.CompanySearch" class="form-control me-2" style="max-width: 340px;" placeholder="Company name or External ID" />
-                <div class="form-check align-self-center me-2">
-                    <input class="form-check-input" type="checkbox" id="showTestCompanies" name="showTestCompanies" value="true" @(Model.ShowTestCompanies ? "checked" : null) />
-                    <label class="form-check-label" for="showTestCompanies">Show Test Companies</label>
-                </div>
                 <button class="btn btn-outline-primary" type="submit">Apply</button>
                 @if (!isImportMode)
                 {
@@ -521,7 +525,7 @@
                             <td>@(record.Fye2023.HasValue ? record.Fye2023.Value.ToString("C0") : "")</td>
                             <td>@record.FinancialYear</td>
                             <td>@record.LastTIN200Year</td>
-                            <td>@(record.Test == true ? "Yes" : "No")</td>
+                            <td>@(TINWeb.Models.TinStatusHelper.IsTestCompany(record.TinStatus) ? "Yes" : "No")</td>
                             <td class="actions-col">
                                 <a asp-page="./Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
                                 <a asp-page="./Edit" asp-route-id="@record.Id" asp-route-lastTin200Year="@Model.SelectedLastTin200Year" class="btn btn-sm btn-warning">Edit</a>

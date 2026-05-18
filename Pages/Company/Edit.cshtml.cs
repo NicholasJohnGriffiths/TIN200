@@ -34,11 +34,17 @@ namespace TINWeb.Pages.Company
             }
 
             Record = record;
+            Record.TinStatus ??= (int)TinStatus.Tin200;
             return Page();
         }
 
         public async Task<IActionResult> OnPostAsync()
         {
+            if (!TinStatusHelper.IsValidSelection(Record.TinStatus))
+            {
+                ModelState.AddModelError("Record.TinStatus", "TIN Status must be Blank, TIN200, TIN200Potential, TIN1000, or TINTest.");
+            }
+
             if (!ModelState.IsValid)
             {
                 return Page();

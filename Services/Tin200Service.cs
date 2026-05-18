@@ -53,7 +53,7 @@ namespace TINWeb.Services
         public async Task<List<Tin200>> GetTestCompaniesAsync(string? search = null)
         {
             var query = _context.Tin200
-                .Where(x => x.Test == true)
+                .Where(x => x.TinStatus == (int)TinStatus.TinTest)
                 .AsQueryable();
 
             var normalizedSearch = (search ?? string.Empty).Trim();
@@ -220,7 +220,7 @@ namespace TINWeb.Services
                 duplicatedCompany.Fye2023 = sourceCompany.Fye2023;
                 duplicatedCompany.FinancialYear = sourceCompany.FinancialYear;
                 duplicatedCompany.LastTIN200Year = sourceCompany.LastTIN200Year;
-                duplicatedCompany.Test = true;
+                duplicatedCompany.TinStatus = (int)TinStatus.TinTest;
 
                 await _context.SaveChangesAsync();
             }
@@ -251,7 +251,7 @@ namespace TINWeb.Services
                     Fye2023 = sourceCompany.Fye2023,
                     FinancialYear = sourceCompany.FinancialYear,
                     LastTIN200Year = sourceCompany.LastTIN200Year,
-                    Test = true
+                    TinStatus = (int)TinStatus.TinTest
                 };
 
                 _context.Tin200.Add(duplicatedCompany);
@@ -423,9 +423,9 @@ namespace TINWeb.Services
                 }
 
                 cmd.CommandText = @"
-INSERT INTO [Company] ([ExternalID], [CompanyName], [Test])
+INSERT INTO [Company] ([ExternalID], [CompanyName], [TINStatus])
 OUTPUT INSERTED.[Id]
-VALUES (@externalId, @companyName, @test);";
+VALUES (@externalId, @companyName, @tinStatus);";
 
                 var externalIdParam = cmd.CreateParameter();
                 externalIdParam.ParameterName = "@externalId";
@@ -437,10 +437,10 @@ VALUES (@externalId, @companyName, @test);";
                 companyNameParam.Value = (object?)companyName ?? DBNull.Value;
                 cmd.Parameters.Add(companyNameParam);
 
-                var testParam = cmd.CreateParameter();
-                testParam.ParameterName = "@test";
-                testParam.Value = true;
-                cmd.Parameters.Add(testParam);
+                var tinStatusParam = cmd.CreateParameter();
+                tinStatusParam.ParameterName = "@tinStatus";
+                tinStatusParam.Value = (int)TinStatus.TinTest;
+                cmd.Parameters.Add(tinStatusParam);
 
                 var result = await cmd.ExecuteScalarAsync();
                 return Convert.ToInt32(result ?? 0);
@@ -529,8 +529,8 @@ VALUES (@externalId, @companyName, @test);";
             foreach (var operation in plan.Operations.Where(x => x.Action == CompanyImportAction.Add))
             {
                 await _context.Database.ExecuteSqlInterpolatedAsync($@"
-INSERT INTO [Company] ([ExternalID], [CompanyName], [CompanyDescription], [ExternalId_ImportColumnName], [CompanyName_ImportColumnName], [CompanyDescription_ImportColumnName], [FinancialYear], [LastTIN200Year], [TIN200])
-VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operation.ImportedCompanyDescription}, {plan.MatchedExternalIdHeader}, {plan.MatchedCompanyNameHeader}, {plan.MatchedCompanyDescriptionHeader}, {importYear}, {importYear}, {1})");
+INSERT INTO [Company] ([ExternalID], [CompanyName], [CompanyDescription], [ExternalId_ImportColumnName], [CompanyName_ImportColumnName], [CompanyDescription_ImportColumnName], [FinancialYear], [LastTIN200Year], [TINStatus])
+VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operation.ImportedCompanyDescription}, {plan.MatchedExternalIdHeader}, {plan.MatchedCompanyNameHeader}, {plan.MatchedCompanyDescriptionHeader}, {importYear}, {importYear}, {(int)TinStatus.Tin200})");
             }
 
             result.CompanySurveyCreatedCount = await EnsureCompanySurveyRowsForImportAsync(plan, importYear, result.Errors);
@@ -1971,7 +1971,7 @@ SELECT
     {SelectOrDefault(map, "Fye2024", "Fye2024")},
     {SelectOrDefault(map, "Fye2023", "Fye2023")},
     {SelectOrDefault(map, "LastTIN200Year", "LastTIN200Year")},
-    {SelectOrDefault(map, "Test", "Test", "CAST(0 AS bit)")}
+    {SelectOrDefault(map, "TinStatus", "TinStatus")}
 FROM [Company]";
 
                 if (lastTin200Year.HasValue)
@@ -2009,7 +2009,7 @@ FROM [Company]";
                         Fye2024 = GetDecimal(reader, "Fye2024"),
                         Fye2023 = GetDecimal(reader, "Fye2023"),
                         LastTIN200Year = GetNullableInt32(reader, "LastTIN200Year"),
-                        Test = GetBoolean(reader, "Test")
+                        TinStatus = GetNullableInt32(reader, "TinStatus")
                     });
                 }
 
@@ -2093,7 +2093,7 @@ WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'Company'";
                     ["Fye2024"] = PickOptional("FYEYear-1", "FYE2024", "Fye2024", "FYE 2024"),
                     ["Fye2023"] = PickOptional("FYEYear-2", "FYE2023", "Fye2023", "FYE 2023"),
                     ["LastTIN200Year"] = PickOptional("LastTIN200Year", "Last TIN200 Year"),
-                    ["Test"] = PickOptional("Test")
+                    ["TinStatus"] = PickOptional("TINStatus")
                 };
             }
             finally
@@ -2139,16 +2139,6 @@ WHERE TABLE_SCHEMA = 'dbo' AND TABLE_NAME = 'Company'";
             return Convert.ToDecimal(record.GetValue(ordinal));
         }
 
-        private static bool GetBoolean(IDataRecord record, string name)
-        {
-            var ordinal = record.GetOrdinal(name);
-            if (record.IsDBNull(ordinal))
-            {
-                return false;
-            }
-
-            return Convert.ToBoolean(record.GetValue(ordinal));
-        }
     }
 
     public class Tin200Service : CompanyService

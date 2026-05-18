@@ -13,7 +13,7 @@
             financialYear = Model.SelectedFinancialYear,
             companySearch = Model.CompanySearch,
             surveyEmailSentFilter = Model.SurveyEmailSentFilter,
-            includeTestCompanies = Model.IncludeTestCompanies,
+            tinStatus = Model.SelectedTinStatus,
             selectedLinkExpiryDateUtc = Model.SelectedLinkExpiryDateUtc?.ToString("yyyy-MM-dd"),
             sortBy = column,
             sortDir = Model.GetNextSortDirection(column)
@@ -90,7 +90,7 @@
                 <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
                 <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
                 <input type="hidden" name="surveyEmailSentFilter" value="@Model.SurveyEmailSentFilter" />
-                <input type="hidden" name="includeTestCompanies" value="@(Model.IncludeTestCompanies ? "true" : "false")" />
+                <input type="hidden" name="tinStatus" value="@Model.SelectedTinStatus" />
                 <div>
                     <label for="SelectedLinkExpiryDateUtc" class="form-label mb-1">Survey Link Expiry Date</label>
                     <input asp-for="SelectedLinkExpiryDateUtc" type="date" asp-format="{0:yyyy-MM-dd}" class="form-control" style="min-width: 180px;" />
@@ -145,7 +145,7 @@
                 <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
                 <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
                 <input type="hidden" name="surveyEmailSentFilter" value="@Model.SurveyEmailSentFilter" />
-                <input type="hidden" name="includeTestCompanies" value="@(Model.IncludeTestCompanies ? "true" : "false")" />
+                <input type="hidden" name="tinStatus" value="@Model.SelectedTinStatus" />
                 <div>
                     <label class="form-label mb-1">Historical Year Data</label>
                     <div class="d-flex flex-column">
@@ -218,14 +218,19 @@
                         <option value="not-sent" selected="@(Model.SurveyEmailSentFilter == "not-sent" ? "selected" : null)">Not sent</option>
                     </select>
                 </div>
-                <div class="form-check mb-2 ms-1">
-                    <input class="form-check-input" type="checkbox" id="includeTestCompanies" name="includeTestCompanies" value="true" @(Model.IncludeTestCompanies ? "checked" : null) />
-                    <label class="form-check-label" for="includeTestCompanies">Include Test Companies</label>
+                <div>
+                    <label class="form-label mb-1">TIN Status</label>
+                    <select name="tinStatus" class="form-select" aria-label="TIN status filter" style="min-width: 180px;">
+                        @foreach (var option in TINWeb.Models.TinStatusHelper.DropdownOptions)
+                        {
+                            <option value="@option.Value" selected="@(Model.SelectedTinStatus == option.Value ? "selected" : null)">@option.Label</option>
+                        }
+                    </select>
                 </div>
                 <button class="btn btn-outline-primary mb-2" type="submit">Apply</button>
                 @if (Model.IsAdmin)
                 {
-                    <a class="btn btn-link mb-2" asp-page="./Index" asp-route-financialYear="@Model.SelectedFinancialYear" asp-route-includeTestCompanies="@Model.IncludeTestCompanies">Clear</a>
+                    <a class="btn btn-link mb-2" asp-page="./Index" asp-route-financialYear="@Model.SelectedFinancialYear">Clear</a>
                 }
             </form>
         </div>

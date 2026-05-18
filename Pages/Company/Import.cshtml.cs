@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Data.SqlClient;
+using TINWeb.Models;
 
 namespace TINWeb.Pages.Company
 {
@@ -79,6 +80,7 @@ namespace TINWeb.Pages.Company
                     var fye2025 = ParseDecimalNullable(fye2025Raw);
                     var fye2024 = ParseDecimalNullable(fye2024Raw);
                     var fye2023 = ParseDecimalNullable(fye2023Raw);
+                    TinStatusHelper.TryParseLegacyTin200(tin200Raw, out var tinStatus);
 
                     // Validate email
                     var emailValid = true;
@@ -105,7 +107,8 @@ namespace TINWeb.Pages.Company
                         Fye2025 = fye2025,
                         Fye2024 = fye2024,
                         Fye2023 = fye2023,
-                        Tin200 = tin200Raw
+                        Tin200 = tin200Raw,
+                        TinStatus = tinStatus
                     });
                 }
             }
@@ -173,6 +176,7 @@ namespace TINWeb.Pages.Company
                         var fye2025 = ParseDecimalNullable(fye2025Raw);
                         var fye2024 = ParseDecimalNullable(fye2024Raw);
                         var fye2023 = ParseDecimalNullable(fye2023Raw);
+                        TinStatusHelper.TryParseLegacyTin200(tin200Raw, out var tinStatus);
 
                         try
                         {
@@ -215,7 +219,8 @@ SET [CEOFirstName] = @ceoFirst,
     [CompanyDescription_ImportColumnName] = @companyDescriptionImportColumnName,
     [FYE2025] = @fye2025,
     [FYE2024] = @fye2024,
-    [FYE2023] = @fye2023
+    [FYE2023] = @fye2023,
+    [TINStatus] = @tinStatus
 WHERE [Id] = @id";
                                 cmd.Parameters.AddWithValue("@ceoFirst", (object?)ceoFirst ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@ceoLast", (object?)ceoLast ?? DBNull.Value);
@@ -229,6 +234,7 @@ WHERE [Id] = @id";
                                 cmd.Parameters.AddWithValue("@fye2025", (object?)fye2025 ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@fye2024", (object?)fye2024 ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@fye2023", (object?)fye2023 ?? DBNull.Value);
+                                cmd.Parameters.AddWithValue("@tinStatus", (object?)tinStatus ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@id", existingId.Value);
 
                                 var affected = await cmd.ExecuteNonQueryAsync();
@@ -239,8 +245,8 @@ WHERE [Id] = @id";
                                 using var cmd = conn.CreateCommand();
                                 cmd.Transaction = tran;
                                 cmd.CommandText = @"
-INSERT INTO [TIN200] ([CEOFirstName], [CEOLastName], [Email], [ExternalID], [CompanyName], [CompanyDescription], [ExternalId_ImportColumnName], [CompanyName_ImportColumnName], [CompanyDescription_ImportColumnName], [FYE2025], [FYE2024], [FYE2023], [TIN200])
-VALUES (@ceoFirst, @ceoLast, @email, @externalId, @companyName, @companyDesc, @externalIdImportColumnName, @companyNameImportColumnName, @companyDescriptionImportColumnName, @fye2025, @fye2024, @fye2023, @tin200)";
+INSERT INTO [TIN200] ([CEOFirstName], [CEOLastName], [Email], [ExternalID], [CompanyName], [CompanyDescription], [ExternalId_ImportColumnName], [CompanyName_ImportColumnName], [CompanyDescription_ImportColumnName], [FYE2025], [FYE2024], [FYE2023], [TINStatus])
+VALUES (@ceoFirst, @ceoLast, @email, @externalId, @companyName, @companyDesc, @externalIdImportColumnName, @companyNameImportColumnName, @companyDescriptionImportColumnName, @fye2025, @fye2024, @fye2023, @tinStatus)";
                                 cmd.Parameters.AddWithValue("@ceoFirst", (object?)ceoFirst ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@ceoLast", (object?)ceoLast ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@email", (object?)email ?? DBNull.Value);
@@ -253,7 +259,7 @@ VALUES (@ceoFirst, @ceoLast, @email, @externalId, @companyName, @companyDesc, @e
                                 cmd.Parameters.AddWithValue("@fye2025", (object?)fye2025 ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@fye2024", (object?)fye2024 ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@fye2023", (object?)fye2023 ?? DBNull.Value);
-                                cmd.Parameters.AddWithValue("@tin200", (object?)tin200Raw ?? DBNull.Value);
+                                cmd.Parameters.AddWithValue("@tinStatus", (object?)tinStatus ?? DBNull.Value);
 
                                 await cmd.ExecuteNonQueryAsync();
                                 inserted++;

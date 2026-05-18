@@ -24,14 +24,25 @@
 
     <div class="row mb-3">
         <div class="col-12">
-            <form method="get" class="d-flex">
-                <label class="me-2 align-self-center">Survey Financial Year:</label>
-                <select name="financialYear" class="form-select me-2" aria-label="Survey Financial Year" style="max-width: 180px;">
-                    @foreach (var year in Model.FinancialYears)
-                    {
-                        <option value="@year" selected="@(Model.SelectedFinancialYear == year ? "selected" : null)">@year</option>
-                    }
-                </select>
+            <form method="get" class="d-flex flex-wrap align-items-end gap-2">
+                <div>
+                    <label class="form-label mb-1">Survey Financial Year</label>
+                    <select name="financialYear" class="form-select" aria-label="Survey Financial Year" style="min-width: 180px;">
+                        @foreach (var year in Model.FinancialYears)
+                        {
+                            <option value="@year" selected="@(Model.SelectedFinancialYear == year ? "selected" : null)">@year</option>
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label class="form-label mb-1">TIN Status</label>
+                    <select name="selectedTinStatus" class="form-select" style="min-width: 180px;" aria-label="TIN Status">
+                        @foreach (var option in TINWeb.Models.TinStatusHelper.DropdownOptions)
+                        {
+                            <option value="@option.Value" selected="@(Model.SelectedTinStatus == option.Value ? "selected" : null)">@option.Label</option>
+                        }
+                    </select>
+                </div>
                 <button class="btn btn-outline-primary" type="submit">Apply</button>
             </form>
         </div>
@@ -41,6 +52,7 @@
     {
         <form method="post" id="surveyLockingForm">
             <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
+            <input type="hidden" name="selectedTinStatus" value="@Model.SelectedTinStatus" />
 
             <div class="card mb-3">
                 <div class="card-body py-3">

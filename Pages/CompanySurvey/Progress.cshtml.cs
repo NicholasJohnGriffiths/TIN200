@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using TINWeb.Models;
 using TINWeb.Services;
 
 namespace TINWeb.Pages.CompanySurvey
@@ -38,7 +39,7 @@ namespace TINWeb.Pages.CompanySurvey
         public string SortDir { get; set; } = "desc";
 
         [BindProperty(SupportsGet = true)]
-        public bool IncludeTestCompanies { get; set; }
+        public int SelectedTinStatus { get; set; } = (int)TinStatus.Tin200;
 
         public ProgressModel(CompanySurveyService companySurveyService)
         {
@@ -47,6 +48,7 @@ namespace TINWeb.Pages.CompanySurvey
 
         public async Task OnGetAsync()
         {
+            SelectedTinStatus = NormalizeTinStatusFilter(SelectedTinStatus);
             FinancialYears = await _companySurveyService.GetAvailableFinancialYearsAsync();
 
             if (!FinancialYear.HasValue)
@@ -55,11 +57,7 @@ namespace TINWeb.Pages.CompanySurvey
             }
 
             var rows = await _companySurveyService.GetListRowsAsync(FinancialYear);
-
-            if (!IncludeTestCompanies)
-            {
-                rows = rows.Where(r => !r.IsTestCompany).ToList();
-            }
+            rows = rows.Where(r => r.TinStatus == SelectedTinStatus).ToList();
 
             LastTIN200Years = rows
                 .Where(r => r.LastTIN200Year.HasValue)
@@ -163,6 +161,18 @@ namespace TINWeb.Pages.CompanySurvey
             }
 
             return row.SavedDate ?? row.SubmittedDate;
+        }
+
+        private static int NormalizeTinStatusFilter(int tinStatus)
+        {
+            return tinStatus switch
+            {
+                (int)TinStatus.Tin200 => (int)TinStatus.Tin200,
+                (int)TinStatus.Tin200Potential => (int)TinStatus.Tin200Potential,
+                (int)TinStatus.Tin1000 => (int)TinStatus.Tin1000,
+                (int)TinStatus.TinTest => (int)TinStatus.TinTest,
+                _ => (int)TinStatus.Tin200
+            };
         }
     }
 }

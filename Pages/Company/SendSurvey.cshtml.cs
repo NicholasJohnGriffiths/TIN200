@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
 using TINWeb.Data;
+using TINWeb.Models;
 using TINWeb.Services;
 
 namespace TINWeb.Pages.Company
@@ -56,7 +57,7 @@ namespace TINWeb.Pages.Company
         public int IntervalBetweenEachEmailSendSeconds { get; set; }
 
         [BindProperty(SupportsGet = true)]
-        public bool IncludeTestCompanies { get; set; }
+        public int SelectedTinStatus { get; set; } = (int)TinStatus.Tin200;
 
         [BindProperty(SupportsGet = true)]
         public int? SelectedLastTin200Year { get; set; }
@@ -89,6 +90,7 @@ namespace TINWeb.Pages.Company
 
         public async Task<IActionResult> OnGetAsync(int? id)
         {
+            SelectedTinStatus = NormalizeTinStatusFilter(SelectedTinStatus);
             await LoadAvailableClientsAsync();
 
             if (id.HasValue)
@@ -199,7 +201,7 @@ namespace TINWeb.Pages.Company
                     BulkFailedCount = 0;
                     BulkLastRunAt = DateTime.Now.ToString("MMM d, yyyy h:mm tt");
                     BulkSendSucceeded = false;
-                    return RedirectToPage(new { IncludeTestCompanies, SelectedLastTin200Year });
+                    return RedirectToPage(new { SelectedTinStatus, SelectedLastTin200Year });
                 }
             }
 
@@ -263,7 +265,7 @@ namespace TINWeb.Pages.Company
                         BulkFailedCount = failedCount;
                         BulkLastRunAt = DateTime.Now.ToString("MMM d, yyyy h:mm tt");
                         BulkSendSucceeded = false;
-                        return RedirectToPage(new { IncludeTestCompanies, SelectedLastTin200Year });
+                        return RedirectToPage(new { SelectedTinStatus, SelectedLastTin200Year });
                     }
                 }
             }
@@ -303,7 +305,7 @@ namespace TINWeb.Pages.Company
 
             BulkSendSucceeded = true;
 
-            return RedirectToPage(new { IncludeTestCompanies, SelectedLastTin200Year });
+            return RedirectToPage(new { SelectedTinStatus, SelectedLastTin200Year });
         }
 
         private async Task DelayUntilStartAsync(DateTime sendStartTimeLocal, CancellationToken cancellationToken)
@@ -368,10 +370,7 @@ namespace TINWeb.Pages.Company
             AvailableLastTin200Years = await _companyService.GetAvailableLastTin200YearsAsync();
 
             var clients = await _companyService.GetAllCompaniesAsync(SelectedLastTin200Year);
-            if (!IncludeTestCompanies)
-            {
-                clients = clients.Where(c => c.Test != true).ToList();
-            }
+            clients = clients.Where(c => c.TinStatus == SelectedTinStatus).ToList();
 
             var lockedCompanyIds = await GetLockedCompanyIdsForCurrentSurveyAsync();
             var surveyEmailStatusByCompanyId = await GetSurveyEmailStatusByCompanyIdForCurrentSurveyAsync();
@@ -401,6 +400,18 @@ namespace TINWeb.Pages.Company
                     };
                 })
                 .ToList();
+        }
+
+        private static int NormalizeTinStatusFilter(int tinStatus)
+        {
+            return tinStatus switch
+            {
+                (int)TinStatus.Tin200 => (int)TinStatus.Tin200,
+                (int)TinStatus.Tin200Potential => (int)TinStatus.Tin200Potential,
+                (int)TinStatus.Tin1000 => (int)TinStatus.Tin1000,
+                (int)TinStatus.TinTest => (int)TinStatus.TinTest,
+                _ => (int)TinStatus.Tin200
+            };
         }
 
         private async Task<Dictionary<int, SurveyEmailStatus>> GetSurveyEmailStatusByCompanyIdForCurrentSurveyAsync()

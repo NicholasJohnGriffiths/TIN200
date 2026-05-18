@@ -22,12 +22,17 @@ namespace TINWeb.Pages.Company
 
         public void OnGet(bool isTest = false, string? returnTo = null)
         {
-            Record.Test = isTest;
             ReturnTo = returnTo;
+            Record.TinStatus = isTest ? (int)TinStatus.TinTest : (int)TinStatus.Tin200;
         }
 
         public async Task<IActionResult> OnPostAsync()
         {
+            if (!TinStatusHelper.IsValidSelection(Record.TinStatus))
+            {
+                ModelState.AddModelError("Record.TinStatus", "TIN Status must be Blank, TIN200, TIN200Potential, TIN1000, or TINTest.");
+            }
+
             if (!ModelState.IsValid)
             {
                 return Page();

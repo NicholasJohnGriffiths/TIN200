@@ -31,16 +31,19 @@
             <div class="d-inline-flex align-items-center gap-2 flex-wrap justify-content-end">
                 <form method="post" asp-page-handler="CreateMissingAnswers" id="createMissingAnswersForm" class="d-inline">
                     <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
+                    <input type="hidden" name="selectedTinStatus" value="@Model.SelectedTinStatus" />
                     <button type="submit" class="btn btn-outline-secondary btn-sm">Create Missing Answers</button>
                 </form>
 
                 <form method="get" asp-page="./Index" asp-page-handler="Export" id="answersExportForm" class="d-inline">
                     <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
+                    <input type="hidden" name="selectedTinStatus" value="@Model.SelectedTinStatus" />
                     <button type="submit" class="btn btn-outline-success btn-sm">Export</button>
                 </form>
 
                 <form method="post" asp-page-handler="DeleteAllAnswers" id="deleteAllAnswersForm" class="d-inline">
                     <input type="hidden" name="deleteConfirmation" id="deleteConfirmationInput" />
+                    <input type="hidden" name="selectedTinStatus" value="@Model.SelectedTinStatus" />
                     <button type="button" class="btn btn-danger btn-sm" id="deleteAllAnswersButton" disabled="@(!Model.IsAdmin)" title="@(!Model.IsAdmin ? "Admin only" : null)">Delete All Answers</button>
                 </form>
             </div>
@@ -54,6 +57,7 @@
                 <h5 class="card-title mb-3">Import Qualtrics File</h5>
                 <form method="post" asp-page-handler="PreviewImport" enctype="multipart/form-data" id="previewImportForm" class="d-inline-flex align-items-center gap-2">
                     <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
+                    <input type="hidden" name="selectedTinStatus" value="@Model.SelectedTinStatus" />
                     <input type="hidden" name="showImportTool" value="qualtrics" />
                     <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="max-width: 260px;" />
                     <button type="submit" class="btn btn-outline-primary btn-sm">Preview Qualtrics Import</button>
@@ -69,6 +73,7 @@
                 <h5 class="card-title mb-3">Import Global File</h5>
                 <form method="post" asp-page-handler="PreviewGlobalImport" enctype="multipart/form-data" id="previewGlobalImportForm" class="d-inline-flex align-items-center gap-2">
                     <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
+                    <input type="hidden" name="selectedTinStatus" value="@Model.SelectedTinStatus" />
                     <input type="hidden" name="showImportTool" value="global" />
                     <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="max-width: 260px;" />
                     <button type="submit" class="btn btn-outline-dark btn-sm">Preview Global Import</button>
@@ -152,6 +157,7 @@
 
                 <form method="post" asp-page-handler="ApplyImport" id="applyImportForm" class="d-inline">
                     <input type="hidden" name="previewToken" value="@Model.PendingImportToken" />
+                    <input type="hidden" name="selectedTinStatus" value="@Model.SelectedTinStatus" />
                     <input type="hidden" name="showImportTool" value="qualtrics" />
                     <button type="submit" class="btn btn-primary">Apply Import</button>
                 </form>
@@ -225,6 +231,7 @@
 
                 <form method="post" asp-page-handler="ApplyGlobalImport" id="applyGlobalImportForm" class="d-inline">
                     <input type="hidden" name="previewToken" value="@Model.PendingGlobalImportToken" />
+                    <input type="hidden" name="selectedTinStatus" value="@Model.SelectedTinStatus" />
                     <input type="hidden" name="showImportTool" value="global" />
                     <button type="submit" class="btn btn-dark">Apply Global Import</button>
                 </form>
@@ -241,6 +248,14 @@
                     @foreach (var year in Model.FinancialYears)
                     {
                         <option value="@year" selected="@(Model.SelectedFinancialYear == year ? "selected" : null)">@year</option>
+                    }
+                </select>
+
+                <label class="ms-2 me-1">TIN Status:</label>
+                <select name="selectedTinStatus" class="form-select" aria-label="TIN Status" style="max-width: 220px;">
+                    @foreach (var option in TINWeb.Models.TinStatusHelper.DropdownOptions)
+                    {
+                        <option value="@option.Value" selected="@(Model.SelectedTinStatus == option.Value ? "selected" : null)">@option.Label</option>
                     }
                 </select>
 

@@ -52,15 +52,19 @@
                 <div class="card-body">
                     <form method="get" class="mb-3">
                         <input type="hidden" asp-for="SelectedLastTin200Year" />
-                        <div class="form-check">
-                            <input asp-for="IncludeTestCompanies" class="form-check-input" onchange="this.form.submit()" />
-                            <label asp-for="IncludeTestCompanies" class="form-check-label">Include Test Companies</label>
+                        <div>
+                            <label asp-for="SelectedTinStatus" class="form-label mb-1">TIN Status</label>
+                            <select asp-for="SelectedTinStatus" class="form-select" style="max-width: 220px;" onchange="this.form.submit()">
+                                @foreach (var option in TINWeb.Models.TinStatusHelper.DropdownOptions)
+                                {
+                                    <option value="@option.Value">@option.Label</option>
+                                }
+                            </select>
                         </div>
-                        <div class="form-text">By default, test companies are hidden from this page.</div>
                     </form>
 
                     <form method="get" class="d-flex align-items-center gap-2 mb-3 flex-wrap">
-                        <input type="hidden" asp-for="IncludeTestCompanies" />
+                        <input type="hidden" asp-for="SelectedTinStatus" />
                         <label asp-for="SelectedLastTin200Year" class="form-label mb-0">Filter Last TIN200 Year:</label>
                         <select asp-for="SelectedLastTin200Year" class="form-select" style="max-width: 160px;" aria-label="Last TIN200 Year">
                             <option value="">All</option>
@@ -73,7 +77,7 @@
                     </form>
 
                     <form id="bulkSendForm" method="post" asp-page-handler="Bulk">
-                        <input type="hidden" asp-for="IncludeTestCompanies" />
+                        <input type="hidden" asp-for="SelectedTinStatus" />
                         <input type="hidden" asp-for="SelectedLastTin200Year" />
                         <div class="form-check mb-3">
                             <input asp-for="SendToAllClients" class="form-check-input" />

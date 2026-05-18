@@ -16,6 +16,7 @@ namespace TINWeb.Pages.Company
         public int? SelectedLastTin200Year { get; set; }
         public int? FocusId { get; set; }
         public string CompanySearch { get; set; } = string.Empty;
+        public int? SelectedTinStatus { get; set; } = (int)TinStatus.Tin200;
         public bool ShowTestCompanies { get; set; }
         [BindProperty(SupportsGet = true)]
         public string? ShowImportTool { get; set; }
@@ -51,7 +52,7 @@ namespace TINWeb.Pages.Company
             _service = service;
         }
 
-        public async Task OnGetAsync(int? lastTin200Year, int? focusId, string? companySearch, bool showTestCompanies = false, string? showImportTool = null, string? showImportTab = null)
+        public async Task OnGetAsync(int? lastTin200Year, int? focusId, string? companySearch, int? tinStatus, bool showTestCompanies = false, string? showImportTool = null, string? showImportTab = null)
         {
             FocusId = focusId;
             ShowImportTool = showImportTool;
@@ -68,7 +69,8 @@ namespace TINWeb.Pages.Company
                 ShowImportTab = "global";
             }
 
-            await LoadPageAsync(lastTin200Year, companySearch, showTestCompanies);
+            var hasTinStatusFilter = Request.Query.ContainsKey("tinStatus");
+            await LoadPageAsync(lastTin200Year, companySearch, showTestCompanies, tinStatus, hasTinStatusFilter);
         }
 
         public async Task<IActionResult> OnPostPreviewResetFyeValuesAsync(int? lastTin200Year, string? companySearch, bool showTestCompanies = false)
@@ -440,12 +442,13 @@ namespace TINWeb.Pages.Company
             return RedirectToPage(new { lastTin200Year = pendingImport.LastTin200Year, companySearch = pendingImport.CompanySearch, showTestCompanies = pendingImport.ShowTestCompanies, showImportTool = pendingImport.ShowImportTool, showImportTab = pendingImport.ShowImportTab });
         }
 
-        private async Task LoadPageAsync(int? lastTin200Year, string? companySearch, bool showTestCompanies = false)
+        private async Task LoadPageAsync(int? lastTin200Year, string? companySearch, bool showTestCompanies = false, int? tinStatus = null, bool hasTinStatusFilter = false)
         {
             AvailableLastTin200Years = await _service.GetAvailableLastTin200YearsAsync();
             SelectedImportYear ??= SelectedLastTin200Year;
             CompanySearch = (companySearch ?? string.Empty).Trim();
             ShowTestCompanies = showTestCompanies;
+            SelectedTinStatus = NormalizeTinStatusFilter(tinStatus, hasTinStatusFilter);
             if (lastTin200Year.HasValue)
             {
                 SelectedLastTin200Year = lastTin200Year.Value;
@@ -457,10 +460,18 @@ namespace TINWeb.Pages.Company
             }
 
             Records = await _service.GetAllCompaniesAsync(SelectedLastTin200Year);
-
-            if (!ShowTestCompanies)
+            if (SelectedTinStatus.HasValue)
             {
-                Records = Records.Where(x => x.Test != true).ToList();
+                Records = Records.Where(x => x.TinStatus == SelectedTinStatus.Value).ToList();
+            }
+            else
+            {
+                Records = Records.Where(x => !x.TinStatus.HasValue || x.TinStatus.Value == (int)TinStatus.Blank).ToList();
+            }
+
+            if (!ShowTestCompanies && SelectedTinStatus != (int)TinStatus.TinTest)
+            {
+                Records = Records.Where(x => !TinStatusHelper.IsTestCompany(x.TinStatus)).ToList();
             }
 
             if (!string.IsNullOrWhiteSpace(CompanySearch))
@@ -471,6 +482,28 @@ namespace TINWeb.Pages.Company
                         || (!string.IsNullOrWhiteSpace(x.ExternalId) && x.ExternalId.Contains(CompanySearch, StringComparison.OrdinalIgnoreCase)))
                     .ToList();
             }
+        }
+
+        private static int? NormalizeTinStatusFilter(int? tinStatus, bool hasTinStatusFilter)
+        {
+            if (!hasTinStatusFilter)
+            {
+                return (int)TinStatus.Tin200;
+            }
+
+            if (!tinStatus.HasValue || tinStatus.Value == (int)TinStatus.Blank)
+            {
+                return null;
+            }
+
+            return tinStatus.Value switch
+            {
+                (int)TinStatus.Tin200 => (int)TinStatus.Tin200,
+                (int)TinStatus.Tin200Potential => (int)TinStatus.Tin200Potential,
+                (int)TinStatus.Tin1000 => (int)TinStatus.Tin1000,
+                (int)TinStatus.TinTest => (int)TinStatus.TinTest,
+                _ => (int)TinStatus.Tin200
+            };
         }
 
         private static void CleanupExpiredPendingImports()
