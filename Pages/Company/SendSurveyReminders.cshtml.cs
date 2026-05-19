@@ -62,6 +62,9 @@ namespace TINWeb.Pages.Company
         [BindProperty(SupportsGet = true)]
         public int? SelectedSentYear { get; set; }
 
+        [BindProperty(SupportsGet = true)]
+        public bool IncludeSavedSubmitted { get; set; }
+
         public List<int> AvailableSentYears { get; set; } = new();
         public List<ReminderClientRow> AvailableClients { get; set; } = new();
 
@@ -156,7 +159,7 @@ namespace TINWeb.Pages.Company
                     BulkFailedCount = 0;
                     BulkLastRunAt = DateTime.Now.ToString("MMM d, yyyy h:mm tt");
                     BulkSendSucceeded = false;
-                    return RedirectToPage(new { SelectedTinStatus, SelectedSentYear });
+                    return RedirectToPage(new { SelectedTinStatus, SelectedSentYear, IncludeSavedSubmitted });
                 }
             }
 
@@ -209,7 +212,7 @@ namespace TINWeb.Pages.Company
                         BulkFailedCount = failedCount;
                         BulkLastRunAt = DateTime.Now.ToString("MMM d, yyyy h:mm tt");
                         BulkSendSucceeded = false;
-                        return RedirectToPage(new { SelectedTinStatus, SelectedSentYear });
+                        return RedirectToPage(new { SelectedTinStatus, SelectedSentYear, IncludeSavedSubmitted });
                     }
                 }
             }
@@ -242,7 +245,7 @@ namespace TINWeb.Pages.Company
             }
 
             BulkSendSucceeded = true;
-            return RedirectToPage(new { SelectedTinStatus, SelectedSentYear });
+            return RedirectToPage(new { SelectedTinStatus, SelectedSentYear, IncludeSavedSubmitted });
         }
 
         private async Task LoadAvailableClientsAsync()
@@ -270,6 +273,12 @@ namespace TINWeb.Pages.Company
                         .ThenByDescending(cs => cs.Id)
                         .First())
                     .ToDictionaryAsync(cs => cs.CompanyId, cs => cs);
+
+                companies = companies
+                    .Where(c => latestSurveyByCompanyId.TryGetValue(c.Id, out var cs)
+                        && (IncludeSavedSubmitted
+                            || (!cs.Saved && !cs.Submitted)))
+                    .ToList();
 
                 var lockedCompanyIds = await GetLockedCompanyIdsForCurrentSurveyAsync();
 
@@ -305,8 +314,8 @@ namespace TINWeb.Pages.Company
                 // Distinct years from SurveyEmailSentLastDate for companies with selected TinStatus
                 AvailableSentYears = await _context.CompanySurvey
                     .Where(cs => (cs.SurveyEmailSent ?? false)
-                        && !cs.Saved
-                        && !cs.Submitted
+                        && (IncludeSavedSubmitted
+                            || (!cs.Saved && !cs.Submitted))
                         && cs.SurveyEmailSentLastDate.HasValue
                         && companiesWithStatus.Contains(cs.CompanyId))
                     .Select(cs => cs.SurveyEmailSentLastDate!.Value.Year)
@@ -324,8 +333,8 @@ namespace TINWeb.Pages.Company
                 // CRITICAL: Filter by companiesWithStatus to ensure we only get records for the selected TinStatus
                 var surveyEmailStatusByCompanyId = await _context.CompanySurvey
                     .Where(cs => (cs.SurveyEmailSent ?? false)
-                        && !cs.Saved
-                        && !cs.Submitted
+                        && (IncludeSavedSubmitted
+                            || (!cs.Saved && !cs.Submitted))
                         && cs.SurveyEmailSentLastDate.HasValue
                         && companiesWithStatus.Contains(cs.CompanyId)
                         && (!SelectedSentYear.HasValue || cs.SurveyEmailSentLastDate!.Value.Year == SelectedSentYear.Value))

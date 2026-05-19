@@ -10,6 +10,7 @@
             <h1>Send Survey Reminders</h1>
             <p class="text-muted mb-1">Send a reminder survey email to companies that have already been sent a survey.</p>
             <p class="small text-muted">Only companies with a previously sent survey email are shown.</p>
+            <p class="small text-muted mb-1">By default, companies with saved or submitted surveys are excluded.</p>
             <hr />
 
             @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
@@ -50,35 +51,42 @@
             <div class="card mb-3">
                 <div class="card-header">Bulk Send Reminders</div>
                 <div class="card-body">
-                    <form method="get" class="mb-3">
-                        <input type="hidden" asp-for="SelectedSentYear" />
+                    <form method="get" class="mb-3 d-flex align-items-end gap-3 flex-wrap">
                         <div>
                             <label asp-for="SelectedTinStatus" class="form-label mb-1">TIN Status</label>
-                            <select asp-for="SelectedTinStatus" class="form-select" style="max-width: 220px;" onchange="this.form.submit()">
+                            <select asp-for="SelectedTinStatus" class="form-select" style="min-width: 220px;" onchange="this.form.submit()">
                                 @foreach (var option in TINWeb.Models.TinStatusHelper.DropdownOptions)
                                 {
                                     <option value="@option.Value">@option.Label</option>
                                 }
                             </select>
                         </div>
-                    </form>
 
-                    <form method="get" class="d-flex align-items-center gap-2 mb-3 flex-wrap">
-                        <input type="hidden" asp-for="SelectedTinStatus" />
-                        <label asp-for="SelectedSentYear" class="form-label mb-0">Year Survey Sent:</label>
-                        <select asp-for="SelectedSentYear" class="form-select" style="max-width: 160px;" aria-label="Year Survey Sent">
-                            <option value="">All Years</option>
-                            @foreach (var y in Model.AvailableSentYears)
-                            {
-                                <option value="@y">@y</option>
-                            }
-                        </select>
-                        <button type="submit" class="btn btn-outline-primary btn-sm">Apply</button>
+                        <div>
+                            <label asp-for="SelectedSentYear" class="form-label mb-1">Year Survey Sent</label>
+                            <select asp-for="SelectedSentYear" class="form-select" style="min-width: 160px;" aria-label="Year Survey Sent">
+                                <option value="">All Years</option>
+                                @foreach (var y in Model.AvailableSentYears)
+                                {
+                                    <option value="@y">@y</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="form-check mb-2">
+                            <input asp-for="IncludeSavedSubmitted" class="form-check-input" onchange="this.form.submit()" />
+                            <label asp-for="IncludeSavedSubmitted" class="form-check-label">Include saved/submitted</label>
+                        </div>
+
+                        <div class="mb-2">
+                            <button type="submit" class="btn btn-outline-primary btn-sm">Apply Filters</button>
+                        </div>
                     </form>
 
                     <form id="bulkSendForm" method="post" asp-page-handler="Bulk">
                         <input type="hidden" asp-for="SelectedTinStatus" />
                         <input type="hidden" asp-for="SelectedSentYear" />
+                        <input type="hidden" asp-for="IncludeSavedSubmitted" />
 
                         <div class="mb-2">
                             <button type="button" id="selectAllClientsBtn" class="btn btn-outline-secondary btn-sm">Select All Listed</button>
@@ -93,9 +101,9 @@
                         <div class="mb-3 d-flex align-items-center" role="group" aria-label="Reminder sent filter">
                             <label for="reminderSentFilter" class="form-label me-2 mb-0">Reminder Sent</label>
                             <select id="reminderSentFilter" class="form-select form-select-sm" style="max-width: 180px;">
-                                <option value="all">All</option>
+                                <option value="all" selected>All</option>
                                 <option value="sent">Sent</option>
-                                <option value="not-sent" selected>Not sent</option>
+                                <option value="not-sent">Not sent</option>
                             </select>
                         </div>
 
@@ -340,7 +348,7 @@
             let filterParam = null;
             let activeFilter = 'all';
             let reminderSentFilterParam = null;
-            let activeReminderSentFilter = 'not-sent';
+            let activeReminderSentFilter = 'all';
             let sortKey = 'company';
             let sortDir = 'asc';
             let bulkProgressTimerId = null;
