@@ -247,67 +247,126 @@ namespace TINWeb.Pages.Company
 
         private async Task LoadAvailableClientsAsync()
         {
-            // Distinct years from SurveyEmailSentLastDate where a survey email was sent
-            AvailableSentYears = await _context.CompanySurvey
-                .Where(cs => (cs.SurveyEmailSent ?? false)
-                    && !cs.Saved
-                    && !cs.Submitted
-                    && cs.SurveyEmailSentLastDate.HasValue)
-                .Select(cs => cs.SurveyEmailSentLastDate!.Value.Year)
-                .Distinct()
-                .OrderByDescending(y => y)
-                .ToListAsync();
+            // First, get all companies with the selected TinStatus
+            var allCompanies = await _companyService.GetAllCompaniesAsync(null);
+            var companiesWithStatus = allCompanies.Where(c => c.TinStatus == SelectedTinStatus).Select(c => c.Id).ToHashSet();
 
-            // Default to the latest year if no year explicitly selected
-            if (!SelectedSentYear.HasValue && AvailableSentYears.Any())
+            bool isTestCompanyFilter = SelectedTinStatus == (int)TinStatus.TinTest;
+
+            if (isTestCompanyFilter)
             {
-                SelectedSentYear = AvailableSentYears.First();
-            }
+                // For test companies: show all TINTest companies regardless of survey send status
+                // No year filtering needed
+                AvailableSentYears = new List<int>();
+                SelectedSentYear = null;
 
-            // Load all companies with a survey email sent in the selected year
-            var surveyEmailStatusByCompanyId = await _context.CompanySurvey
-                .Where(cs => (cs.SurveyEmailSent ?? false)
-                    && !cs.Saved
-                    && !cs.Submitted
-                    && cs.SurveyEmailSentLastDate.HasValue
-                    && (!SelectedSentYear.HasValue || cs.SurveyEmailSentLastDate!.Value.Year == SelectedSentYear.Value))
-                .GroupBy(cs => cs.CompanyId)
-                .Select(g => g.OrderByDescending(cs => cs.SurveyEmailSentLastDate).First())
-                .ToDictionaryAsync(cs => cs.CompanyId, cs => cs);
+                var companies = allCompanies.Where(c => c.TinStatus == SelectedTinStatus).ToList();
+                var latestSurveyByCompanyId = await _context.CompanySurvey
+                    .Where(cs => companiesWithStatus.Contains(cs.CompanyId))
+                    .GroupBy(cs => cs.CompanyId)
+                    .Select(g => g
+                        .OrderByDescending(cs => cs.SurveyEmailSentLastDate.HasValue)
+                        .ThenByDescending(cs => cs.SurveyEmailSentLastDate)
+                        .ThenByDescending(cs => cs.Id)
+                        .First())
+                    .ToDictionaryAsync(cs => cs.CompanyId, cs => cs);
 
-            var companyIds = surveyEmailStatusByCompanyId.Keys.ToList();
+                var lockedCompanyIds = await GetLockedCompanyIdsForCurrentSurveyAsync();
 
-            var companies = await _companyService.GetAllCompaniesAsync(null);
-            companies = companies.Where(c => companyIds.Contains(c.Id)).ToList();
-            companies = companies.Where(c => c.TinStatus == SelectedTinStatus).ToList();
-
-            var lockedCompanyIds = await GetLockedCompanyIdsForCurrentSurveyAsync();
-
-            AvailableClients = companies
-                .OrderBy(c => c.CompanyName)
-                .ThenBy(c => c.Id)
-                .Select(c =>
-                {
-                    surveyEmailStatusByCompanyId.TryGetValue(c.Id, out var cs);
-                    var surveyLink = cs?.SurveyLink;
-                    var surveyLinkExpiryUtc = GetSurveyLinkExpiryUtc(surveyLink);
-
-                    return new ReminderClientRow
+                AvailableClients = companies
+                    .OrderBy(c => c.CompanyName)
+                    .ThenBy(c => c.Id)
+                    .Select(c =>
                     {
-                        Id = c.Id,
-                        CompanyName = c.CompanyName,
-                        Email = c.ContactEmail,
-                        IsLocked = lockedCompanyIds.Contains(c.Id),
-                        SurveyEmailSentLastDate = cs?.SurveyEmailSentLastDate,
-                        SurveyReminderEmailSent = cs?.SurveyReminderEmailSent ?? false,
-                        SurveyReminderEmailSentLastDate = cs?.SurveyReminderEmailSentLastDate,
-                        Unsubscribed = cs?.Unsubscribed ?? false,
-                        SurveyLink = surveyLink,
-                        SurveyLinkExpiryUtc = surveyLinkExpiryUtc,
-                        IsSurveyLinkExpired = surveyLinkExpiryUtc.HasValue && surveyLinkExpiryUtc.Value <= DateTimeOffset.UtcNow
-                    };
-                })
-                .ToList();
+                        latestSurveyByCompanyId.TryGetValue(c.Id, out var cs);
+                        var surveyLink = cs?.SurveyLink;
+                        var surveyLinkExpiryUtc = GetSurveyLinkExpiryUtc(surveyLink);
+
+                        return new ReminderClientRow
+                        {
+                            Id = c.Id,
+                            CompanyName = c.CompanyName,
+                            Email = c.ContactEmail,
+                            IsLocked = lockedCompanyIds.Contains(c.Id),
+                            SurveyEmailSentLastDate = cs?.SurveyEmailSentLastDate,
+                            SurveyReminderEmailSent = cs?.SurveyReminderEmailSent ?? false,
+                            SurveyReminderEmailSentLastDate = cs?.SurveyReminderEmailSentLastDate,
+                            Unsubscribed = cs?.Unsubscribed ?? false,
+                            SurveyLink = surveyLink,
+                            SurveyLinkExpiryUtc = surveyLinkExpiryUtc,
+                            IsSurveyLinkExpired = surveyLinkExpiryUtc.HasValue && surveyLinkExpiryUtc.Value <= DateTimeOffset.UtcNow
+                        };
+                    })
+                    .ToList();
+            }
+            else
+            {
+                // For production companies: only show those with survey emails sent
+                // Distinct years from SurveyEmailSentLastDate for companies with selected TinStatus
+                AvailableSentYears = await _context.CompanySurvey
+                    .Where(cs => (cs.SurveyEmailSent ?? false)
+                        && !cs.Saved
+                        && !cs.Submitted
+                        && cs.SurveyEmailSentLastDate.HasValue
+                        && companiesWithStatus.Contains(cs.CompanyId))
+                    .Select(cs => cs.SurveyEmailSentLastDate!.Value.Year)
+                    .Distinct()
+                    .OrderByDescending(y => y)
+                    .ToListAsync();
+
+                // Default to the latest year if no year explicitly selected, or if the currently selected year has no records for this TinStatus
+                if ((!SelectedSentYear.HasValue || !AvailableSentYears.Contains(SelectedSentYear.Value)) && AvailableSentYears.Any())
+                {
+                    SelectedSentYear = AvailableSentYears.First();
+                }
+
+                // Load all companies with a survey email sent in the selected year
+                // CRITICAL: Filter by companiesWithStatus to ensure we only get records for the selected TinStatus
+                var surveyEmailStatusByCompanyId = await _context.CompanySurvey
+                    .Where(cs => (cs.SurveyEmailSent ?? false)
+                        && !cs.Saved
+                        && !cs.Submitted
+                        && cs.SurveyEmailSentLastDate.HasValue
+                        && companiesWithStatus.Contains(cs.CompanyId)
+                        && (!SelectedSentYear.HasValue || cs.SurveyEmailSentLastDate!.Value.Year == SelectedSentYear.Value))
+                    .GroupBy(cs => cs.CompanyId)
+                    .Select(g => g.OrderByDescending(cs => cs.SurveyEmailSentLastDate).First())
+                    .ToDictionaryAsync(cs => cs.CompanyId, cs => cs);
+
+                var companyIds = surveyEmailStatusByCompanyId.Keys.ToList();
+
+                var companies = allCompanies;
+                companies = companies.Where(c => companyIds.Contains(c.Id)).ToList();
+                companies = companies.Where(c => c.TinStatus == SelectedTinStatus).ToList();
+
+                var lockedCompanyIds = await GetLockedCompanyIdsForCurrentSurveyAsync();
+
+                AvailableClients = companies
+                    .OrderBy(c => c.CompanyName)
+                    .ThenBy(c => c.Id)
+                    .Select(c =>
+                    {
+                        surveyEmailStatusByCompanyId.TryGetValue(c.Id, out var cs);
+                        var surveyLink = cs?.SurveyLink;
+                        var surveyLinkExpiryUtc = GetSurveyLinkExpiryUtc(surveyLink);
+
+                        return new ReminderClientRow
+                        {
+                            Id = c.Id,
+                            CompanyName = c.CompanyName,
+                            Email = c.ContactEmail,
+                            IsLocked = lockedCompanyIds.Contains(c.Id),
+                            SurveyEmailSentLastDate = cs?.SurveyEmailSentLastDate,
+                            SurveyReminderEmailSent = cs?.SurveyReminderEmailSent ?? false,
+                            SurveyReminderEmailSentLastDate = cs?.SurveyReminderEmailSentLastDate,
+                            Unsubscribed = cs?.Unsubscribed ?? false,
+                            SurveyLink = surveyLink,
+                            SurveyLinkExpiryUtc = surveyLinkExpiryUtc,
+                            IsSurveyLinkExpired = surveyLinkExpiryUtc.HasValue && surveyLinkExpiryUtc.Value <= DateTimeOffset.UtcNow
+                        };
+                    })
+                    .ToList();
+            }
         }
 
         private static int NormalizeTinStatusFilter(int tinStatus)

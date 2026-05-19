@@ -29,6 +29,17 @@ namespace TINWeb.Models
                 || status.Value == (int)TinStatus.TinTest;
         }
 
+        public static string ToDisplayLabel(int? status)
+        {
+            if (!status.HasValue || status.Value == (int)TinStatus.Blank)
+            {
+                return "Blank";
+            }
+
+            var matched = DropdownOptions.FirstOrDefault(x => x.Value == status.Value);
+            return string.IsNullOrWhiteSpace(matched.Label) ? status.Value.ToString() : matched.Label;
+        }
+
             public static bool IsTestCompany(int? status)
             {
                 return status.HasValue && status.Value == (int)TinStatus.TinTest;

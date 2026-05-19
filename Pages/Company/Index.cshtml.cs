@@ -39,6 +39,8 @@ namespace TINWeb.Pages.Company
         public string? ContactMapLastNameHeader { get; set; }
         [BindProperty]
         public string? ContactMapEmailHeader { get; set; }
+        [BindProperty]
+        public int? ContactImportTinStatus { get; set; } = (int)TinStatus.Tin200;
         public int? SelectedImportYear { get; set; }
 
         [TempData]
@@ -236,7 +238,7 @@ namespace TINWeb.Pages.Company
 
             if (sourceImport == null && (importFile == null || importFile.Length == 0))
             {
-                ErrorMessage = "Contact import failed: please select an Excel file.";
+                ErrorMessage = "Companies import failed: please select an Excel file.";
                 return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
             }
 
@@ -245,7 +247,7 @@ namespace TINWeb.Pages.Company
                 var fileName = importFile?.FileName ?? string.Empty;
                 if (!fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
                 {
-                    ErrorMessage = "Contact import failed: only .xlsx Excel files are supported.";
+                    ErrorMessage = "Companies import failed: only .xlsx Excel files are supported.";
                     return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
                 }
 
@@ -278,7 +280,9 @@ namespace TINWeb.Pages.Company
                 CompanyNameHeader = ContactMapCompanyNameHeader,
                 ContactFirstNameHeader = ContactMapFirstNameHeader,
                 ContactLastNameHeader = ContactMapLastNameHeader,
-                ContactEmailHeader = ContactMapEmailHeader
+                ContactEmailHeader = ContactMapEmailHeader,
+                ApplyTinStatus = true,
+                TinStatusToApply = ContactImportTinStatus
             };
 
             CompanyService.CompanyContactImportPreviewResult preview;
@@ -303,6 +307,8 @@ namespace TINWeb.Pages.Company
             sourceImport.MappedContactFirstNameHeader = preview.MatchedFields.FirstOrDefault(x => x.StartsWith("Contact First Name ->", StringComparison.OrdinalIgnoreCase))?.Split("->", 2).ElementAtOrDefault(1)?.Trim();
             sourceImport.MappedContactLastNameHeader = preview.MatchedFields.FirstOrDefault(x => x.StartsWith("Contact Last Name ->", StringComparison.OrdinalIgnoreCase))?.Split("->", 2).ElementAtOrDefault(1)?.Trim();
             sourceImport.MappedContactEmailHeader = preview.MatchedFields.FirstOrDefault(x => x.StartsWith("Contact Email ->", StringComparison.OrdinalIgnoreCase))?.Split("->", 2).ElementAtOrDefault(1)?.Trim();
+            sourceImport.ApplyTinStatus = true;
+            sourceImport.ContactImportTinStatus = ContactImportTinStatus;
 
             PendingImports[sourceImport.Token] = sourceImport;
 
@@ -314,6 +320,7 @@ namespace TINWeb.Pages.Company
             ContactMapFirstNameHeader = sourceImport.MappedContactFirstNameHeader;
             ContactMapLastNameHeader = sourceImport.MappedContactLastNameHeader;
             ContactMapEmailHeader = sourceImport.MappedContactEmailHeader;
+            ContactImportTinStatus = sourceImport.ContactImportTinStatus;
             return Page();
         }
 
@@ -329,14 +336,14 @@ namespace TINWeb.Pages.Company
             ShowImportTab = string.IsNullOrWhiteSpace(showImportTab) ? "contacts" : showImportTab;
             if (importFile == null || importFile.Length == 0)
             {
-                ErrorMessage = "Contact import mapping failed: please select an Excel file.";
+                ErrorMessage = "Companies import mapping failed: please select an Excel file.";
                 return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
             }
 
             var fileName = importFile.FileName ?? string.Empty;
             if (!fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
             {
-                ErrorMessage = "Contact import mapping failed: only .xlsx Excel files are supported.";
+                ErrorMessage = "Companies import mapping failed: only .xlsx Excel files are supported.";
                 return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
             }
 
@@ -365,7 +372,7 @@ namespace TINWeb.Pages.Company
                     System.IO.File.Delete(tempFilePath);
                 }
 
-                ErrorMessage = "Contact import mapping failed: no header row was detected in the selected file.";
+                ErrorMessage = "Companies import mapping failed: no header row was detected in the selected file.";
                 return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
             }
 
@@ -389,11 +396,12 @@ namespace TINWeb.Pages.Company
             ContactMapFirstNameHeader = headers.FirstOrDefault(x => string.Equals(x.Trim(), "Contact Person - First Name", StringComparison.OrdinalIgnoreCase));
             ContactMapLastNameHeader = headers.FirstOrDefault(x => string.Equals(x.Trim(), "Contact Person - Last Name", StringComparison.OrdinalIgnoreCase));
             ContactMapEmailHeader = headers.FirstOrDefault(x => string.Equals(x.Trim(), "Contact Email", StringComparison.OrdinalIgnoreCase));
-            StatusMessage = "Contact import file loaded. Review or adjust the header mappings, then preview the import.";
+            ContactImportTinStatus = (int)TinStatus.Tin200;
+            StatusMessage = "Companies import file loaded. Review or adjust the header mappings, then preview the import.";
             return Page();
         }
 
-        public async Task<IActionResult> OnPostApplyContactImportAsync(string? previewToken)
+        public async Task<IActionResult> OnPostApplyContactImportAsync(string? previewToken, string? selectedContactImportRows)
         {
             if (!User.IsInRole("1"))
             {
@@ -405,8 +413,15 @@ namespace TINWeb.Pages.Company
 
             if (string.IsNullOrWhiteSpace(previewToken) || !PendingImports.TryGetValue(previewToken, out var pendingImport))
             {
-                ErrorMessage = "Apply contact import failed: preview session not found or expired. Please preview the file again.";
+                ErrorMessage = "Apply companies import failed: preview session not found or expired. Please preview the file again.";
                 return RedirectToPage();
+            }
+
+            var selectedRows = ParseSelectedRowNumbers(selectedContactImportRows);
+            if (selectedRows.Count == 0)
+            {
+                ErrorMessage = "Apply companies import failed: please select at least one row from the preview.";
+                return RedirectToPage(new { lastTin200Year = pendingImport.LastTin200Year, companySearch = pendingImport.CompanySearch, showTestCompanies = pendingImport.ShowTestCompanies, showImportTool = pendingImport.ShowImportTool, showImportTab = pendingImport.ShowImportTab });
             }
 
             try
@@ -417,17 +432,20 @@ namespace TINWeb.Pages.Company
                     CompanyNameHeader = pendingImport.MappedCompanyNameHeader,
                     ContactFirstNameHeader = pendingImport.MappedContactFirstNameHeader,
                     ContactLastNameHeader = pendingImport.MappedContactLastNameHeader,
-                    ContactEmailHeader = pendingImport.MappedContactEmailHeader
+                    ContactEmailHeader = pendingImport.MappedContactEmailHeader,
+                    ApplyTinStatus = pendingImport.ApplyTinStatus,
+                    TinStatusToApply = pendingImport.ContactImportTinStatus,
+                    SelectedRowNumbers = selectedRows
                 };
 
                 var result = await _service.ImportContactsFromExcelAsync(stream, mapping);
                 if (result.Errors.Any())
                 {
-                    StatusMessage = $"Contact import completed with warnings. Updated: {result.UpdatedCount}, Unchanged: {result.UnchangedCount}, Not Found: {result.NotFoundCount}. Warnings: {string.Join(" ", result.Errors.Take(5))}";
+                    StatusMessage = $"Companies import completed with warnings. Updated: {result.UpdatedCount}, Added: {result.InsertedCount}, Unchanged: {result.UnchangedCount}. Warnings: {string.Join(" ", result.Errors.Take(5))}";
                 }
                 else
                 {
-                    StatusMessage = $"Contact import completed. Updated: {result.UpdatedCount}, Unchanged: {result.UnchangedCount}, Not Found: {result.NotFoundCount}.";
+                    StatusMessage = $"Companies import completed. Updated: {result.UpdatedCount}, Added: {result.InsertedCount}, Unchanged: {result.UnchangedCount}.";
                 }
             }
             finally
@@ -506,6 +524,20 @@ namespace TINWeb.Pages.Company
             };
         }
 
+        private static HashSet<int> ParseSelectedRowNumbers(string? selectedContactImportRows)
+        {
+            if (string.IsNullOrWhiteSpace(selectedContactImportRows))
+            {
+                return new HashSet<int>();
+            }
+
+            return selectedContactImportRows
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(x => int.TryParse(x, out var rowNumber) ? rowNumber : 0)
+                .Where(x => x > 0)
+                .ToHashSet();
+        }
+
         private static void CleanupExpiredPendingImports()
         {
             var cutoff = DateTime.UtcNow.AddMinutes(-30);
@@ -538,6 +570,8 @@ namespace TINWeb.Pages.Company
             public string? MappedContactFirstNameHeader { get; set; }
             public string? MappedContactLastNameHeader { get; set; }
             public string? MappedContactEmailHeader { get; set; }
+            public bool ApplyTinStatus { get; set; }
+            public int? ContactImportTinStatus { get; set; }
         }
     }
 }

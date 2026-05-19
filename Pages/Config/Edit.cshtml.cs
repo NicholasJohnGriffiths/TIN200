@@ -83,6 +83,9 @@ public class EditModel : PageModel
         Record.SurveyEmailTemplate = string.IsNullOrWhiteSpace(Record.SurveyEmailTemplate)
             ? null
             : Record.SurveyEmailTemplate.Trim();
+        Record.SurveyReminderEmailTemplate = string.IsNullOrWhiteSpace(Record.SurveyReminderEmailTemplate)
+            ? null
+            : Record.SurveyReminderEmailTemplate.Trim();
 
         if (string.IsNullOrWhiteSpace(Record.AdminEmail))
         {
@@ -111,6 +114,7 @@ public class EditModel : PageModel
         existing.SurveyEmailSubject = Record.SurveyEmailSubject;
         existing.SurveyEmailTemplate = Record.SurveyEmailTemplate;
         existing.EmailHeaderImageId = Record.EmailHeaderImageId;
+        existing.SurveyReminderEmailTemplate = Record.SurveyReminderEmailTemplate;
         await _context.SaveChangesAsync();
 
         StatusMessage = "Config updated successfully.";

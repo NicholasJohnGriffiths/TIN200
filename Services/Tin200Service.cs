@@ -574,7 +574,7 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                 Errors = new List<string>(plan.Errors),
                 UpdatedCount = plan.Operations.Count(x => x.Action == CompanyContactImportAction.Update),
                 UnchangedCount = plan.Operations.Count(x => x.Action == CompanyContactImportAction.Unchanged),
-                NotFoundCount = plan.Operations.Count(x => x.Action == CompanyContactImportAction.NotFound),
+                InsertedCount = plan.Operations.Count(x => x.Action == CompanyContactImportAction.Add),
                 PreviewRows = plan.Operations
                     .OrderBy(x => x.RowNumber)
                     .Take(200)
@@ -589,7 +589,9 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                         CurrentContactLastName = x.CurrentContactLastName,
                         ImportedContactLastName = x.ImportedContactLastName,
                         CurrentContactEmail = x.CurrentContactEmail,
-                        ImportedContactEmail = x.ImportedContactEmail
+                        ImportedContactEmail = x.ImportedContactEmail,
+                        CurrentTinStatus = x.CurrentTinStatus,
+                        ImportedTinStatus = x.ImportedTinStatus
                     })
                     .ToList()
             };
@@ -647,37 +649,70 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                 Errors = new List<string>(plan.Errors),
                 UpdatedCount = plan.Operations.Count(x => x.Action == CompanyContactImportAction.Update),
                 UnchangedCount = plan.Operations.Count(x => x.Action == CompanyContactImportAction.Unchanged),
-                NotFoundCount = plan.Operations.Count(x => x.Action == CompanyContactImportAction.NotFound)
+                InsertedCount = plan.Operations.Count(x => x.Action == CompanyContactImportAction.Add)
             };
 
-            var operationsToApply = plan.Operations
+            var operationsToUpdate = plan.Operations
                 .Where(x => x.Action == CompanyContactImportAction.Update && x.CompanyId.HasValue)
                 .ToList();
 
-            if (!operationsToApply.Any())
+            var operationsToInsert = plan.Operations
+                .Where(x => x.Action == CompanyContactImportAction.Add)
+                .ToList();
+
+            if (!operationsToUpdate.Any() && !operationsToInsert.Any())
             {
                 return result;
             }
 
-            var companyIds = operationsToApply
-                .Select(x => x.CompanyId!.Value)
-                .Distinct()
-                .ToList();
-
-            var companies = await _context.Tin200
-                .Where(x => companyIds.Contains(x.Id))
-                .ToDictionaryAsync(x => x.Id);
-
-            foreach (var operation in operationsToApply)
+            if (operationsToUpdate.Any())
             {
-                if (!operation.CompanyId.HasValue || !companies.TryGetValue(operation.CompanyId.Value, out var company))
-                {
-                    continue;
-                }
+                var companyIds = operationsToUpdate
+                    .Select(x => x.CompanyId!.Value)
+                    .Distinct()
+                    .ToList();
 
-                company.ContactFirstName = operation.ImportedContactFirstName;
-                company.ContactLastName = operation.ImportedContactLastName;
-                company.ContactEmail = operation.ImportedContactEmail;
+                var companies = await _context.Tin200
+                    .Where(x => companyIds.Contains(x.Id))
+                    .ToDictionaryAsync(x => x.Id);
+
+                foreach (var operation in operationsToUpdate)
+                {
+                    if (!operation.CompanyId.HasValue || !companies.TryGetValue(operation.CompanyId.Value, out var company))
+                    {
+                        continue;
+                    }
+
+                    company.ContactFirstName = operation.ImportedContactFirstName;
+                    company.ContactLastName = operation.ImportedContactLastName;
+                    company.ContactEmail = operation.ImportedContactEmail;
+                    company.TinStatus = operation.ImportedTinStatus;
+                }
+            }
+
+            if (operationsToInsert.Any())
+            {
+                var allExternalIds = await _context.Tin200
+                    .Where(x => !string.IsNullOrWhiteSpace(x.ExternalId))
+                    .Select(x => x.ExternalId!)
+                    .ToListAsync();
+
+                foreach (var operation in operationsToInsert)
+                {
+                    var generatedExternalId = ResolveNextExternalId(null, allExternalIds);
+                    allExternalIds.Add(generatedExternalId);
+
+                    _context.Tin200.Add(new Tin200
+                    {
+                        CompanyName = operation.CompanyName,
+                        ContactFirstName = operation.ImportedContactFirstName,
+                        ContactLastName = operation.ImportedContactLastName,
+                        ContactEmail = operation.ImportedContactEmail,
+                        ExternalId = ClampToMaxLength(generatedExternalId, 50),
+                        CompanyNameImportColumnName = plan.MatchedCompanyNameHeader,
+                        TinStatus = operation.ImportedTinStatus
+                    });
+                }
             }
 
             await _context.SaveChangesAsync();
@@ -1610,7 +1645,8 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                     t.CompanyName,
                     t.ContactFirstName,
                     t.ContactLastName,
-                    t.ContactEmail
+                    t.ContactEmail,
+                    t.TinStatus
                 })
                 .ToListAsync();
 
@@ -1651,6 +1687,13 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                     continue;
                 }
 
+                if (mapping?.SelectedRowNumbers != null
+                    && mapping.SelectedRowNumbers.Count > 0
+                    && !mapping.SelectedRowNumbers.Contains(rowNumber))
+                {
+                    continue;
+                }
+
                 var existing = companyByName.TryGetValue(importedCompanyName, out var matchedCompany)
                     ? matchedCompany
                     : null;
@@ -1664,13 +1707,17 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                 var finalContactEmail = hasContactEmailColumn
                     ? NullIfWhiteSpace(importedContactEmail)
                     : NullIfWhiteSpace(existing?.ContactEmail);
+                var finalTinStatus = mapping?.ApplyTinStatus == true
+                    ? mapping.TinStatusToApply
+                    : existing?.TinStatus;
 
-                var action = CompanyContactImportAction.NotFound;
+                var action = CompanyContactImportAction.Add;
                 if (existing != null)
                 {
                     var unchanged = string.Equals(NullIfWhiteSpace(existing.ContactFirstName), finalContactFirstName, StringComparison.OrdinalIgnoreCase)
                         && string.Equals(NullIfWhiteSpace(existing.ContactLastName), finalContactLastName, StringComparison.OrdinalIgnoreCase)
-                        && string.Equals(NullIfWhiteSpace(existing.ContactEmail), finalContactEmail, StringComparison.OrdinalIgnoreCase);
+                        && string.Equals(NullIfWhiteSpace(existing.ContactEmail), finalContactEmail, StringComparison.OrdinalIgnoreCase)
+                        && existing.TinStatus == finalTinStatus;
 
                     action = unchanged
                         ? CompanyContactImportAction.Unchanged
@@ -1688,7 +1735,9 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                     CurrentContactLastName = NullIfWhiteSpace(existing?.ContactLastName),
                     ImportedContactLastName = finalContactLastName,
                     CurrentContactEmail = NullIfWhiteSpace(existing?.ContactEmail),
-                    ImportedContactEmail = finalContactEmail
+                    ImportedContactEmail = finalContactEmail,
+                    CurrentTinStatus = existing?.TinStatus,
+                    ImportedTinStatus = finalTinStatus
                 });
             }
 
@@ -1827,7 +1876,7 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             public List<string> Errors { get; set; } = new();
             public int UpdatedCount { get; set; }
             public int UnchangedCount { get; set; }
-            public int NotFoundCount { get; set; }
+            public int InsertedCount { get; set; }
             public List<CompanyContactImportPreviewRow> PreviewRows { get; set; } = new();
         }
 
@@ -1843,13 +1892,15 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             public string? ImportedContactLastName { get; set; }
             public string? CurrentContactEmail { get; set; }
             public string? ImportedContactEmail { get; set; }
+            public int? CurrentTinStatus { get; set; }
+            public int? ImportedTinStatus { get; set; }
         }
 
         public class CompanyContactImportResult
         {
             public int UpdatedCount { get; set; }
             public int UnchangedCount { get; set; }
-            public int NotFoundCount { get; set; }
+            public int InsertedCount { get; set; }
             public List<string> Errors { get; set; } = new();
         }
 
@@ -1859,6 +1910,9 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             public string? ContactFirstNameHeader { get; set; }
             public string? ContactLastNameHeader { get; set; }
             public string? ContactEmailHeader { get; set; }
+            public bool ApplyTinStatus { get; set; }
+            public int? TinStatusToApply { get; set; }
+            public HashSet<int>? SelectedRowNumbers { get; set; }
         }
 
         private sealed class CompanyGlobalImportPlan
@@ -1909,6 +1963,8 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             public string? ImportedContactLastName { get; set; }
             public string? CurrentContactEmail { get; set; }
             public string? ImportedContactEmail { get; set; }
+            public int? CurrentTinStatus { get; set; }
+            public int? ImportedTinStatus { get; set; }
         }
 
         private enum CompanyImportAction
@@ -1920,9 +1976,9 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
 
         private enum CompanyContactImportAction
         {
+            Add,
             Update,
-            Unchanged,
-            NotFound
+            Unchanged
         }
 
         private async Task<List<Tin200>> GetAllCompaniesFallbackAsync(int? lastTin200Year = null)

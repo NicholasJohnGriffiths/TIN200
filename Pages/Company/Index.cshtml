@@ -84,10 +84,10 @@
     {
         <div class="card mb-3 border-info">
             <div class="card-body">
-                <h5 class="card-title mb-3">Contact Import Preview</h5>
+                <h5 class="card-title mb-3">Companies Import Preview</h5>
                 <p class="mb-1"><strong>Records to update:</strong> @Model.ContactImportPreview.UpdatedCount</p>
-                <p class="mb-1"><strong>Unchanged records:</strong> @Model.ContactImportPreview.UnchangedCount</p>
-                <p class="mb-3"><strong>Companies not found:</strong> @Model.ContactImportPreview.NotFoundCount</p>
+                <p class="mb-1"><strong>New records to add:</strong> @Model.ContactImportPreview.InsertedCount</p>
+                <p class="mb-3"><strong>Unchanged records:</strong> @Model.ContactImportPreview.UnchangedCount</p>
                 <p class="mb-3 text-muted">Matching used: Excel <strong>Company Name</strong> to Company <strong>CompanyName</strong>. Contact fields read from <strong>Contact Person - First Name</strong>, <strong>Contact Person - Last Name</strong>, and <strong>Contact Email</strong>.</p>
 
                 <p class="mb-1"><strong>Matched columns:</strong></p>
@@ -138,18 +138,25 @@
                         <table class="table table-sm table-bordered align-middle mb-0">
                             <thead class="table-light">
                                 <tr>
+                                    <th style="width: 48px;" class="text-center">
+                                        <input type="checkbox" id="contactImportSelectAll" checked title="Select all displayed rows" />
+                                    </th>
                                     <th>Row</th>
                                     <th>Action</th>
                                     <th>Company</th>
                                     <th>Contact First Name</th>
                                     <th>Contact Last Name</th>
                                     <th>Contact Email</th>
+                                    <th>TIN Status</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach (var row in Model.ContactImportPreview.PreviewRows)
                                 {
                                     <tr>
+                                        <td class="text-center">
+                                            <input type="checkbox" class="contact-import-row-checkbox" value="@row.RowNumber" checked />
+                                        </td>
                                         <td>@row.RowNumber</td>
                                         <td>@row.Action</td>
                                         <td>
@@ -166,6 +173,7 @@
                                         <td>@(row.CurrentContactFirstName != row.ImportedContactFirstName ? $"{row.CurrentContactFirstName} -> {row.ImportedContactFirstName}" : row.CurrentContactFirstName ?? "")</td>
                                         <td>@(row.CurrentContactLastName != row.ImportedContactLastName ? $"{row.CurrentContactLastName} -> {row.ImportedContactLastName}" : row.CurrentContactLastName ?? "")</td>
                                         <td>@(row.CurrentContactEmail != row.ImportedContactEmail ? $"{row.CurrentContactEmail} -> {row.ImportedContactEmail}" : row.CurrentContactEmail ?? "")</td>
+                                        <td>@(row.CurrentTinStatus != row.ImportedTinStatus ? $"{TINWeb.Models.TinStatusHelper.ToDisplayLabel(row.CurrentTinStatus)} -> {TINWeb.Models.TinStatusHelper.ToDisplayLabel(row.ImportedTinStatus)}" : TINWeb.Models.TinStatusHelper.ToDisplayLabel(row.CurrentTinStatus))</td>
                                     </tr>
                                 }
                             </tbody>
@@ -177,7 +185,8 @@
                     <input type="hidden" name="previewToken" value="@Model.PendingContactImportToken" />
                     <input type="hidden" name="showImportTool" value="@(string.Equals(Model.ShowImportTool, "import", StringComparison.OrdinalIgnoreCase) ? "import" : "contacts")" />
                     <input type="hidden" name="showImportTab" value="contacts" />
-                    <button type="submit" class="btn btn-info text-white">Apply Contact Import</button>
+                    <input type="hidden" name="selectedContactImportRows" id="selectedContactImportRows" value="" />
+                    <button type="submit" class="btn btn-info text-white">Apply Companies Import</button>
                 </form>
             </div>
         </div>
@@ -346,7 +355,7 @@
                     <h5 class="card-title mb-3">Import Companies</h5>
                     <ul class="nav nav-tabs" id="companyImportTabs" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link @(activeImportTab == "contacts" ? "active" : null)" id="company-import-contacts-tab" data-bs-toggle="tab" data-bs-target="#company-import-contacts-pane" type="button" role="tab" aria-controls="company-import-contacts-pane" aria-selected="@(activeImportTab == "contacts" ? "true" : "false")">Contacts</button>
+                            <button class="nav-link @(activeImportTab == "contacts" ? "active" : null)" id="company-import-contacts-tab" data-bs-toggle="tab" data-bs-target="#company-import-contacts-pane" type="button" role="tab" aria-controls="company-import-contacts-pane" aria-selected="@(activeImportTab == "contacts" ? "true" : "false")">Companies Generic</button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link @(activeImportTab == "global" ? "active" : null)" id="company-import-global-tab" data-bs-toggle="tab" data-bs-target="#company-import-global-pane" type="button" role="tab" aria-controls="company-import-global-pane" aria-selected="@(activeImportTab == "global" ? "true" : "false")">Global</button>
@@ -422,8 +431,19 @@
                                     </select>
                                 </div>
 
+                                <div class="col-md-3">
+                                    <label asp-for="ContactImportTinStatus" class="form-label">TIN Status</label>
+                                    <select asp-for="ContactImportTinStatus" class="form-select form-select-sm">
+                                        <option value="">Blank</option>
+                                        @foreach (var option in TINWeb.Models.TinStatusHelper.DropdownOptions)
+                                        {
+                                            <option value="@option.Value">@option.Label</option>
+                                        }
+                                    </select>
+                                </div>
+
                                 <div class="col-12 d-flex gap-2 flex-wrap mt-2">
-                                    <button type="submit" class="btn btn-info text-white btn-sm">Preview Contact Import</button>
+                                    <button type="submit" class="btn btn-info text-white btn-sm">Preview Companies Import</button>
                                     <button type="button" class="btn btn-outline-secondary btn-sm" id="saveContactMappingBtn">Save Mapping File</button>
                                     <input type="file" id="contactMappingFile" accept="application/json,.json" class="form-control form-control-sm" style="max-width: 240px;" />
                                     <button type="button" class="btn btn-outline-secondary btn-sm" id="loadContactMappingBtn">Load Mapping File</button>
@@ -687,14 +707,14 @@
         var contactImportLoadForm = document.getElementById('contactImportLoadForm');
         if (contactImportLoadForm) {
             contactImportLoadForm.addEventListener('submit', function () {
-                startProgress('Reading contact import headers...');
+                startProgress('Reading companies import headers...');
             });
         }
 
         var contactImportForm = document.getElementById('contactImportForm');
         if (contactImportForm) {
             contactImportForm.addEventListener('submit', function () {
-                startProgress('Building contact import preview...');
+                startProgress('Building companies import preview...');
             });
         }
 
@@ -705,6 +725,59 @@
             });
         }
 
+        var applyContactImportForm = document.getElementById('applyContactImportForm');
+        var selectAllContactImportRows = document.getElementById('contactImportSelectAll');
+        var selectedContactImportRowsField = document.getElementById('selectedContactImportRows');
+
+        function getContactImportRowCheckboxes() {
+            return Array.from(document.querySelectorAll('.contact-import-row-checkbox'));
+        }
+
+        function updateSelectedContactImportRowsField() {
+            if (!selectedContactImportRowsField) {
+                return;
+            }
+
+            var selectedValues = getContactImportRowCheckboxes()
+                .filter(function (checkbox) { return checkbox.checked; })
+                .map(function (checkbox) { return checkbox.value; });
+
+            selectedContactImportRowsField.value = selectedValues.join(',');
+        }
+
+        if (selectAllContactImportRows) {
+            selectAllContactImportRows.addEventListener('change', function () {
+                getContactImportRowCheckboxes().forEach(function (checkbox) {
+                    checkbox.checked = !!selectAllContactImportRows.checked;
+                });
+                updateSelectedContactImportRowsField();
+            });
+        }
+
+        getContactImportRowCheckboxes().forEach(function (checkbox) {
+            checkbox.addEventListener('change', function () {
+                var allChecked = getContactImportRowCheckboxes().every(function (rowCheckbox) { return rowCheckbox.checked; });
+                if (selectAllContactImportRows) {
+                    selectAllContactImportRows.checked = allChecked;
+                }
+                updateSelectedContactImportRowsField();
+            });
+        });
+
+        updateSelectedContactImportRowsField();
+
+        if (applyContactImportForm) {
+            applyContactImportForm.addEventListener('submit', function (event) {
+                updateSelectedContactImportRowsField();
+                if (!selectedContactImportRowsField || !selectedContactImportRowsField.value) {
+                    event.preventDefault();
+                    alert('Please select at least one row to import.');
+                    return;
+                }
+                startProgress('Applying companies import...');
+            });
+        }
+
         var saveContactMappingBtn = document.getElementById('saveContactMappingBtn');
         var loadContactMappingBtn = document.getElementById('loadContactMappingBtn');
         var contactMappingFile = document.getElementById('contactMappingFile');
@@ -712,8 +785,9 @@
         var firstField = document.getElementById('ContactMapFirstNameHeader');
         var lastField = document.getElementById('ContactMapLastNameHeader');
         var emailField = document.getElementById('ContactMapEmailHeader');
+        var tinStatusField = document.getElementById('ContactImportTinStatus');
 
-        if (saveContactMappingBtn && companyField && firstField && lastField && emailField) {
+        if (saveContactMappingBtn && companyField && firstField && lastField && emailField && tinStatusField) {
             saveContactMappingBtn.addEventListener('click', function () {
                 var payload = {
                     mappingType: 'company-contact-import',
@@ -721,7 +795,9 @@
                     companyNameHeader: companyField.value || '',
                     contactFirstNameHeader: firstField.value || '',
                     contactLastNameHeader: lastField.value || '',
-                    contactEmailHeader: emailField.value || ''
+                    contactEmailHeader: emailField.value || '',
+                    applyTinStatus: true,
+                    tinStatus: tinStatusField.value === '' ? null : Number(tinStatusField.value)
                 };
 
                 var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -736,7 +812,7 @@
             });
         }
 
-        if (loadContactMappingBtn && contactMappingFile && companyField && firstField && lastField && emailField) {
+        if (loadContactMappingBtn && contactMappingFile && companyField && firstField && lastField && emailField && tinStatusField) {
             loadContactMappingBtn.addEventListener('click', function () {
                 var file = contactMappingFile.files && contactMappingFile.files.length ? contactMappingFile.files[0] : null;
                 if (!file) {
@@ -752,6 +828,7 @@
                         firstField.value = data.contactFirstNameHeader || '';
                         lastField.value = data.contactLastNameHeader || '';
                         emailField.value = data.contactEmailHeader || '';
+                        tinStatusField.value = data.tinStatus === null || data.tinStatus === undefined ? '' : String(data.tinStatus);
                     } catch (error) {
                         alert('Invalid mapping file. Please choose a valid JSON mapping file.');
                     }
