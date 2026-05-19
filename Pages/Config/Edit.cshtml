@@ -28,6 +28,12 @@
         </div>
 
         <div class="mb-3">
+            <label asp-for="Record.SurveyReminderEmailSubject" class="form-label">Survey Reminder Email Subject</label>
+            <input asp-for="Record.SurveyReminderEmailSubject" class="form-control" maxlength="255" />
+            <div class="form-text">Used only for reminder emails. Leave blank to use the default reminder subject.</div>
+        </div>
+
+        <div class="mb-3">
             <label asp-for="Record.EmailHeaderImageId" class="form-label">Email Header Image</label>
             <select asp-for="Record.EmailHeaderImageId" asp-items="Model.EmailHeaderImageOptions" class="form-select"></select>
             <span asp-validation-for="Record.EmailHeaderImageId" class="text-danger"></span>

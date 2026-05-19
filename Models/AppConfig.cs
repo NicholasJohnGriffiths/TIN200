@@ -17,6 +17,10 @@ namespace TINWeb.Models
         [DataType(DataType.MultilineText)]
         public string? SurveyEmailTemplate { get; set; }
 
+        [Display(Name = "Survey Reminder Email Subject")]
+        [StringLength(255)]
+        public string? SurveyReminderEmailSubject { get; set; }
+
         [Display(Name = "Survey Reminder Email Template")]
         [DataType(DataType.MultilineText)]
         public string? SurveyReminderEmailTemplate { get; set; }

@@ -83,6 +83,9 @@ public class EditModel : PageModel
         Record.SurveyEmailTemplate = string.IsNullOrWhiteSpace(Record.SurveyEmailTemplate)
             ? null
             : Record.SurveyEmailTemplate.Trim();
+        Record.SurveyReminderEmailSubject = string.IsNullOrWhiteSpace(Record.SurveyReminderEmailSubject)
+            ? null
+            : Record.SurveyReminderEmailSubject.Trim();
         Record.SurveyReminderEmailTemplate = string.IsNullOrWhiteSpace(Record.SurveyReminderEmailTemplate)
             ? null
             : Record.SurveyReminderEmailTemplate.Trim();
@@ -113,6 +116,7 @@ public class EditModel : PageModel
         existing.AdminEmail = Record.AdminEmail;
         existing.SurveyEmailSubject = Record.SurveyEmailSubject;
         existing.SurveyEmailTemplate = Record.SurveyEmailTemplate;
+        existing.SurveyReminderEmailSubject = Record.SurveyReminderEmailSubject;
         existing.EmailHeaderImageId = Record.EmailHeaderImageId;
         existing.SurveyReminderEmailTemplate = Record.SurveyReminderEmailTemplate;
         await _context.SaveChangesAsync();

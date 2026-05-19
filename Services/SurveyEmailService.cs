@@ -69,7 +69,13 @@ namespace TINWeb.Services
             var recipientName = string.IsNullOrWhiteSpace(companyName) ? "there" : companyName.Trim();
             var senderDisplayName = GetSenderDisplayName();
             var supportEmail = "tin100@tinetwork.com";
-            var defaultSubject = "TIN200 survey reminder: please review your company details";
+            var currentSurveyYear = await _context.Survey
+                .AsNoTracking()
+                .Where(s => s.CurrentSurvey)
+                .OrderByDescending(s => s.FinancialYear)
+                .ThenByDescending(s => s.Id)
+                .Select(s => (int?)s.FinancialYear)
+                .FirstOrDefaultAsync() ?? DateTime.UtcNow.Year;
 
             var unsubscribeToken = GenerateUnsubscribeToken(clientId);
             var baseUrl = (_surveyLinkSettings.BaseUrl ?? string.Empty).Trim().TrimEnd('/');
@@ -78,14 +84,14 @@ namespace TINWeb.Services
             var configuredEmailOptions = await _context.AppConfig
                 .AsNoTracking()
                 .OrderBy(c => c.Id)
-                .Select(c => new { c.SurveyEmailSubject, c.SurveyReminderEmailTemplate, c.SurveyEmailTemplate, c.EmailHeaderImageId })
+                .Select(c => new { c.SurveyReminderEmailSubject, c.SurveyReminderEmailTemplate, c.SurveyEmailTemplate, c.EmailHeaderImageId })
                 .FirstOrDefaultAsync();
 
-            var emailHeaderImageUrl = BuildEmailHeaderImageUrl(configuredEmailOptions?.EmailHeaderImageId);
+            var subject = string.IsNullOrWhiteSpace(configuredEmailOptions?.SurveyReminderEmailSubject)
+                ? $"Reminder: Complete Your {currentSurveyYear} TIN Survey"
+                : configuredEmailOptions.SurveyReminderEmailSubject.Trim();
 
-            var subject = string.IsNullOrWhiteSpace(configuredEmailOptions?.SurveyEmailSubject)
-                ? defaultSubject
-                : configuredEmailOptions.SurveyEmailSubject.Trim();
+            var emailHeaderImageUrl = BuildEmailHeaderImageUrl(configuredEmailOptions?.EmailHeaderImageId);
 
             // Use reminder template, falling back to the standard survey email template
             var template = !string.IsNullOrWhiteSpace(configuredEmailOptions?.SurveyReminderEmailTemplate)
