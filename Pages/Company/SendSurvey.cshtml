@@ -50,30 +50,31 @@
             <div class="card mb-3">
                 <div class="card-header">Bulk Send</div>
                 <div class="card-body">
-                    <form method="get" class="mb-3">
-                        <input type="hidden" asp-for="SelectedLastTin200Year" />
+                    <form method="get" class="mb-3 d-flex align-items-end gap-3 flex-wrap">
                         <div>
                             <label asp-for="SelectedTinStatus" class="form-label mb-1">TIN Status</label>
-                            <select asp-for="SelectedTinStatus" class="form-select" style="max-width: 220px;" onchange="this.form.submit()">
+                            <select asp-for="SelectedTinStatus" class="form-select" style="min-width: 220px;" onchange="this.form.submit()">
                                 @foreach (var option in TINWeb.Models.TinStatusHelper.DropdownOptions)
                                 {
                                     <option value="@option.Value">@option.Label</option>
                                 }
                             </select>
                         </div>
-                    </form>
 
-                    <form method="get" class="d-flex align-items-center gap-2 mb-3 flex-wrap">
-                        <input type="hidden" asp-for="SelectedTinStatus" />
-                        <label asp-for="SelectedLastTin200Year" class="form-label mb-0">Filter Last TIN200 Year:</label>
-                        <select asp-for="SelectedLastTin200Year" class="form-select" style="max-width: 160px;" aria-label="Last TIN200 Year">
-                            <option value="">All</option>
-                            @foreach (var y in Model.AvailableLastTin200Years)
-                            {
-                                <option value="@y">@y</option>
-                            }
-                        </select>
-                        <button type="submit" class="btn btn-outline-primary btn-sm">Apply</button>
+                        <div>
+                            <label asp-for="SelectedLastTin200Year" class="form-label mb-1">Filter Last TIN200 Year</label>
+                            <select asp-for="SelectedLastTin200Year" class="form-select" style="min-width: 160px;" aria-label="Last TIN200 Year">
+                                <option value="">All</option>
+                                @foreach (var y in Model.AvailableLastTin200Years)
+                                {
+                                    <option value="@y">@y</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="mb-2">
+                            <button type="submit" class="btn btn-outline-primary btn-sm">Apply Filters</button>
+                        </div>
                     </form>
 
                     <form id="bulkSendForm" method="post" asp-page-handler="Bulk">
