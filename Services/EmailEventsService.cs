@@ -245,7 +245,7 @@ namespace TINWeb.Services
 
         private string ResolveAzExecutablePath()
         {
-            var configuredPath = string.IsNullOrWhiteSpace(_settings.AzPath) ? "az" : _settings.AzPath.Trim();
+            var configuredPath = NormalizeExecutablePath(string.IsNullOrWhiteSpace(_settings.AzPath) ? "az" : _settings.AzPath.Trim());
             if (Path.IsPathRooted(configuredPath) && File.Exists(configuredPath))
             {
                 return configuredPath;
@@ -262,6 +262,14 @@ namespace TINWeb.Services
                 {
                     return candidate;
                 }
+            }
+
+            var pathCandidate = FindWindowsExecutableOnPath(configuredPath)
+                ?? FindWindowsExecutableOnPath("az.cmd")
+                ?? FindWindowsExecutableOnPath("az");
+            if (!string.IsNullOrWhiteSpace(pathCandidate))
+            {
+                return pathCandidate;
             }
 
             return configuredPath;
@@ -293,6 +301,53 @@ namespace TINWeb.Services
             {
                 yield return Path.Combine(localAppData, "Programs", "Azure CLI", "wbin", "az.cmd");
             }
+        }
+
+        private static string? FindWindowsExecutableOnPath(string executable)
+        {
+            var normalized = NormalizeExecutablePath(executable);
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return null;
+            }
+
+            var path = Environment.GetEnvironmentVariable("PATH");
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return null;
+            }
+
+            var hasExtension = Path.HasExtension(normalized);
+            foreach (var dir in path.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (string.IsNullOrWhiteSpace(dir))
+                {
+                    continue;
+                }
+
+                var direct = Path.Combine(dir, normalized);
+                if (File.Exists(direct))
+                {
+                    return direct;
+                }
+
+                if (!hasExtension)
+                {
+                    var cmd = direct + ".cmd";
+                    if (File.Exists(cmd))
+                    {
+                        return cmd;
+                    }
+
+                    var exe = direct + ".exe";
+                    if (File.Exists(exe))
+                    {
+                        return exe;
+                    }
+                }
+            }
+
+            return null;
         }
 
         private static void TryKillProcess(Process process)
@@ -469,7 +524,7 @@ namespace TINWeb.Services
             var details = FirstNonEmpty(
                 GetValue(map, "reason"),
                 GetValue(map, "statusDetails"),
-                GetValue(map, "diagnosticCode"),
+                    Arguments = $"/d /s /c \"\"{safeExecutablePath}\" {command}\"",
                 GetValue(map, "errorMessage"));
 
             return new EmailEventRow
