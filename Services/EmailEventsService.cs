@@ -69,6 +69,16 @@ namespace TINWeb.Services
                 };
             }
 
+            if (IsCliUnavailableError(primaryResult.Stderr)
+                && TryExtractWorkspaceIdentifier(_settings.CommandTemplate, out var cliUnavailableWorkspaceIdentifier))
+            {
+                var apiFallbackResult = await QueryFallbackViaApiAsync(cliUnavailableWorkspaceIdentifier, startUtc, endUtc);
+                if (string.IsNullOrWhiteSpace(apiFallbackResult.Error))
+                {
+                    return apiFallbackResult;
+                }
+            }
+
             if (ShouldUseFallbackQueries(primaryResult.Stderr)
                 && TryExtractWorkspaceIdentifier(_settings.CommandTemplate, out var workspaceIdentifier))
             {
@@ -390,6 +400,14 @@ namespace TINWeb.Services
                 && (stderr.Contains("SEM0529", StringComparison.OrdinalIgnoreCase)
                     || stderr.Contains("SEM0100", StringComparison.OrdinalIgnoreCase)
                     || stderr.Contains("PathNotFoundError", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static bool IsCliUnavailableError(string? stderr)
+        {
+            return !string.IsNullOrWhiteSpace(stderr)
+                && (stderr.Contains("is not recognized as an internal or external command", StringComparison.OrdinalIgnoreCase)
+                    || stderr.Contains("command not found", StringComparison.OrdinalIgnoreCase)
+                    || stderr.Contains("No such file or directory", StringComparison.OrdinalIgnoreCase));
         }
 
         private string ResolveAzExecutablePath()
