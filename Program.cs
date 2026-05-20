@@ -74,9 +74,11 @@ builder.Services.AddScoped<QuestionService>();
 builder.Services.AddScoped<QuestionGroupService>();
 builder.Services.AddScoped<TaskService>();
 builder.Services.AddScoped<SurveyEmailBounceService>();
+builder.Services.AddScoped<EmailEventsService>();
 builder.Services.AddScoped<IImageStorageService, ImageStorageService>();
 builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("SmtpSettings"));
 builder.Services.Configure<AzureCommunicationEmailSettings>(builder.Configuration.GetSection("AzureCommunicationEmail"));
+builder.Services.Configure<EmailEventsSettings>(builder.Configuration.GetSection("EmailEvents"));
 builder.Services.Configure<SurveyLinkSettings>(builder.Configuration.GetSection("SurveyLinkSettings"));
 builder.Services.AddOptions<StripeSettings>().Configure<IConfiguration>((settings, configuration) =>
 {
