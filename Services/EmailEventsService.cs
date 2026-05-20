@@ -80,15 +80,7 @@ namespace TINWeb.Services
 
         private async Task<AzCommandExecutionResult> ExecuteAzCommandAsync(string azExecutablePath, string command)
         {
-            var processStartInfo = new ProcessStartInfo
-            {
-                FileName = azExecutablePath,
-                Arguments = command,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
+            var processStartInfo = BuildProcessStartInfo(azExecutablePath, command);
 
             using var process = new Process { StartInfo = processStartInfo };
             try
@@ -133,6 +125,34 @@ namespace TINWeb.Services
                 ExitCode = process.ExitCode,
                 Stdout = await stdoutTask,
                 Stderr = await stderrTask
+            };
+        }
+
+        private static ProcessStartInfo BuildProcessStartInfo(string azExecutablePath, string command)
+        {
+            // .cmd/.bat scripts require cmd.exe when UseShellExecute=false.
+            if (azExecutablePath.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
+                || azExecutablePath.EndsWith(".bat", StringComparison.OrdinalIgnoreCase))
+            {
+                return new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c \"\"{azExecutablePath}\" {command}\"",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+            }
+
+            return new ProcessStartInfo
+            {
+                FileName = azExecutablePath,
+                Arguments = command,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
             };
         }
 
