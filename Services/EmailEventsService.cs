@@ -134,10 +134,11 @@ namespace TINWeb.Services
             if (azExecutablePath.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase)
                 || azExecutablePath.EndsWith(".bat", StringComparison.OrdinalIgnoreCase))
             {
+                var safeExecutablePath = NormalizeExecutablePath(azExecutablePath).Replace("\"", "\"\"");
                 return new ProcessStartInfo
                 {
                     FileName = "cmd.exe",
-                    Arguments = $"/c \"\"{azExecutablePath}\" {command}\"",
+                    Arguments = $"/d /s /c \"\"{safeExecutablePath}\" {command}\"",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
@@ -350,6 +351,11 @@ namespace TINWeb.Services
             return null;
         }
 
+        private static string NormalizeExecutablePath(string value)
+        {
+            return value.Trim().Trim('"', '\'');
+        }
+
         private static void TryKillProcess(Process process)
         {
             try
@@ -524,7 +530,7 @@ namespace TINWeb.Services
             var details = FirstNonEmpty(
                 GetValue(map, "reason"),
                 GetValue(map, "statusDetails"),
-                    Arguments = $"/d /s /c \"\"{safeExecutablePath}\" {command}\"",
+                GetValue(map, "diagnosticCode"),
                 GetValue(map, "errorMessage"));
 
             return new EmailEventRow
