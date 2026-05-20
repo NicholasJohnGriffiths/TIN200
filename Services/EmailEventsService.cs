@@ -48,9 +48,9 @@ namespace TINWeb.Services
             var primaryResult = await ExecuteAzCommandAsync(azExecutablePath, command);
             if (primaryResult.StartErrorResult != null)
             {
-                if (TryExtractWorkspaceIdentifier(_settings.CommandTemplate, out var workspaceIdentifier))
+                if (TryExtractWorkspaceIdentifier(_settings.CommandTemplate, out var apiWorkspaceIdentifier))
                 {
-                    var apiFallbackResult = await QueryFallbackViaApiAsync(workspaceIdentifier, startUtc, endUtc);
+                    var apiFallbackResult = await QueryFallbackViaApiAsync(apiWorkspaceIdentifier, startUtc, endUtc);
                     if (string.IsNullOrWhiteSpace(apiFallbackResult.Error))
                     {
                         return apiFallbackResult;
