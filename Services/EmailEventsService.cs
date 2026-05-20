@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
@@ -9,6 +10,7 @@ namespace TINWeb.Services
 {
     public class EmailEventsService
     {
+        private static readonly HttpClient HttpClient = new();
         private readonly EmailEventsSettings _settings;
         private readonly ILogger<EmailEventsService> _logger;
 
@@ -46,6 +48,15 @@ namespace TINWeb.Services
             var primaryResult = await ExecuteAzCommandAsync(azExecutablePath, command);
             if (primaryResult.StartErrorResult != null)
             {
+                if (TryExtractWorkspaceIdentifier(_settings.CommandTemplate, out var workspaceIdentifier))
+                {
+                    var apiFallbackResult = await QueryFallbackViaApiAsync(workspaceIdentifier, startUtc, endUtc);
+                    if (string.IsNullOrWhiteSpace(apiFallbackResult.Error))
+                    {
+                        return apiFallbackResult;
+                    }
+                }
+
                 return primaryResult.StartErrorResult;
             }
 
@@ -194,7 +205,80 @@ namespace TINWeb.Services
                 .ToList();
         }
 
+        private async Task<EmailEventsQueryResult> QueryFallbackViaApiAsync(string workspaceIdentifier, DateTime startUtc, DateTime endUtc)
+        {
+            try
+            {
+                var accessToken = await GetManagedIdentityAccessTokenAsync();
+                if (string.IsNullOrWhiteSpace(accessToken))
+                {
+                    return new EmailEventsQueryResult
+                    {
+                        Error = "Azure CLI was unavailable and managed identity token acquisition failed for Log Analytics API."
+                    };
+                }
+
+                var workspaceForApi = NormalizeWorkspaceIdentifierForApi(workspaceIdentifier);
+                var allRows = new List<EmailEventRow>();
+
+                foreach (var kql in BuildFallbackKqlQueries(startUtc, endUtc))
+                {
+                    using var request = new HttpRequestMessage(HttpMethod.Post, $"https://api.loganalytics.io/v1/workspaces/{workspaceForApi}/query")
+                    {
+                        Content = new StringContent(JsonSerializer.Serialize(new { query = kql }), Encoding.UTF8, "application/json")
+                    };
+
+                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+
+                    using var response = await HttpClient.SendAsync(request);
+                    var body = await response.Content.ReadAsStringAsync();
+
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        if (!IsIgnorableQueryError(body))
+                        {
+                            _logger.LogWarning("Log Analytics API fallback query failed. Status={StatusCode}, Body={Body}", response.StatusCode, body);
+                        }
+
+                        continue;
+                    }
+
+                    allRows.AddRange(ParseRows(body));
+                }
+
+                return new EmailEventsQueryResult
+                {
+                    Rows = allRows
+                        .GroupBy(row => string.Join("|",
+                            row.TimestampUtc?.ToString("O") ?? string.Empty,
+                            row.EventType ?? string.Empty,
+                            row.Recipient ?? string.Empty,
+                            row.MessageId ?? string.Empty,
+                            row.Subject ?? string.Empty))
+                        .Select(group => group.First())
+                        .OrderByDescending(row => row.TimestampUtc)
+                        .ToList()
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Log Analytics API fallback failed.");
+                return new EmailEventsQueryResult
+                {
+                    Error = "Azure CLI was unavailable and direct Log Analytics API fallback failed."
+                };
+            }
+        }
+
         private static IEnumerable<string> BuildFallbackCommands(string workspaceIdentifier, DateTime startUtc, DateTime endUtc)
+        {
+            foreach (var kql in BuildFallbackKqlQueries(startUtc, endUtc))
+            {
+                yield return $"monitor log-analytics query --workspace {workspaceIdentifier} --analytics-query \"{kql}\" --output json";
+            }
+        }
+
+        private static IEnumerable<string> BuildFallbackKqlQueries(DateTime startUtc, DateTime endUtc)
         {
             var start = startUtc.ToString("yyyy-MM-ddTHH:mm:ssZ");
             var end = endUtc.ToString("yyyy-MM-ddTHH:mm:ssZ");
@@ -209,10 +293,74 @@ namespace TINWeb.Services
                 "EmailUserEngagementOperational"
             })
             {
-                yield return $"monitor log-analytics query --workspace {workspaceIdentifier} --analytics-query \"{table} | where TimeGenerated between (datetime({start}) .. datetime({end})) | project TimeGenerated, EventType=coalesce(tostring(column_ifexists('Status','')), tostring(column_ifexists('DeliveryStatus','')), tostring(column_ifexists('EventType','')), tostring(column_ifexists('OperationName','')), tostring(column_ifexists('Category',''))), Recipient=tostring(coalesce(column_ifexists('RecipientId',''), column_ifexists('Recipient',''), column_ifexists('RecipientAddress',''), column_ifexists('EmailAddress',''))), Subject=tostring(column_ifexists('Subject','')), MessageId=tostring(coalesce(column_ifexists('MessageId',''), column_ifexists('CorrelationId',''), column_ifexists('OperationId',''))), Details=tostring(coalesce(column_ifexists('StatusDetails',''), column_ifexists('DiagnosticCode',''), column_ifexists('ErrorMessage',''), column_ifexists('ResultDescription',''))) | order by TimeGenerated desc\" --output json";
+                yield return $"{table} | where TimeGenerated between (datetime({start}) .. datetime({end})) | project TimeGenerated, EventType=coalesce(tostring(column_ifexists('Status','')), tostring(column_ifexists('DeliveryStatus','')), tostring(column_ifexists('EventType','')), tostring(column_ifexists('OperationName','')), tostring(column_ifexists('Category',''))), Recipient=tostring(coalesce(column_ifexists('RecipientId',''), column_ifexists('Recipient',''), column_ifexists('RecipientAddress',''), column_ifexists('EmailAddress',''))), Subject=tostring(column_ifexists('Subject','')), MessageId=tostring(coalesce(column_ifexists('MessageId',''), column_ifexists('CorrelationId',''), column_ifexists('OperationId',''))), Details=tostring(coalesce(column_ifexists('StatusDetails',''), column_ifexists('DiagnosticCode',''), column_ifexists('ErrorMessage',''), column_ifexists('ResultDescription',''))) | order by TimeGenerated desc";
             }
 
-            yield return $"monitor log-analytics query --workspace {workspaceIdentifier} --analytics-query \"AzureDiagnostics | where TimeGenerated between (datetime({start}) .. datetime({end})) | where ResourceProvider == 'MICROSOFT.COMMUNICATION' or ResourceType =~ 'MICROSOFT.COMMUNICATION/COMMUNICATIONSERVICES' or Category in ('EmailSendMailOperational', 'EmailStatusUpdateOperational', 'EmailUserEngagementOperational') | project TimeGenerated, EventType=coalesce(tostring(column_ifexists('Category','')), tostring(column_ifexists('OperationName','')), tostring(column_ifexists('status_s','')), tostring(column_ifexists('deliveryStatus_s',''))), Recipient=tostring(coalesce(column_ifexists('RecipientId_s',''), column_ifexists('recipient_s',''), column_ifexists('RecipientAddress_s',''), column_ifexists('EmailAddress_s',''))), Subject=tostring(coalesce(column_ifexists('Subject_s',''), column_ifexists('subject_s',''))), MessageId=tostring(coalesce(column_ifexists('MessageId_g',''), column_ifexists('MessageId_s',''), column_ifexists('CorrelationId_g',''), column_ifexists('CorrelationId_s',''), column_ifexists('OperationId_g',''), column_ifexists('OperationId_s',''))), Details=tostring(coalesce(column_ifexists('statusDetails_s',''), column_ifexists('DiagnosticCode_s',''), column_ifexists('ErrorMessage_s',''), column_ifexists('ResultDescription',''))) | order by TimeGenerated desc\" --output json";
+            yield return $"AzureDiagnostics | where TimeGenerated between (datetime({start}) .. datetime({end})) | where ResourceProvider == 'MICROSOFT.COMMUNICATION' or ResourceType =~ 'MICROSOFT.COMMUNICATION/COMMUNICATIONSERVICES' or Category in ('EmailSendMailOperational', 'EmailStatusUpdateOperational', 'EmailUserEngagementOperational') | project TimeGenerated, EventType=coalesce(tostring(column_ifexists('Category','')), tostring(column_ifexists('OperationName','')), tostring(column_ifexists('status_s','')), tostring(column_ifexists('deliveryStatus_s',''))), Recipient=tostring(coalesce(column_ifexists('RecipientId_s',''), column_ifexists('recipient_s',''), column_ifexists('RecipientAddress_s',''), column_ifexists('EmailAddress_s',''))), Subject=tostring(coalesce(column_ifexists('Subject_s',''), column_ifexists('subject_s',''))), MessageId=tostring(coalesce(column_ifexists('MessageId_g',''), column_ifexists('MessageId_s',''), column_ifexists('CorrelationId_g',''), column_ifexists('CorrelationId_s',''), column_ifexists('OperationId_g',''), column_ifexists('OperationId_s',''))), Details=tostring(coalesce(column_ifexists('statusDetails_s',''), column_ifexists('DiagnosticCode_s',''), column_ifexists('ErrorMessage_s',''), column_ifexists('ResultDescription',''))) | order by TimeGenerated desc";
+        }
+
+        private async Task<string?> GetManagedIdentityAccessTokenAsync()
+        {
+            var identityEndpoint = Environment.GetEnvironmentVariable("IDENTITY_ENDPOINT");
+            var identityHeader = Environment.GetEnvironmentVariable("IDENTITY_HEADER");
+            if (!string.IsNullOrWhiteSpace(identityEndpoint) && !string.IsNullOrWhiteSpace(identityHeader))
+            {
+                var url = $"{identityEndpoint}?resource={Uri.EscapeDataString("https://api.loganalytics.io")}&api-version=2019-08-01";
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Add("X-IDENTITY-HEADER", identityHeader);
+
+                using var response = await HttpClient.SendAsync(request);
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    using var doc = JsonDocument.Parse(content);
+                    if (TryGetPropertyIgnoreCase(doc.RootElement, "access_token", out var tokenElement))
+                    {
+                        return tokenElement.GetString();
+                    }
+                }
+            }
+
+            var msiEndpoint = Environment.GetEnvironmentVariable("MSI_ENDPOINT");
+            var msiSecret = Environment.GetEnvironmentVariable("MSI_SECRET");
+            if (!string.IsNullOrWhiteSpace(msiEndpoint) && !string.IsNullOrWhiteSpace(msiSecret))
+            {
+                var url = $"{msiEndpoint}?resource={Uri.EscapeDataString("https://api.loganalytics.io")}&api-version=2017-09-01";
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                request.Headers.Add("Secret", msiSecret);
+
+                using var response = await HttpClient.SendAsync(request);
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    using var doc = JsonDocument.Parse(content);
+                    if (TryGetPropertyIgnoreCase(doc.RootElement, "access_token", out var tokenElement))
+                    {
+                        return tokenElement.GetString();
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        private static string NormalizeWorkspaceIdentifierForApi(string workspaceIdentifier)
+        {
+            var trimmed = workspaceIdentifier.Trim().Trim('"', '\'');
+
+            var guidMatch = Regex.Match(trimmed, "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+            if (guidMatch.Success)
+            {
+                return guidMatch.Value;
+            }
+
+            if (trimmed.StartsWith("/subscriptions/", StringComparison.OrdinalIgnoreCase))
+            {
+                var parts = trimmed.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                return parts.LastOrDefault() ?? trimmed;
+            }
+
+            return trimmed;
         }
 
         private static bool TryExtractWorkspaceIdentifier(string commandTemplate, out string workspaceIdentifier)
