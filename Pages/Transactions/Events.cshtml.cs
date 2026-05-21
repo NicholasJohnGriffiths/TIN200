@@ -107,10 +107,13 @@ namespace TINWeb.Pages.Transactions
 
         public async Task OnGetAsync()
         {
-            var currentYear = DateTime.UtcNow.Year;
-            AvailableYears = Enumerable.Range(2022, currentYear - 2022 + 1).OrderByDescending(y => y).ToList();
             try
             {
+                var currentYear = DateTime.UtcNow.Year;
+                AvailableYears = Enumerable.Range(2017, currentYear - 2017 + 1)
+                    .OrderByDescending(year => year)
+                    .ToList();
+
                 var cacheKey = $"StripeYearData_v3_{EffectiveYear}";
                 string? cachedResult = null;
 

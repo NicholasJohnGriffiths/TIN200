@@ -54,6 +54,8 @@ namespace TINWeb.Services
                     Estimate = companySurvey.Estimate ?? false,
                     SurveyEmailSent = companySurvey.SurveyEmailSent ?? false,
                     SurveyEmailSentLastDate = companySurvey.SurveyEmailSentLastDate,
+                    SurveyReminderEmailSent = companySurvey.SurveyReminderEmailSent ?? false,
+                    SurveyReminderEmailSentLastDate = companySurvey.SurveyReminderEmailSentLastDate,
                     SavedDate = companySurvey.SavedDate,
                     SubmittedDate = companySurvey.SubmittedDate,
                     RequestedDate = companySurvey.RequestedDate,
@@ -842,6 +844,8 @@ namespace TINWeb.Services
             public bool Estimate { get; set; }
             public bool SurveyEmailSent { get; set; }
             public DateTime? SurveyEmailSentLastDate { get; set; }
+            public bool SurveyReminderEmailSent { get; set; }
+            public DateTime? SurveyReminderEmailSentLastDate { get; set; }
             public DateTime? SavedDate { get; set; }
             public DateTime? SubmittedDate { get; set; }
             public DateTime? RequestedDate { get; set; }
