@@ -8,6 +8,7 @@ on:
 
 env:
   AZURE_WEBAPP_NAME: tin200app-linux-260302144937
+  AZURE_RESOURCE_GROUP: rg-tin200-260302144937
   AZURE_WEBAPP_PACKAGE_PATH: ./publish
   DOTNET_VERSION: '9.0'
 
@@ -37,6 +38,19 @@ jobs:
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Configure app settings and connection string
+        run: |
+          az webapp config appsettings set \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --name ${{ env.AZURE_WEBAPP_NAME }} \
+            --settings ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_HTTPS_PORT=443
+
+          az webapp config connection-string set \
+            --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+            --name ${{ env.AZURE_WEBAPP_NAME }} \
+            --connection-string-type SQLAzure \
+            --settings DefaultConnection='${{ secrets.AZURE_SQL_CONNECTION_STRING }}'
 
       - name: Deploy to Azure App Service
         uses: azure/webapps-deploy@v2
