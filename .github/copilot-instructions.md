@@ -5,13 +5,17 @@ ASP.NET Core web application with SQL Server CRUD interface for the TIN200 datab
 
 ## Setup Checklist
 
-- [ ] Scaffold the ASP.NET Core project
-- [ ] Create Entity Framework DbContext and models
-- [ ] Create CRUD controller and services
-- [ ] Create Razor Pages views for CRUD operations
-- [ ] Configure SQL Server connection string
+- [x] Scaffold the ASP.NET Core project
+- [x] Create Entity Framework DbContext and models
+- [x] Create CRUD page handlers and services
+- [x] Create Razor Pages views for CRUD operations
+- [x] Configure SQL Server connection string
 - [ ] Create and apply database migrations
 - [ ] Test and verify the application
+
+Verification notes:
+- Project publish build completed successfully on 2026-06-11.
+- Migration scripts are present in Migrations/, but database apply state is not verified from this workspace.
 
 ## Key Features
 - Create, Read, Update, Delete operations for TIN200 table

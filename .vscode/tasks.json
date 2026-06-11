@@ -4,7 +4,7 @@
 		{
 			"label": "Build and zip publish output",
 			"type": "shell",
-			"command": "dotnet publish -c Release -o ./publish; Compress-Archive -Path ./publish/* -DestinationPath ./publish.zip -Force"
+			"command": "dotnet publish .\\TINWeb.csproj -c Release -o ./publish; Compress-Archive -Path ./publish/* -DestinationPath ./publish.zip -Force"
 		}
 	]
 }

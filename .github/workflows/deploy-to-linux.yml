@@ -1,0 +1,46 @@
+name: Deploy to Linux App Service
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: tin200app-linux-260302144937
+  AZURE_WEBAPP_PACKAGE_PATH: ./publish
+  DOTNET_VERSION: '9.0'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore NuGet packages
+        run: dotnet restore
+
+      - name: Build the project
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Publish for Linux
+        run: dotnet publish TINWeb.csproj --configuration Release --output ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+
+      - name: Deploy to Azure App Service
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+          publish-profile: ${{ secrets.AZURE_PUBLISH_PROFILE }}
+
+      - name: Verify deployment
+        run: |
+          echo "Deployment to ${{ env.AZURE_WEBAPP_NAME }} completed"
+          echo "App URL: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
