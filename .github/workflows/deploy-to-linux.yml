@@ -44,7 +44,7 @@ jobs:
           az webapp config appsettings set \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
             --name ${{ env.AZURE_WEBAPP_NAME }} \
-            --settings ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_HTTPS_PORT=443 ConnectionStrings__DefaultConnection='${{ secrets.AZURE_SQL_CONNECTION_STRING }}'
+            --settings ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_HTTPS_PORT=443 ConnectionStrings__DefaultConnection='${{ secrets.AZURE_SQL_CONNECTION_STRING }}' EmailEvents__AzPath=az
 
           az webapp config connection-string set \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
