@@ -51,6 +51,8 @@ namespace TINWeb.Pages.Survey
 
         public string? ErrorMessage { get; private set; }
 
+        public string? InfoMessage { get; private set; }
+
         public bool IsConfigured => _emailEventsService.IsEnabled;
 
         public DateTime EffectiveStartDate { get; private set; }
@@ -83,7 +85,14 @@ namespace TINWeb.Pages.Survey
 
             if (!string.IsNullOrWhiteSpace(result.Error))
             {
-                ErrorMessage = result.Error;
+                if (result.Error.StartsWith("Could not start Azure CLI.", StringComparison.OrdinalIgnoreCase))
+                {
+                    InfoMessage = "Azure delivery telemetry is not available from this hosted app environment. Recorded send history is shown below when available.";
+                }
+                else
+                {
+                    ErrorMessage = result.Error;
+                }
             }
         }
 

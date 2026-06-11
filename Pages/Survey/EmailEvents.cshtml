@@ -47,6 +47,11 @@
         <div class="alert alert-danger">@Model.ErrorMessage</div>
     }
 
+    @if (!string.IsNullOrWhiteSpace(Model.InfoMessage))
+    {
+        <div class="alert alert-info">@Model.InfoMessage</div>
+    }
+
     @if (Model.Events.Any())
     {
         <div class="mb-2 text-muted small">
