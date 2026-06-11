@@ -33,5 +33,7 @@ webapp_logs.zip
 creds.json
 live-logs/
 live-logs.zip
+live-logs-latest/
+live-logs-latest.zip
 publish-linux/
 publish-linux.zip

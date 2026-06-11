@@ -45,7 +45,7 @@ jobs:
           az webapp config appsettings set \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
             --name ${{ env.AZURE_WEBAPP_NAME }} \
-            --settings ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_HTTPS_PORT=443 ConnectionStrings__DefaultConnection='${{ secrets.AZURE_SQL_CONNECTION_STRING }}' EmailEvents__AzPath=az
+            --settings ASPNETCORE_ENVIRONMENT=Production ASPNETCORE_HTTPS_PORT=443 ConnectionStrings__DefaultConnection='${{ secrets.AZURE_SQL_CONNECTION_STRING }}' EmailEvents__Enabled=true EmailEvents__AzPath=az
 
           az webapp config connection-string set \
             --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
@@ -64,6 +64,9 @@ jobs:
         shell: bash
         run: |
           HEALTH_URL="https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net${{ env.HEALTH_PATH }}"
+          LOGIN_URL="https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/Login"
+          EMAIL_EVENTS_URL="https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/Survey/EmailEvents"
+          health_ok=false
 
           echo "Health URL: $HEALTH_URL"
 
@@ -71,15 +74,32 @@ jobs:
             status=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" || true)
             if [ "$status" = "200" ]; then
               echo "Health check passed."
-              exit 0
+              health_ok=true
+              break
             fi
 
             echo "Attempt $i/10 failed with HTTP $status. Retrying in 10s..."
             sleep 10
           done
 
-          echo "Health check failed after 10 attempts."
-          exit 1
+          if [ "$health_ok" != "true" ]; then
+            echo "Health check failed after 10 attempts."
+            exit 1
+          fi
+
+          login_status=$(curl -s -o /dev/null -w "%{http_code}" "$LOGIN_URL" || true)
+          if [ "$login_status" != "200" ]; then
+            echo "Login endpoint check failed with HTTP $login_status"
+            exit 1
+          fi
+
+          email_events_status=$(curl -s -o /dev/null -w "%{http_code}" "$EMAIL_EVENTS_URL" || true)
+          if [ "$email_events_status" != "302" ]; then
+            echo "Email Events anonymous redirect check failed with HTTP $email_events_status"
+            exit 1
+          fi
+
+          echo "Smoke checks passed for health/login/email-events."
 
       - name: Verify deployment
         run: |
