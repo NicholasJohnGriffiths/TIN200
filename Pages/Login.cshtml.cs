@@ -15,10 +15,12 @@ namespace TINWeb.Pages;
 public class LoginModel : PageModel
 {
     private readonly ApplicationDbContext _context;
+    private readonly ILogger<LoginModel> _logger;
 
-    public LoginModel(ApplicationDbContext context)
+    public LoginModel(ApplicationDbContext context, ILogger<LoginModel> logger)
     {
         _context = context;
+        _logger = logger;
     }
 
     [BindProperty]
@@ -54,11 +56,21 @@ public class LoginModel : PageModel
         var loginIdentifier = Email.Trim();
         var normalizedLogin = loginIdentifier.ToLower();
 
-        var user = await _context.AppUsers
-            .AsNoTracking()
-            .FirstOrDefaultAsync(u =>
-                u.Email.ToLower() == normalizedLogin
-                || u.UserName.ToLower() == normalizedLogin);
+        Models.AppUser? user;
+        try
+        {
+            user = await _context.AppUsers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u =>
+                    u.Email.ToLower() == normalizedLogin
+                    || u.UserName.ToLower() == normalizedLogin);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Login lookup failed for identifier {LoginIdentifier}.", loginIdentifier);
+            ModelState.AddModelError(string.Empty, "Sign in is temporarily unavailable. Please try again in a moment.");
+            return Page();
+        }
 
         if (user == null || user.Password != Password)
         {
