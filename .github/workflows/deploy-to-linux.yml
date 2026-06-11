@@ -11,6 +11,7 @@ env:
   AZURE_RESOURCE_GROUP: rg-tin200-260302144937
   AZURE_WEBAPP_PACKAGE_PATH: ./publish
   DOTNET_VERSION: '9.0'
+  HEALTH_PATH: /health
 
 jobs:
   build-and-deploy:
@@ -58,6 +59,27 @@ jobs:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
           startup-command: dotnet TINWeb.dll
+
+      - name: Smoke test health endpoint
+        shell: bash
+        run: |
+          HEALTH_URL="https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net${{ env.HEALTH_PATH }}"
+
+          echo "Health URL: $HEALTH_URL"
+
+          for i in {1..10}; do
+            status=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_URL" || true)
+            if [ "$status" = "200" ]; then
+              echo "Health check passed."
+              exit 0
+            fi
+
+            echo "Attempt $i/10 failed with HTTP $status. Retrying in 10s..."
+            sleep 10
+          done
+
+          echo "Health check failed after 10 attempts."
+          exit 1
 
       - name: Verify deployment
         run: |
