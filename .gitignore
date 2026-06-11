@@ -30,3 +30,8 @@ _deploy_out/
 _deploy_out.zip
 build_errors.csv
 webapp_logs.zip
+creds.json
+live-logs/
+live-logs.zip
+publish-linux/
+publish-linux.zip
