@@ -33,14 +33,18 @@ jobs:
       - name: Publish for Linux
         run: dotnet publish TINWeb.csproj --configuration Release --output ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
 
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
       - name: Deploy to Azure App Service
         uses: azure/webapps-deploy@v2
         with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
+
+      - name: Verify deployment
+        run: |
           echo "Deployment to ${{ env.AZURE_WEBAPP_NAME }} completed"
-          - name: Deploy ZIP to Azure App Service
-            uses: azure/webapps-deploy@v2
-            with:
-              app-name: ${{ env.AZURE_WEBAPP_NAME }}
-              package: ${{ env.AZURE_WEBAPP_PACKAGE_PATH }}
-              credential: ${{ secrets.AZURE_CREDENTIALS }}
           echo "App URL: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net"
