@@ -389,15 +389,17 @@ namespace TINWeb.Services
         private static bool ShouldUseFallbackQueries(string? stderr)
         {
             return !string.IsNullOrWhiteSpace(stderr)
-                && (stderr.Contains("SEM0529", StringComparison.OrdinalIgnoreCase)
-                    || stderr.Contains("SemanticError", StringComparison.OrdinalIgnoreCase)
+                && (stderr.Contains("SemanticError", StringComparison.OrdinalIgnoreCase)
+                    || stderr.Contains("SEM0002", StringComparison.OrdinalIgnoreCase)
+                    || stderr.Contains("SEM0529", StringComparison.OrdinalIgnoreCase)
                     || stderr.Contains("PathNotFoundError", StringComparison.OrdinalIgnoreCase));
         }
 
         private static bool IsIgnorableQueryError(string? stderr)
         {
             return !string.IsNullOrWhiteSpace(stderr)
-                && (stderr.Contains("SEM0529", StringComparison.OrdinalIgnoreCase)
+                && (stderr.Contains("SEM0002", StringComparison.OrdinalIgnoreCase)
+                    || stderr.Contains("SEM0529", StringComparison.OrdinalIgnoreCase)
                     || stderr.Contains("SEM0100", StringComparison.OrdinalIgnoreCase)
                     || stderr.Contains("PathNotFoundError", StringComparison.OrdinalIgnoreCase));
         }
