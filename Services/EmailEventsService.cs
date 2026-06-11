@@ -1,3 +1,5 @@
+using Azure.Core;
+using Azure.Identity;
 using System.Diagnostics;
 using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
@@ -44,14 +46,26 @@ namespace TINWeb.Services
 
             var command = BuildCommand(_settings.CommandTemplate, startUtc, endUtc);
             var azExecutablePath = ResolveAzExecutablePath();
+            var workspaceIdentifier = TryExtractWorkspaceIdentifier(_settings.CommandTemplate, out var extractedWorkspaceIdentifier)
+                ? extractedWorkspaceIdentifier
+                : string.Empty;
+
+            if (!string.IsNullOrWhiteSpace(workspaceIdentifier))
+            {
+                var apiResult = await QueryFallbackViaApiAsync(workspaceIdentifier, startUtc, endUtc);
+                if (apiResult.Rows.Count > 0 || !string.IsNullOrWhiteSpace(apiResult.Error))
+                {
+                    return apiResult;
+                }
+            }
 
             var primaryResult = await ExecuteAzCommandAsync(azExecutablePath, command);
             if (primaryResult.StartErrorResult != null)
             {
-                if (TryExtractWorkspaceIdentifier(_settings.CommandTemplate, out var apiWorkspaceIdentifier))
+                if (!string.IsNullOrWhiteSpace(workspaceIdentifier))
                 {
-                    var apiFallbackResult = await QueryFallbackViaApiAsync(apiWorkspaceIdentifier, startUtc, endUtc);
-                    if (string.IsNullOrWhiteSpace(apiFallbackResult.Error))
+                    var apiFallbackResult = await QueryFallbackViaApiAsync(workspaceIdentifier, startUtc, endUtc);
+                    if (apiFallbackResult.Rows.Count > 0 || string.IsNullOrWhiteSpace(apiFallbackResult.Error))
                     {
                         return apiFallbackResult;
                     }
@@ -70,17 +84,17 @@ namespace TINWeb.Services
             }
 
             if (IsCliUnavailableError(primaryResult.Stderr)
-                && TryExtractWorkspaceIdentifier(_settings.CommandTemplate, out var cliUnavailableWorkspaceIdentifier))
+                && !string.IsNullOrWhiteSpace(workspaceIdentifier))
             {
-                var apiFallbackResult = await QueryFallbackViaApiAsync(cliUnavailableWorkspaceIdentifier, startUtc, endUtc);
-                if (string.IsNullOrWhiteSpace(apiFallbackResult.Error))
+                var apiFallbackResult = await QueryFallbackViaApiAsync(workspaceIdentifier, startUtc, endUtc);
+                if (apiFallbackResult.Rows.Count > 0 || string.IsNullOrWhiteSpace(apiFallbackResult.Error))
                 {
                     return apiFallbackResult;
                 }
             }
 
             if (ShouldUseFallbackQueries(primaryResult.Stderr)
-                && TryExtractWorkspaceIdentifier(_settings.CommandTemplate, out var workspaceIdentifier))
+                && !string.IsNullOrWhiteSpace(workspaceIdentifier))
             {
                 var fallbackRows = await QueryFallbackCommandsAsync(azExecutablePath, workspaceIdentifier, startUtc, endUtc);
                 return new EmailEventsQueryResult
@@ -219,7 +233,7 @@ namespace TINWeb.Services
         {
             try
             {
-                var accessToken = await GetManagedIdentityAccessTokenAsync();
+                var accessToken = await GetLogAnalyticsAccessTokenAsync();
                 if (string.IsNullOrWhiteSpace(accessToken))
                 {
                     return new EmailEventsQueryResult
@@ -272,10 +286,10 @@ namespace TINWeb.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Log Analytics API fallback failed.");
+                _logger.LogError(ex, "Log Analytics API query failed.");
                 return new EmailEventsQueryResult
                 {
-                    Error = "Azure CLI was unavailable and direct Log Analytics API fallback failed."
+                    Error = "Direct Log Analytics API query failed."
                 };
             }
         }
@@ -309,49 +323,21 @@ namespace TINWeb.Services
             yield return $"AzureDiagnostics | where TimeGenerated between (datetime({start}) .. datetime({end})) | where ResourceProvider == 'MICROSOFT.COMMUNICATION' or ResourceType =~ 'MICROSOFT.COMMUNICATION/COMMUNICATIONSERVICES' or Category in ('EmailSendMailOperational', 'EmailStatusUpdateOperational', 'EmailUserEngagementOperational') | project TimeGenerated, EventType=coalesce(tostring(column_ifexists('Category','')), tostring(column_ifexists('OperationName','')), tostring(column_ifexists('status_s','')), tostring(column_ifexists('deliveryStatus_s',''))), Recipient=tostring(coalesce(column_ifexists('RecipientId_s',''), column_ifexists('recipient_s',''), column_ifexists('RecipientAddress_s',''), column_ifexists('EmailAddress_s',''))), Subject=tostring(coalesce(column_ifexists('Subject_s',''), column_ifexists('subject_s',''))), MessageId=tostring(coalesce(column_ifexists('MessageId_g',''), column_ifexists('MessageId_s',''), column_ifexists('CorrelationId_g',''), column_ifexists('CorrelationId_s',''), column_ifexists('OperationId_g',''), column_ifexists('OperationId_s',''))), Details=tostring(coalesce(column_ifexists('statusDetails_s',''), column_ifexists('DiagnosticCode_s',''), column_ifexists('ErrorMessage_s',''), column_ifexists('ResultDescription',''))) | order by TimeGenerated desc";
         }
 
-        private async Task<string?> GetManagedIdentityAccessTokenAsync()
+        private async Task<string?> GetLogAnalyticsAccessTokenAsync()
         {
-            var identityEndpoint = Environment.GetEnvironmentVariable("IDENTITY_ENDPOINT");
-            var identityHeader = Environment.GetEnvironmentVariable("IDENTITY_HEADER");
-            if (!string.IsNullOrWhiteSpace(identityEndpoint) && !string.IsNullOrWhiteSpace(identityHeader))
+            try
             {
-                var url = $"{identityEndpoint}?resource={Uri.EscapeDataString("https://api.loganalytics.io")}&api-version=2019-08-01";
-                using var request = new HttpRequestMessage(HttpMethod.Get, url);
-                request.Headers.Add("X-IDENTITY-HEADER", identityHeader);
+                var credential = new DefaultAzureCredential();
+                var token = await credential.GetTokenAsync(
+                    new TokenRequestContext(new[] { "https://api.loganalytics.io/.default" }));
 
-                using var response = await HttpClient.SendAsync(request);
-                if (response.IsSuccessStatusCode)
-                {
-                    var content = await response.Content.ReadAsStringAsync();
-                    using var doc = JsonDocument.Parse(content);
-                    if (TryGetPropertyIgnoreCase(doc.RootElement, "access_token", out var tokenElement))
-                    {
-                        return tokenElement.GetString();
-                    }
-                }
+                return token.Token;
             }
-
-            var msiEndpoint = Environment.GetEnvironmentVariable("MSI_ENDPOINT");
-            var msiSecret = Environment.GetEnvironmentVariable("MSI_SECRET");
-            if (!string.IsNullOrWhiteSpace(msiEndpoint) && !string.IsNullOrWhiteSpace(msiSecret))
+            catch (Exception ex)
             {
-                var url = $"{msiEndpoint}?resource={Uri.EscapeDataString("https://api.loganalytics.io")}&api-version=2017-09-01";
-                using var request = new HttpRequestMessage(HttpMethod.Get, url);
-                request.Headers.Add("Secret", msiSecret);
-
-                using var response = await HttpClient.SendAsync(request);
-                if (response.IsSuccessStatusCode)
-                {
-                    var content = await response.Content.ReadAsStringAsync();
-                    using var doc = JsonDocument.Parse(content);
-                    if (TryGetPropertyIgnoreCase(doc.RootElement, "access_token", out var tokenElement))
-                    {
-                        return tokenElement.GetString();
-                    }
-                }
+                _logger.LogError(ex, "Log Analytics token acquisition failed.");
+                return null;
             }
-
-            return null;
         }
 
         private static string NormalizeWorkspaceIdentifierForApi(string workspaceIdentifier)
