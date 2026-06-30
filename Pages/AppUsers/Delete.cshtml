@@ -19,7 +19,7 @@
         <dd class="col-sm-9">@Model.Record.UserName</dd>
 
         <dt class="col-sm-3">User Type</dt>
-        <dd class="col-sm-9">@(Model.Record.UserType == 1 ? "Admin" : $"UserType {Model.Record.UserType}")</dd>
+        <dd class="col-sm-9">@Model.GetUserTypeLabel(Model.Record.UserType)</dd>
     </dl>
 
     <form method="post" class="d-flex gap-2">

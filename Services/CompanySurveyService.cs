@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using TINWeb.Data;
 using TINWeb.Models;
 
@@ -9,17 +10,28 @@ namespace TINWeb.Services
     public class CompanySurveyService
     {
         private readonly ApplicationDbContext _context;
+        private readonly SurveyLinkSettings _surveyLinkSettings;
 
-        public CompanySurveyService(ApplicationDbContext context)
+        public CompanySurveyService(
+            ApplicationDbContext context,
+            IOptions<SurveyLinkSettings> surveyLinkSettings)
         {
             _context = context;
+            _surveyLinkSettings = surveyLinkSettings.Value;
         }
 
         public async Task<List<CompanySurvey>> GetAllAsync()
         {
-            return await _context.CompanySurvey
+            var records = await _context.CompanySurvey
                 .OrderByDescending(x => x.Id)
                 .ToListAsync();
+
+            foreach (var record in records)
+            {
+                record.SurveyLink = NormalizeSurveyLink(record.SurveyLink);
+            }
+
+            return records;
         }
 
         public async Task<List<CompanySurveyListRow>> GetListRowsAsync()
@@ -72,10 +84,17 @@ namespace TINWeb.Services
                 query = query.Where(x => x.FinancialYear == financialYear.Value);
             }
 
-            return await query
+            var rows = await query
                 .OrderBy(x => x.CompanyName)
                 .ThenBy(x => x.Id)
                 .ToListAsync();
+
+            foreach (var row in rows)
+            {
+                row.SurveyLink = NormalizeSurveyLink(row.SurveyLink);
+            }
+
+            return rows;
         }
 
         public async Task<List<int>> GetAvailableFinancialYearsAsync()
@@ -98,7 +117,48 @@ namespace TINWeb.Services
 
         public async Task<CompanySurvey?> GetByIdAsync(int id)
         {
-            return await _context.CompanySurvey.FindAsync(id);
+            var record = await _context.CompanySurvey.FindAsync(id);
+            if (record != null)
+            {
+                record.SurveyLink = NormalizeSurveyLink(record.SurveyLink);
+            }
+
+            return record;
+        }
+
+        private string? NormalizeSurveyLink(string? surveyLink)
+        {
+            if (string.IsNullOrWhiteSpace(surveyLink))
+            {
+                return surveyLink;
+            }
+
+            if (!Uri.TryCreate(surveyLink.Trim(), UriKind.Absolute, out var existingUri))
+            {
+                return surveyLink;
+            }
+
+            if (!IsLocalHost(existingUri.Host))
+            {
+                return surveyLink;
+            }
+
+            var configuredBaseUrl = (_surveyLinkSettings.BaseUrl ?? string.Empty).Trim().TrimEnd('/');
+            if (string.IsNullOrWhiteSpace(configuredBaseUrl)
+                || !Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var configuredUri)
+                || IsLocalHost(configuredUri.Host))
+            {
+                return surveyLink;
+            }
+
+            return $"{configuredBaseUrl}{existingUri.PathAndQuery}{existingUri.Fragment}";
+        }
+
+        private static bool IsLocalHost(string host)
+        {
+            return string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(host, "127.0.0.1", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(host, "::1", StringComparison.OrdinalIgnoreCase);
         }
 
         public async Task<CompanySurvey> CreateAsync(CompanySurvey record)

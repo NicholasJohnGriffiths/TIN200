@@ -154,6 +154,80 @@ Please review the contact email for this company before resending the survey.";
             await SendEmailAsync(new[] { adminEmail }, subject, plainTextBody, htmlBody);
         }
 
+        public async Task SendSurveySubmittedNotificationAsync(
+            string adminEmail,
+            string companyName,
+            int surveyYear,
+            DateTime submittedAt,
+            string? submitterEmail)
+        {
+            EnsureEmailConfigured();
+
+            var safeCompanyName = string.IsNullOrWhiteSpace(companyName) ? "Unknown company" : companyName.Trim();
+            var safeSubmitterEmail = string.IsNullOrWhiteSpace(submitterEmail)
+                ? "Not available"
+                : submitterEmail.Trim();
+
+            var subject = $"TIN200 survey submitted - {safeCompanyName}";
+
+            var plainTextBody = $@"A TIN200 survey has been submitted.
+
+Company: {safeCompanyName}
+Survey year: {surveyYear}
+Submitted at: {submittedAt:yyyy-MM-dd HH:mm:ss}
+Submitter email: {safeSubmitterEmail}
+
+Please review the submitted survey and follow up if needed.";
+
+            var htmlBody = $@"<p>A <strong>TIN200</strong> survey has been submitted.</p>
+<ul>
+    <li><strong>Company:</strong> {WebUtility.HtmlEncode(safeCompanyName)}</li>
+    <li><strong>Survey year:</strong> {surveyYear}</li>
+    <li><strong>Submitted at:</strong> {WebUtility.HtmlEncode(submittedAt.ToString("yyyy-MM-dd HH:mm:ss"))}</li>
+    <li><strong>Submitter email:</strong> {WebUtility.HtmlEncode(safeSubmitterEmail)}</li>
+</ul>
+<p>Please review the submitted survey and follow up if needed.</p>";
+
+            await SendEmailAsync(new[] { adminEmail }, subject, plainTextBody, htmlBody);
+        }
+
+        public async Task SendSurveySavedNotificationAsync(
+            string adminEmail,
+            string companyName,
+            int surveyYear,
+            DateTime savedAt,
+            string? submitterEmail)
+        {
+            EnsureEmailConfigured();
+
+            var safeCompanyName = string.IsNullOrWhiteSpace(companyName) ? "Unknown company" : companyName.Trim();
+            var safeSubmitterEmail = string.IsNullOrWhiteSpace(submitterEmail)
+                ? "Not available"
+                : submitterEmail.Trim();
+
+            var subject = $"TIN200 survey saved - {safeCompanyName}";
+
+            var plainTextBody = $@"A TIN200 survey has been saved for later.
+
+Company: {safeCompanyName}
+Survey year: {surveyYear}
+Saved at: {savedAt:yyyy-MM-dd HH:mm:ss}
+Submitter email: {safeSubmitterEmail}
+
+The survey has not been submitted yet.";
+
+            var htmlBody = $@"<p>A <strong>TIN200</strong> survey has been saved for later.</p>
+<ul>
+    <li><strong>Company:</strong> {WebUtility.HtmlEncode(safeCompanyName)}</li>
+    <li><strong>Survey year:</strong> {surveyYear}</li>
+    <li><strong>Saved at:</strong> {WebUtility.HtmlEncode(savedAt.ToString("yyyy-MM-dd HH:mm:ss"))}</li>
+    <li><strong>Submitter email:</strong> {WebUtility.HtmlEncode(safeSubmitterEmail)}</li>
+</ul>
+<p>The survey has not been submitted yet.</p>";
+
+            await SendEmailAsync(new[] { adminEmail }, subject, plainTextBody, htmlBody);
+        }
+
         private (string PlainTextBody, string HtmlBody) BuildSurveyEmailBodies(
             string? configuredTemplate,
             string? emailHeaderImageUrl,

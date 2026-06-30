@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using TINWeb.Data;
 using TINWeb.Models;
+using TINWeb.Services;
 
 namespace TINWeb.Pages.AppUsers;
 
@@ -49,4 +50,6 @@ public class DeleteModel : PageModel
         StatusMessage = "App user deleted successfully.";
         return RedirectToPage("./Index");
     }
+
+    public string GetUserTypeLabel(int userType) => UserTypes.GetLabel(userType);
 }

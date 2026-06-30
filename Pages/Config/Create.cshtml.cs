@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore;
+using System.Net.Mail;
 using TINWeb.Data;
 using TINWeb.Models;
 using TINWeb.Services;
@@ -74,6 +75,10 @@ public class CreateModel : PageModel
         if (string.IsNullOrWhiteSpace(Record.AdminEmail))
         {
             ModelState.AddModelError("Record.AdminEmail", "Admin email is required.");
+        }
+        else if (!TryValidateAdminEmailList(Record.AdminEmail, out var invalidEmail))
+        {
+            ModelState.AddModelError("Record.AdminEmail", $"Invalid admin email address: {invalidEmail}");
         }
 
         if (!ModelState.IsValid)
@@ -200,5 +205,30 @@ public class CreateModel : PageModel
         }
 
         return contentType;
+    }
+
+    private static bool TryValidateAdminEmailList(string adminEmailList, out string invalidEmail)
+    {
+        invalidEmail = string.Empty;
+
+        var tokens = adminEmailList
+            .Split(new[] { ';', ',' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(token => token.Trim())
+            .Where(token => !string.IsNullOrWhiteSpace(token));
+
+        foreach (var token in tokens)
+        {
+            try
+            {
+                _ = new MailAddress(token);
+            }
+            catch
+            {
+                invalidEmail = token;
+                return false;
+            }
+        }
+
+        return true;
     }
 }

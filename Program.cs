@@ -8,12 +8,14 @@ using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Options;
 using Stripe;
 using TINWeb.Data;
+using TINWeb.Filters;
 using TINWeb.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddDistributedMemoryCache();
+builder.Services.AddScoped<ReadOnlyUserWriteBlockPageFilter>();
 builder.Services.AddRazorPages(options =>
 {
     options.Conventions.AuthorizeFolder("/");
@@ -36,6 +38,7 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AddPageRoute("/Company/SurveyUpdate", "/Tin200/SurveyUpdate/{id:int}");
     options.Conventions.AddPageRoute("/Company/SurveyLinkInvalid", "/Tin200/SurveyLinkInvalid");
 })
+    .AddMvcOptions(options => options.Filters.AddService<ReadOnlyUserWriteBlockPageFilter>())
     .AddSessionStateTempDataProvider();
 builder.Services.AddSession(options =>
 {
@@ -75,11 +78,13 @@ builder.Services.AddScoped<QuestionGroupService>();
 builder.Services.AddScoped<TaskService>();
 builder.Services.AddScoped<SurveyEmailBounceService>();
 builder.Services.AddScoped<EmailEventsService>();
+builder.Services.AddScoped<AdminSurveyNotificationService>();
 builder.Services.AddScoped<IImageStorageService, ImageStorageService>();
 builder.Services.Configure<SmtpSettings>(builder.Configuration.GetSection("SmtpSettings"));
 builder.Services.Configure<AzureCommunicationEmailSettings>(builder.Configuration.GetSection("AzureCommunicationEmail"));
 builder.Services.Configure<EmailEventsSettings>(builder.Configuration.GetSection("EmailEvents"));
 builder.Services.Configure<SurveyLinkSettings>(builder.Configuration.GetSection("SurveyLinkSettings"));
+builder.Services.Configure<SurveySubmittedNotificationQueueSettings>(builder.Configuration.GetSection("SurveySubmittedNotificationQueue"));
 builder.Services.AddOptions<StripeSettings>().Configure<IConfiguration>((settings, configuration) =>
 {
     var testModeRaw = configuration["Stripe:Testmode:TINWeb"]

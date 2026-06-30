@@ -6,6 +6,20 @@ namespace TINWeb.Services
 
         Task SendSurveyReminderLinkAsync(string recipientEmail, string surveyUrl, string? companyName, int clientId);
 
+        Task SendSurveySubmittedNotificationAsync(
+            string adminEmail,
+            string companyName,
+            int surveyYear,
+            DateTime submittedAt,
+            string? submitterEmail);
+
+        Task SendSurveySavedNotificationAsync(
+            string adminEmail,
+            string companyName,
+            int surveyYear,
+            DateTime savedAt,
+            string? submitterEmail);
+
         Task SendBounceNotificationAsync(
             string adminEmail,
             string companyName,

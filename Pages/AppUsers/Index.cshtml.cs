@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using TINWeb.Data;
 using TINWeb.Models;
+using TINWeb.Services;
 
 namespace TINWeb.Pages.AppUsers;
 
@@ -32,5 +33,5 @@ public class IndexModel : PageModel
             .ToListAsync();
     }
 
-    public string GetUserTypeLabel(int userType) => userType == 1 ? "Admin" : $"UserType {userType}";
+    public string GetUserTypeLabel(int userType) => UserTypes.GetLabel(userType);
 }

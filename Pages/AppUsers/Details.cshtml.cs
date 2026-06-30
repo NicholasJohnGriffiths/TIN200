@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using TINWeb.Data;
 using TINWeb.Models;
+using TINWeb.Services;
 
 namespace TINWeb.Pages.AppUsers;
 
@@ -30,4 +31,6 @@ public class DetailsModel : PageModel
         Record = record;
         return Page();
     }
+
+    public string GetUserTypeLabel(int userType) => UserTypes.GetLabel(userType);
 }

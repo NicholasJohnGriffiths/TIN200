@@ -19,6 +19,7 @@
         <div class="mb-3">
             <label asp-for="Record.AdminEmail" class="form-label">Admin Email</label>
             <input asp-for="Record.AdminEmail" class="form-control" />
+            <span asp-validation-for="Record.AdminEmail" class="text-danger"></span>
             <div class="form-text">Use one or more addresses separated by <code>;</code> or <code>,</code>.</div>
         </div>
 

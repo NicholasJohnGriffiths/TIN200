@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using TINWeb.Data;
 using TINWeb.Models;
+using TINWeb.Services;
 
 namespace TINWeb.Pages.AppUsers;
 
@@ -13,7 +14,7 @@ public class CreateModel : PageModel
     private readonly ApplicationDbContext _context;
 
     [BindProperty]
-    public AppUser Record { get; set; } = new() { UserType = 0 };
+    public AppUser Record { get; set; } = new() { UserType = UserTypes.StandardUser };
 
     [TempData]
     public string? StatusMessage { get; set; }
@@ -84,6 +85,13 @@ public class CreateModel : PageModel
         if (string.IsNullOrWhiteSpace(Record.Password))
         {
             ModelState.AddModelError("Record.Password", "Password is required.");
+        }
+
+        if (Record.UserType != UserTypes.StandardUser
+            && Record.UserType != UserTypes.Admin
+            && Record.UserType != UserTypes.StandardUserReadOnly)
+        {
+            ModelState.AddModelError("Record.UserType", "Invalid user type.");
         }
     }
 }

@@ -15,17 +15,28 @@ namespace TINWeb.Pages.Company
     public class AnswerSurveyModel : PageModel
     {
         private const string AccessCookiePrefix = "survey_access_";
+        private const int AdminNotificationSuppressionMinutes = 10;
         private readonly ApplicationDbContext _context;
         private readonly ISurveyLinkTokenService _surveyLinkTokenService;
         private readonly IImageStorageService _imageStorageService;
         private readonly TaskService _taskService;
+        private readonly AdminSurveyNotificationService _adminSurveyNotificationService;
+        private readonly ILogger<AnswerSurveyModel> _logger;
 
-        public AnswerSurveyModel(ApplicationDbContext context, ISurveyLinkTokenService surveyLinkTokenService, IImageStorageService imageStorageService, TaskService taskService)
+        public AnswerSurveyModel(
+            ApplicationDbContext context,
+            ISurveyLinkTokenService surveyLinkTokenService,
+            IImageStorageService imageStorageService,
+            TaskService taskService,
+            AdminSurveyNotificationService adminSurveyNotificationService,
+            ILogger<AnswerSurveyModel> logger)
         {
             _context = context;
             _surveyLinkTokenService = surveyLinkTokenService;
             _imageStorageService = imageStorageService;
             _taskService = taskService;
+            _adminSurveyNotificationService = adminSurveyNotificationService;
+            _logger = logger;
         }
 
         public Tin200 Company { get; set; } = new();
@@ -619,15 +630,22 @@ namespace TINWeb.Pages.Company
             }
 
             var isSubmitAction = string.Equals(FormAction, "submit", StringComparison.OrdinalIgnoreCase);
+            var wasSubmitted = (companySurvey?.Submitted).GetValueOrDefault();
+            var becameSubmitted = false;
+            var submittedAt = DateTime.Now;
+            var savedAt = DateTime.Now;
+            var previousSavedDate = companySurvey?.SavedDate;
+            var previousSubmittedDate = companySurvey?.SubmittedDate;
 
             if (companySurvey != null)
             {
                 companySurvey.Saved = true;
-                companySurvey.SavedDate = DateTime.Now;
+                companySurvey.SavedDate = savedAt;
                 if (isSubmitAction)
                 {
+                    becameSubmitted = !wasSubmitted;
                     companySurvey.Submitted = true;
-                    companySurvey.SubmittedDate = DateTime.Now;
+                    companySurvey.SubmittedDate = submittedAt;
                 }
 
                 var noteText = isSubmitAction
@@ -652,6 +670,40 @@ namespace TINWeb.Pages.Company
                     company.CompanyName ?? $"Company {company.Id}",
                     survey.FinancialYear,
                     "Survey Receiver");
+
+                if (ShouldSendSubmitNotification(wasSubmitted, previousSubmittedDate, submittedAt))
+                {
+                    await NotifyAdminSurveySubmittedAsync(
+                        company.CompanyName ?? $"Company {company.Id}",
+                        survey.FinancialYear,
+                        submittedAt,
+                        company.ContactEmail ?? company.Email);
+                }
+                else
+                {
+                    _logger.LogInformation(
+                        "Suppressed duplicate survey submitted admin notification for company {CompanyId} within {SuppressionMinutes} minutes.",
+                        company.Id,
+                        AdminNotificationSuppressionMinutes);
+                }
+            }
+            else
+            {
+                if (ShouldSendSavedNotification(previousSavedDate, savedAt))
+                {
+                    await NotifyAdminSurveySavedAsync(
+                        company.CompanyName ?? $"Company {company.Id}",
+                        survey.FinancialYear,
+                        savedAt,
+                        company.ContactEmail ?? company.Email);
+                }
+                else
+                {
+                    _logger.LogInformation(
+                        "Suppressed duplicate survey saved admin notification for company {CompanyId} within {SuppressionMinutes} minutes.",
+                        company.Id,
+                        AdminNotificationSuppressionMinutes);
+                }
             }
 
             Submitted = isSubmitAction;
@@ -661,6 +713,102 @@ namespace TINWeb.Pages.Company
             SurveyQuestionGroups = await LoadSurveyQuestionGroupsAsync();
             AvailableGroupImageIds = await GetAvailableGroupImageIdsAsync(Rows, SurveyQuestionGroups);
             return Page();
+        }
+
+        private async Task NotifyAdminSurveySubmittedAsync(
+            string companyName,
+            int surveyYear,
+            DateTime submittedAt,
+            string? submitterEmail)
+        {
+            var adminEmail = await _context.AppConfig
+                .AsNoTracking()
+                .OrderBy(c => c.Id)
+                .Select(c => c.AdminEmail)
+                .FirstOrDefaultAsync();
+
+            adminEmail = string.IsNullOrWhiteSpace(adminEmail) ? null : adminEmail.Trim();
+            if (string.IsNullOrWhiteSpace(adminEmail))
+            {
+                return;
+            }
+
+            try
+            {
+                await _adminSurveyNotificationService.NotifySurveySubmittedAsync(
+                    adminEmail,
+                    companyName,
+                    surveyYear,
+                    submittedAt,
+                    submitterEmail);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Failed sending survey submitted notification to admin {AdminEmail} for company {CompanyName}.",
+                    adminEmail,
+                    companyName);
+            }
+        }
+
+        private async Task NotifyAdminSurveySavedAsync(
+            string companyName,
+            int surveyYear,
+            DateTime savedAt,
+            string? submitterEmail)
+        {
+            var adminEmail = await _context.AppConfig
+                .AsNoTracking()
+                .OrderBy(c => c.Id)
+                .Select(c => c.AdminEmail)
+                .FirstOrDefaultAsync();
+
+            adminEmail = string.IsNullOrWhiteSpace(adminEmail) ? null : adminEmail.Trim();
+            if (string.IsNullOrWhiteSpace(adminEmail))
+            {
+                return;
+            }
+
+            try
+            {
+                await _adminSurveyNotificationService.NotifySurveySavedAsync(
+                    adminEmail,
+                    companyName,
+                    surveyYear,
+                    savedAt,
+                    submitterEmail);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Failed sending survey saved notification to admin {AdminEmail} for company {CompanyName}.",
+                    adminEmail,
+                    companyName);
+            }
+        }
+
+        private static bool ShouldSendSubmitNotification(bool wasSubmitted, DateTime? previousSubmittedDate, DateTime submittedAt)
+        {
+            if (!wasSubmitted || !previousSubmittedDate.HasValue)
+            {
+                return true;
+            }
+
+            var elapsed = submittedAt - previousSubmittedDate.Value;
+            return elapsed >= TimeSpan.FromMinutes(AdminNotificationSuppressionMinutes);
+        }
+
+        private static bool ShouldSendSavedNotification(DateTime? previousSavedDate, DateTime savedAt)
+        {
+            if (!previousSavedDate.HasValue)
+            {
+                return true;
+            }
+
+            var elapsed = savedAt - previousSavedDate.Value;
+            return elapsed >= TimeSpan.FromMinutes(AdminNotificationSuppressionMinutes);
         }
 
         private async Task<HashSet<int>> GetAvailableGroupImageIdsAsync(List<AnswerEditRow> rows, IEnumerable<QuestionGroup> groups)

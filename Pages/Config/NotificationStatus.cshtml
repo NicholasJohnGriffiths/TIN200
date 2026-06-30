@@ -1,0 +1,45 @@
+@page
+@model TINWeb.Pages.Config.NotificationStatusModel
+@{
+    ViewData["Title"] = "Notification Status";
+}
+
+<div class="container mt-4">
+    <h1>Notification Status</h1>
+    <p class="text-muted">Live status for survey submitted admin notifications.</p>
+
+    <div class="row g-3 mb-3">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">Admin Recipient</div>
+                <div class="card-body">
+                    <div><strong>Admin Email:</strong> @Model.AdminEmail</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">Last Survey Submit Note</div>
+                <div class="card-body">
+                    <div><strong>Timestamp:</strong> @(Model.LastSubmitAt?.ToString("yyyy-MM-dd HH:mm:ss") ?? "N/A")</div>
+                    <div><strong>Note:</strong> @(!string.IsNullOrWhiteSpace(Model.LastSubmitNote) ? Model.LastSubmitNote : "N/A")</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-header">Queue Health</div>
+        <div class="card-body">
+            <div><strong>Queue Enabled:</strong> @Model.QueueEnabled</div>
+            <div><strong>Queue Name:</strong> @Model.QueueName</div>
+            <div><strong>Pending Messages:</strong> @(Model.PendingQueueCount?.ToString() ?? "N/A")</div>
+            <div><strong>Poison Messages:</strong> @(Model.PoisonQueueCount?.ToString() ?? "N/A")</div>
+            <div class="mt-2"><strong>Status:</strong> @Model.QueueStatusMessage</div>
+        </div>
+    </div>
+
+    <div>
+        <a asp-page="/Config/Edit" asp-route-id="1" class="btn btn-secondary">Back To Config</a>
+    </div>
+</div>
