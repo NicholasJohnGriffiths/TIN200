@@ -139,3 +139,9 @@ body {
     font-size: 0.68rem;
   }
 }
+
+.readonly-action-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
+}

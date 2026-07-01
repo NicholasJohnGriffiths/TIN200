@@ -1,3 +1,8 @@
+@using TINWeb.Services
+@{
+    var isReadOnlyUser = UserTypes.IsReadOnly(User);
+}
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,7 +14,7 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/TINWeb.styles.css" asp-append-version="true" />
 </head>
-<body>
+<body data-read-only-user="@(isReadOnlyUser ? "true" : "false")">
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
             <div class="container-fluid wider-container">
@@ -157,6 +162,96 @@
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
+
+    @if (isReadOnlyUser)
+    {
+        <script>
+            (function () {
+                function isEditOrDeletePath(urlValue) {
+                    if (!urlValue) {
+                        return false;
+                    }
+
+                    try {
+                        var parsed = new URL(urlValue, window.location.origin);
+                        var segments = parsed.pathname
+                            .split("/")
+                            .filter(function (segment) { return segment.length > 0; })
+                            .map(function (segment) { return segment.toLowerCase(); });
+
+                        return segments.indexOf("edit") >= 0 || segments.indexOf("delete") >= 0;
+                    } catch (_) {
+                        return false;
+                    }
+                }
+
+                function isEditOrDeleteLabel(label) {
+                    if (!label) {
+                        return false;
+                    }
+
+                    return /\b(edit|delete)\b/i.test(label.trim());
+                }
+
+                function disableAnchor(anchor) {
+                    anchor.classList.add("disabled", "readonly-action-disabled");
+                    anchor.setAttribute("aria-disabled", "true");
+                    anchor.setAttribute("tabindex", "-1");
+                    anchor.setAttribute("data-readonly-disabled", "true");
+                }
+
+                function disableButton(control) {
+                    control.disabled = true;
+                    control.classList.add("readonly-action-disabled");
+                    control.setAttribute("aria-disabled", "true");
+                }
+
+                function shouldDisableElement(element) {
+                    var label = (element.textContent || element.value || element.getAttribute("aria-label") || element.getAttribute("title") || "").trim();
+                    if (isEditOrDeleteLabel(label)) {
+                        return true;
+                    }
+
+                    var href = element.getAttribute && element.getAttribute("href");
+                    if (isEditOrDeletePath(href)) {
+                        return true;
+                    }
+
+                    var form = element.closest && element.closest("form");
+                    var action = form ? form.getAttribute("action") : null;
+                    if (isEditOrDeletePath(action)) {
+                        return true;
+                    }
+
+                    return false;
+                }
+
+                var interactiveSelector = "a, button, input[type='submit'], input[type='button']";
+                document.querySelectorAll(interactiveSelector).forEach(function (element) {
+                    if (!shouldDisableElement(element)) {
+                        return;
+                    }
+
+                    if (element.tagName.toLowerCase() === "a") {
+                        disableAnchor(element);
+                        return;
+                    }
+
+                    disableButton(element);
+                });
+
+                document.addEventListener("click", function (event) {
+                    var disabledAnchor = event.target.closest("a[data-readonly-disabled='true']");
+                    if (!disabledAnchor) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    event.stopPropagation();
+                }, true);
+            })();
+        </script>
+    }
 
     @await RenderSectionAsync("Scripts", required: false)
 </body>

@@ -6,9 +6,22 @@ namespace TINWeb.Filters;
 
 public sealed class ReadOnlyUserWriteBlockPageFilter : IAsyncPageFilter
 {
+    private static readonly HashSet<string> ReadOnlyBlockedGetPathSegments = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "edit",
+        "delete"
+    };
+
     private static readonly HashSet<string> AllowedMutatingPaths = new(StringComparer.OrdinalIgnoreCase)
     {
         "/Logout"
+    };
+
+    private static readonly string[] AllowedMutatingPathPrefixes =
+    {
+        "/Company/AnswerSurvey",
+        "/Company/SurveyUpdate",
+        "/Tin200/SurveyUpdate"
     };
 
     private static readonly string[] AllowedReadOnlyPostHandlerPrefixes =
@@ -33,6 +46,13 @@ public sealed class ReadOnlyUserWriteBlockPageFilter : IAsyncPageFilter
         }
 
         var request = context.HttpContext.Request;
+
+        if (HttpMethods.IsGet(request.Method) && IsBlockedReadOnlyGetPath(request.Path.Value))
+        {
+            context.Result = new ForbidResult();
+            return;
+        }
+
         if (!IsMutatingMethod(request.Method))
         {
             await next();
@@ -40,7 +60,9 @@ public sealed class ReadOnlyUserWriteBlockPageFilter : IAsyncPageFilter
         }
 
         var path = request.Path.Value ?? string.Empty;
-        if (AllowedMutatingPaths.Contains(path))
+        if (AllowedMutatingPaths.Contains(path)
+            || AllowedMutatingPathPrefixes.Any(prefix =>
+                path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
         {
             await next();
             return;
@@ -63,5 +85,18 @@ public sealed class ReadOnlyUserWriteBlockPageFilter : IAsyncPageFilter
             || HttpMethods.IsPut(method)
             || HttpMethods.IsPatch(method)
             || HttpMethods.IsDelete(method);
+    }
+
+    private static bool IsBlockedReadOnlyGetPath(string? pathValue)
+    {
+        if (string.IsNullOrWhiteSpace(pathValue))
+        {
+            return false;
+        }
+
+        var segments = pathValue
+            .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        return segments.Any(segment => ReadOnlyBlockedGetPathSegments.Contains(segment));
     }
 }
