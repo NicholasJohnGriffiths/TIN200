@@ -23,6 +23,7 @@ namespace TINWeb.Data
         public DbSet<TaskItem> TaskItems { get; set; } = null!;
         public DbSet<AppUser> AppUsers { get; set; } = null!;
         public DbSet<AppConfig> AppConfig { get; set; } = null!;
+        public DbSet<EmailContent> EmailContent { get; set; } = null!;
         public DbSet<CompanyFinancialAnalytics> CompanyFinancialAnalytics { get; set; } = null!;
         public DbSet<FinancialYearComparison> FinancialYearComparison { get; set; } = null!;
         public DbSet<RevenueSummaryBySize> RevenueSummaryBySize { get; set; } = null!;
@@ -711,6 +712,67 @@ namespace TINWeb.Data
                     .HasForeignKey(e => e.EmailHeaderImageId)
                     .OnDelete(DeleteBehavior.SetNull)
                     .HasConstraintName("FK_Config_Image_EmailHeaderImageId");
+            });
+
+            modelBuilder.Entity<EmailContent>(entity =>
+            {
+                entity.ToTable("EmailContent");
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Id)
+                    .HasColumnName("Id")
+                    .ValueGeneratedOnAdd();
+
+                entity.Property(e => e.Name)
+                    .HasColumnName("Name")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255)
+                    .IsRequired();
+
+                entity.Property(e => e.Subject)
+                    .HasColumnName("Subject")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255)
+                    .IsRequired(false);
+
+                entity.Property(e => e.Template)
+                    .HasColumnName("Template")
+                    .HasColumnType("text")
+                    .IsRequired(false);
+
+                entity.Property(e => e.Active)
+                    .HasColumnName("Active")
+                    .HasColumnType("bit")
+                    .HasDefaultValue(true)
+                    .IsRequired();
+
+                entity.Property(e => e.CreatedUtc)
+                    .HasColumnName("CreatedUtc")
+                    .HasColumnType("datetime2")
+                    .HasDefaultValueSql("SYSUTCDATETIME()")
+                    .IsRequired();
+
+                entity.Property(e => e.CreatedBy)
+                    .HasColumnName("CreatedBy")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255)
+                    .IsRequired(false);
+
+                entity.Property(e => e.UpdatedUtc)
+                    .HasColumnName("UpdatedUtc")
+                    .HasColumnType("datetime2")
+                    .HasDefaultValueSql("SYSUTCDATETIME()")
+                    .IsRequired();
+
+                entity.Property(e => e.UpdatedBy)
+                    .HasColumnName("UpdatedBy")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255)
+                    .IsRequired(false);
+
+                entity.HasIndex(e => e.Name)
+                    .IsUnique()
+                    .HasDatabaseName("UX_EmailContent_Name");
             });
 
             // Configure view models - no key required for views

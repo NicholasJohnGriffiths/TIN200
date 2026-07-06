@@ -506,9 +506,12 @@ VALUES (@externalId, @companyName, @tinStatus);";
             };
         }
 
-        public async Task<CompanyGlobalImportResult> ImportGlobalFromExcelAsync(Stream excelStream, int importYear)
+        public async Task<CompanyGlobalImportResult> ImportGlobalFromExcelAsync(Stream excelStream, int importYear, int? importTinStatus = null)
         {
             var plan = await BuildCompanyGlobalImportPlanAsync(excelStream);
+            var finalImportTinStatus = importTinStatus.HasValue && TinStatusHelper.IsValidSelection(importTinStatus)
+                ? importTinStatus
+                : (int)TinStatus.Tin200;
             var result = new CompanyGlobalImportResult
             {
             ImportYear = importYear,
@@ -530,7 +533,7 @@ VALUES (@externalId, @companyName, @tinStatus);";
             {
                 await _context.Database.ExecuteSqlInterpolatedAsync($@"
 INSERT INTO [Company] ([ExternalID], [CompanyName], [CompanyDescription], [ExternalId_ImportColumnName], [CompanyName_ImportColumnName], [CompanyDescription_ImportColumnName], [FinancialYear], [LastTIN200Year], [TINStatus])
-VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operation.ImportedCompanyDescription}, {plan.MatchedExternalIdHeader}, {plan.MatchedCompanyNameHeader}, {plan.MatchedCompanyDescriptionHeader}, {importYear}, {importYear}, {(int)TinStatus.Tin200})");
+VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operation.ImportedCompanyDescription}, {plan.MatchedExternalIdHeader}, {plan.MatchedCompanyNameHeader}, {plan.MatchedCompanyDescriptionHeader}, {importYear}, {importYear}, {finalImportTinStatus})");
             }
 
             result.CompanySurveyCreatedCount = await EnsureCompanySurveyRowsForImportAsync(plan, importYear, result.Errors);

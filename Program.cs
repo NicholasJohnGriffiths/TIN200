@@ -21,6 +21,7 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AuthorizeFolder("/");
     options.Conventions.AuthorizeFolder("/AppUsers", "AdminOnly");
     options.Conventions.AuthorizeFolder("/Config", "AdminOnly");
+    options.Conventions.AuthorizeFolder("/EmailContent", "AdminOnly");
     options.Conventions.AllowAnonymousToPage("/Login");
     options.Conventions.AllowAnonymousToPage("/Error");
     options.Conventions.AllowAnonymousToPage("/Company/SurveyUpdate");

@@ -2,9 +2,11 @@ namespace TINWeb.Services
 {
     public interface ISurveyEmailService
     {
-        Task SendSurveyLinkAsync(string recipientEmail, string surveyUrl, string? companyName, int clientId);
+        Task SendSurveyLinkAsync(string recipientEmail, string surveyUrl, string? companyName, int clientId, int emailContentId);
 
-        Task SendSurveyReminderLinkAsync(string recipientEmail, string surveyUrl, string? companyName, int clientId);
+        Task SendSurveyReminderLinkAsync(string recipientEmail, string surveyUrl, string? companyName, int clientId, int emailContentId);
+
+        Task<SurveyEmailPreviewResult> BuildSurveyEmailPreviewAsync(int emailContentId, string surveyUrl, string? companyName, int clientId);
 
         Task SendSurveySubmittedNotificationAsync(
             string adminEmail,

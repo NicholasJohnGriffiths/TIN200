@@ -183,6 +183,7 @@
 
                 <form method="post" asp-page-handler="ApplyContactImport" class="d-inline" id="applyContactImportForm">
                     <input type="hidden" name="previewToken" value="@Model.PendingContactImportToken" />
+                    <input type="hidden" name="tinStatus" value="@Model.SelectedTinStatus" />
                     <input type="hidden" name="showImportTool" value="@(string.Equals(Model.ShowImportTool, "import", StringComparison.OrdinalIgnoreCase) ? "import" : "contacts")" />
                     <input type="hidden" name="showImportTab" value="contacts" />
                     <input type="hidden" name="selectedContactImportRows" id="selectedContactImportRows" value="" />
@@ -297,6 +298,7 @@
 
                 <form method="post" asp-page-handler="ApplyGlobalImport" class="d-inline" id="applyGlobalImportForm">
                     <input type="hidden" name="previewToken" value="@Model.PendingGlobalImportToken" />
+                    <input type="hidden" name="tinStatus" value="@Model.SelectedTinStatus" />
                     <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
                     <input type="hidden" name="showImportTool" value="@(string.Equals(Model.ShowImportTool, "import", StringComparison.OrdinalIgnoreCase) ? "import" : "global")" />
                     <input type="hidden" name="showImportTab" value="global" />
@@ -308,7 +310,7 @@
 
     <div class="row mb-4">
         <div class="col-md-8">
-            <h1>@(isImportMode ? "Companies Import" : $"Companies ({Model.Records.Count})")</h1>
+            <h1>@(isImportMode ? $"Companies Import ({Model.Records.Count})" : $"Companies ({Model.Records.Count})")</h1>
         </div>
         <div class="col-md-4 text-end">
             <div class="d-inline-flex align-items-center gap-2 flex-wrap justify-content-end">
@@ -366,6 +368,7 @@
                         <div class="tab-pane fade @(activeImportTab == "contacts" ? "show active" : null)" id="company-import-contacts-pane" role="tabpanel" aria-labelledby="company-import-contacts-tab" tabindex="0">
                             <form method="post" asp-page-handler="LoadContactImportHeaders" enctype="multipart/form-data" class="d-inline-flex align-items-center gap-2 flex-wrap" id="contactImportLoadForm">
                                 <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
+                                <input type="hidden" name="tinStatus" value="@Model.SelectedTinStatus" />
                                 <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
                                 <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
                                 <input type="hidden" name="showImportTool" value="import" />
@@ -381,6 +384,7 @@
 
                             <form method="post" asp-page-handler="PreviewContactImport" class="row g-2 align-items-end" id="contactImportForm">
                                 <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
+                                <input type="hidden" name="tinStatus" value="@Model.SelectedTinStatus" />
                                 <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
                                 <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
                                 <input type="hidden" name="showImportTool" value="import" />
@@ -455,6 +459,7 @@
                     <div class="tab-pane fade @(activeImportTab == "global" ? "show active" : null)" id="company-import-global-pane" role="tabpanel" aria-labelledby="company-import-global-tab" tabindex="0">
                         <form method="post" asp-page-handler="PreviewGlobalImport" enctype="multipart/form-data" class="d-inline-flex align-items-center gap-2 flex-wrap" id="globalImportForm">
                             <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
+                            <input type="hidden" name="tinStatus" value="@Model.SelectedTinStatus" />
                             <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
                             <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
                             <input type="hidden" name="showImportTool" value="import" />
@@ -473,6 +478,11 @@
     <div class="row mb-3">
         <div class="col-12">
             <form method="get" class="d-flex" id="companyFilterForm">
+                @if (isImportMode)
+                {
+                    <input type="hidden" name="showImportTool" value="import" />
+                    <input type="hidden" name="showImportTab" value="@activeImportTab" />
+                }
                 <label class="me-2 align-self-center">Filter Last TIN200 Year:</label>
                 <select name="lastTin200Year" class="form-select me-2" aria-label="Last TIN200 Year">
                     <option value="">All</option>
@@ -738,9 +748,16 @@
                 return;
             }
 
-            var selectedValues = getContactImportRowCheckboxes()
+            var rowCheckboxes = getContactImportRowCheckboxes();
+            var selectedValues = rowCheckboxes
                 .filter(function (checkbox) { return checkbox.checked; })
                 .map(function (checkbox) { return checkbox.value; });
+
+            // Empty payload means "apply all rows from the import file" on the server.
+            if (rowCheckboxes.length > 0 && selectedValues.length === rowCheckboxes.length) {
+                selectedContactImportRowsField.value = '';
+                return;
+            }
 
             selectedContactImportRowsField.value = selectedValues.join(',');
         }
@@ -767,13 +784,8 @@
         updateSelectedContactImportRowsField();
 
         if (applyContactImportForm) {
-            applyContactImportForm.addEventListener('submit', function (event) {
+            applyContactImportForm.addEventListener('submit', function () {
                 updateSelectedContactImportRowsField();
-                if (!selectedContactImportRowsField || !selectedContactImportRowsField.value) {
-                    event.preventDefault();
-                    alert('Please select at least one row to import.');
-                    return;
-                }
                 startProgress('Applying companies import...');
             });
         }

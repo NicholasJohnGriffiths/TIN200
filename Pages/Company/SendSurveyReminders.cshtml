@@ -78,15 +78,57 @@
                             <label asp-for="IncludeSavedSubmitted" class="form-check-label">Include saved/submitted</label>
                         </div>
 
+                        <div>
+                            <label asp-for="SelectedEmailContentId" class="form-label mb-1">Email Content</label>
+                            <select asp-for="SelectedEmailContentId" asp-items="Model.EmailContentOptions" class="form-select" style="min-width: 260px;">
+                                <option value="">Select email content</option>
+                            </select>
+                        </div>
+
                         <div class="mb-2">
                             <button type="submit" class="btn btn-outline-primary btn-sm">Apply Filters</button>
                         </div>
                     </form>
 
+                    <span asp-validation-for="SelectedEmailContentId" class="text-danger"></span>
+
+                    @if (Model.EmailPreview != null)
+                    {
+                        <div class="card mb-3 border-info">
+                            <div class="card-header bg-info-subtle">Selected Email Content Preview</div>
+                            <div class="card-body">
+                                <div class="mb-2"><strong>Subject:</strong> @(string.IsNullOrWhiteSpace(Model.EmailPreview.Subject) ? "(blank - default subject will be used)" : Model.EmailPreview.Subject)</div>
+                                <div class="border rounded p-3 bg-white" style="max-height: 320px; overflow-y: auto;">
+                                    @Html.Raw(Model.EmailPreview.HtmlBody)
+                                </div>
+                            </div>
+                        </div>
+                    }
+
+                    @{
+                        var selectedEmailContentLabel = Model.EmailContentOptions
+                            .FirstOrDefault(x => string.Equals(x.Value, Model.SelectedEmailContentId?.ToString(), StringComparison.OrdinalIgnoreCase))
+                            ?.Text;
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(selectedEmailContentLabel))
+                    {
+                        <div class="alert alert-warning" role="alert">
+                            <strong>Sending with Email Content:</strong> @selectedEmailContentLabel
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-danger" role="alert">
+                            <strong>No Email Content selected.</strong> Choose one before sending.
+                        </div>
+                    }
+
                     <form id="bulkSendForm" method="post" asp-page-handler="Bulk">
                         <input type="hidden" asp-for="SelectedTinStatus" />
                         <input type="hidden" asp-for="SelectedSentYear" />
                         <input type="hidden" asp-for="IncludeSavedSubmitted" />
+                        <input type="hidden" asp-for="SelectedEmailContentId" />
 
                         <div class="mb-2">
                             <button type="button" id="selectAllClientsBtn" class="btn btn-outline-secondary btn-sm">Select All Listed</button>

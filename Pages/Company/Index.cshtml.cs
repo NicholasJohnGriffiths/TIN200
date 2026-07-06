@@ -108,12 +108,12 @@ namespace TINWeb.Pages.Company
             return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies });
         }
 
-        public async Task<IActionResult> OnPostPreviewGlobalImportAsync(IFormFile? importFile, int? lastTin200Year, int? importYear, string? companySearch, bool showTestCompanies = false, string? showImportTool = null, string? showImportTab = null)
+        public async Task<IActionResult> OnPostPreviewGlobalImportAsync(IFormFile? importFile, int? lastTin200Year, int? tinStatus, int? importYear, string? companySearch, bool showTestCompanies = false, string? showImportTool = null, string? showImportTab = null)
         {
             if (!User.IsInRole("1"))
             {
                 ErrorMessage = "Companies import is only available to admin users.";
-                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool = "import", showImportTab = "global" });
+                return RedirectToPage(new { lastTin200Year, tinStatus, companySearch, showTestCompanies, showImportTool = "import", showImportTab = "global" });
             }
 
             ShowImportTool = showImportTool;
@@ -121,20 +121,20 @@ namespace TINWeb.Pages.Company
             if (importFile == null || importFile.Length == 0)
             {
                 ErrorMessage = "Global company import failed: please select an Excel file.";
-                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
+                return RedirectToPage(new { lastTin200Year, tinStatus, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
             }
 
             if (!importYear.HasValue || importYear.Value <= 0)
             {
                 ErrorMessage = "Global company import failed: please provide a valid Import Year.";
-                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
+                return RedirectToPage(new { lastTin200Year, tinStatus, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
             }
 
             var fileName = importFile.FileName ?? string.Empty;
             if (!fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
             {
                 ErrorMessage = "Global company import failed: only .xlsx Excel files are supported.";
-                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
+                return RedirectToPage(new { lastTin200Year, tinStatus, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
             }
 
             CleanupExpiredPendingImports();
@@ -164,23 +164,24 @@ namespace TINWeb.Pages.Company
                 CompanySearch = companySearch,
                 ShowTestCompanies = showTestCompanies,
                 ImportYear = importYear.Value,
+                ImportTinStatus = ResolveDefaultContactImportTinStatus(tinStatus),
                 ShowImportTool = showImportTool,
                 ShowImportTab = ShowImportTab
             };
 
-            await LoadPageAsync(lastTin200Year, companySearch, showTestCompanies);
+            await LoadPageAsync(lastTin200Year, companySearch, showTestCompanies, tinStatus, hasTinStatusFilter: true);
             GlobalImportPreview = preview;
             PendingGlobalImportToken = token;
             SelectedImportYear = importYear.Value;
             return Page();
         }
 
-        public async Task<IActionResult> OnPostApplyGlobalImportAsync(string? previewToken)
+        public async Task<IActionResult> OnPostApplyGlobalImportAsync(string? previewToken, int? tinStatus)
         {
             if (!User.IsInRole("1"))
             {
                 ErrorMessage = "Companies import is only available to admin users.";
-                return RedirectToPage(new { showImportTool = "import", showImportTab = "global" });
+                return RedirectToPage(new { tinStatus, showImportTool = "import", showImportTab = "global" });
             }
 
             CleanupExpiredPendingImports();
@@ -188,13 +189,13 @@ namespace TINWeb.Pages.Company
             if (string.IsNullOrWhiteSpace(previewToken) || !PendingImports.TryGetValue(previewToken, out var pendingImport))
             {
                 ErrorMessage = "Apply global company import failed: preview session not found or expired. Please preview the file again.";
-                return RedirectToPage();
+                return RedirectToPage(new { tinStatus });
             }
 
             try
             {
                 await using var stream = System.IO.File.OpenRead(pendingImport.TempFilePath);
-                var result = await _service.ImportGlobalFromExcelAsync(stream, pendingImport.ImportYear);
+                var result = await _service.ImportGlobalFromExcelAsync(stream, pendingImport.ImportYear, pendingImport.ImportTinStatus);
                 if (result.Errors.Any())
                 {
                     StatusMessage = $"Global company import completed with warnings. Import Year: {result.ImportYear}. Added: {result.InsertedCount}, Updated: {result.UpdatedCount}, Unchanged: {result.UnchangedCount}, CompanySurvey created: {result.CompanySurveyCreatedCount}. Warnings: {string.Join(" ", result.Errors.Take(5))}";
@@ -213,15 +214,15 @@ namespace TINWeb.Pages.Company
                 }
             }
 
-            return RedirectToPage(new { lastTin200Year = pendingImport.LastTin200Year, companySearch = pendingImport.CompanySearch, showTestCompanies = pendingImport.ShowTestCompanies, showImportTool = pendingImport.ShowImportTool, showImportTab = pendingImport.ShowImportTab });
+            return RedirectToPage(new { lastTin200Year = pendingImport.LastTin200Year, tinStatus, companySearch = pendingImport.CompanySearch, showTestCompanies = pendingImport.ShowTestCompanies, showImportTool = pendingImport.ShowImportTool, showImportTab = pendingImport.ShowImportTab });
         }
 
-        public async Task<IActionResult> OnPostPreviewContactImportAsync(IFormFile? importFile, int? lastTin200Year, string? companySearch, bool showTestCompanies = false, string? showImportTool = null, string? showImportTab = null)
+        public async Task<IActionResult> OnPostPreviewContactImportAsync(IFormFile? importFile, int? lastTin200Year, int? tinStatus, string? companySearch, bool showTestCompanies = false, string? showImportTool = null, string? showImportTab = null)
         {
             if (!User.IsInRole("1"))
             {
                 ErrorMessage = "Companies import is only available to admin users.";
-                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool = "import", showImportTab = "contacts" });
+                return RedirectToPage(new { lastTin200Year, tinStatus, companySearch, showTestCompanies, showImportTool = "import", showImportTab = "contacts" });
             }
 
             ShowImportTool = showImportTool;
@@ -239,7 +240,7 @@ namespace TINWeb.Pages.Company
             if (sourceImport == null && (importFile == null || importFile.Length == 0))
             {
                 ErrorMessage = "Companies import failed: please select an Excel file.";
-                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
+                return RedirectToPage(new { lastTin200Year, tinStatus, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
             }
 
             if (sourceImport == null)
@@ -248,7 +249,7 @@ namespace TINWeb.Pages.Company
                 if (!fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
                 {
                     ErrorMessage = "Companies import failed: only .xlsx Excel files are supported.";
-                    return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
+                    return RedirectToPage(new { lastTin200Year, tinStatus, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
                 }
 
                 var token = Guid.NewGuid().ToString("N");
@@ -274,6 +275,8 @@ namespace TINWeb.Pages.Company
                     ShowImportTab = ShowImportTab
                 };
             }
+
+            ContactImportTinStatus ??= ResolveDefaultContactImportTinStatus(tinStatus);
 
             var selectedMapping = new CompanyService.CompanyContactImportMapping
             {
@@ -312,7 +315,7 @@ namespace TINWeb.Pages.Company
 
             PendingImports[sourceImport.Token] = sourceImport;
 
-            await LoadPageAsync(lastTin200Year, companySearch, showTestCompanies);
+            await LoadPageAsync(lastTin200Year, companySearch, showTestCompanies, tinStatus, hasTinStatusFilter: true);
             ContactImportPreview = preview;
             PendingContactImportToken = sourceImport.Token;
             ContactImportMappingToken = sourceImport.Token;
@@ -324,12 +327,12 @@ namespace TINWeb.Pages.Company
             return Page();
         }
 
-        public async Task<IActionResult> OnPostLoadContactImportHeadersAsync(IFormFile? importFile, int? lastTin200Year, string? companySearch, bool showTestCompanies = false, string? showImportTool = null, string? showImportTab = null)
+        public async Task<IActionResult> OnPostLoadContactImportHeadersAsync(IFormFile? importFile, int? lastTin200Year, int? tinStatus, string? companySearch, bool showTestCompanies = false, string? showImportTool = null, string? showImportTab = null)
         {
             if (!User.IsInRole("1"))
             {
                 ErrorMessage = "Companies import is only available to admin users.";
-                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool = "import", showImportTab = "contacts" });
+                return RedirectToPage(new { lastTin200Year, tinStatus, companySearch, showTestCompanies, showImportTool = "import", showImportTab = "contacts" });
             }
 
             ShowImportTool = showImportTool;
@@ -337,14 +340,14 @@ namespace TINWeb.Pages.Company
             if (importFile == null || importFile.Length == 0)
             {
                 ErrorMessage = "Companies import mapping failed: please select an Excel file.";
-                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
+                return RedirectToPage(new { lastTin200Year, tinStatus, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
             }
 
             var fileName = importFile.FileName ?? string.Empty;
             if (!fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
             {
                 ErrorMessage = "Companies import mapping failed: only .xlsx Excel files are supported.";
-                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
+                return RedirectToPage(new { lastTin200Year, tinStatus, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
             }
 
             CleanupExpiredPendingImports();
@@ -373,7 +376,7 @@ namespace TINWeb.Pages.Company
                 }
 
                 ErrorMessage = "Companies import mapping failed: no header row was detected in the selected file.";
-                return RedirectToPage(new { lastTin200Year, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
+                return RedirectToPage(new { lastTin200Year, tinStatus, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
             }
 
             PendingImports[token] = new PendingCompanyImport
@@ -389,19 +392,19 @@ namespace TINWeb.Pages.Company
                 ShowImportTab = ShowImportTab
             };
 
-            await LoadPageAsync(lastTin200Year, companySearch, showTestCompanies);
+            await LoadPageAsync(lastTin200Year, companySearch, showTestCompanies, tinStatus, hasTinStatusFilter: true);
             ContactImportHeaders = headers;
             ContactImportMappingToken = token;
             ContactMapCompanyNameHeader = headers.FirstOrDefault(x => string.Equals(x.Trim(), "Company Name", StringComparison.OrdinalIgnoreCase));
             ContactMapFirstNameHeader = headers.FirstOrDefault(x => string.Equals(x.Trim(), "Contact Person - First Name", StringComparison.OrdinalIgnoreCase));
             ContactMapLastNameHeader = headers.FirstOrDefault(x => string.Equals(x.Trim(), "Contact Person - Last Name", StringComparison.OrdinalIgnoreCase));
             ContactMapEmailHeader = headers.FirstOrDefault(x => string.Equals(x.Trim(), "Contact Email", StringComparison.OrdinalIgnoreCase));
-            ContactImportTinStatus = (int)TinStatus.Tin200;
+            ContactImportTinStatus = ResolveDefaultContactImportTinStatus(tinStatus);
             StatusMessage = "Companies import file loaded. Review or adjust the header mappings, then preview the import.";
             return Page();
         }
 
-        public async Task<IActionResult> OnPostApplyContactImportAsync(string? previewToken, string? selectedContactImportRows)
+        public async Task<IActionResult> OnPostApplyContactImportAsync(string? previewToken, string? selectedContactImportRows, int? tinStatus)
         {
             if (!User.IsInRole("1"))
             {
@@ -414,15 +417,11 @@ namespace TINWeb.Pages.Company
             if (string.IsNullOrWhiteSpace(previewToken) || !PendingImports.TryGetValue(previewToken, out var pendingImport))
             {
                 ErrorMessage = "Apply companies import failed: preview session not found or expired. Please preview the file again.";
-                return RedirectToPage();
+                return RedirectToPage(new { tinStatus });
             }
 
             var selectedRows = ParseSelectedRowNumbers(selectedContactImportRows);
-            if (selectedRows.Count == 0)
-            {
-                ErrorMessage = "Apply companies import failed: please select at least one row from the preview.";
-                return RedirectToPage(new { lastTin200Year = pendingImport.LastTin200Year, companySearch = pendingImport.CompanySearch, showTestCompanies = pendingImport.ShowTestCompanies, showImportTool = pendingImport.ShowImportTool, showImportTab = pendingImport.ShowImportTab });
-            }
+            var effectiveTinStatus = pendingImport.ContactImportTinStatus ?? ResolveDefaultContactImportTinStatus(tinStatus);
 
             try
             {
@@ -434,8 +433,8 @@ namespace TINWeb.Pages.Company
                     ContactLastNameHeader = pendingImport.MappedContactLastNameHeader,
                     ContactEmailHeader = pendingImport.MappedContactEmailHeader,
                     ApplyTinStatus = pendingImport.ApplyTinStatus,
-                    TinStatusToApply = pendingImport.ContactImportTinStatus,
-                    SelectedRowNumbers = selectedRows
+                    TinStatusToApply = effectiveTinStatus,
+                    SelectedRowNumbers = selectedRows.Count > 0 ? selectedRows : null
                 };
 
                 var result = await _service.ImportContactsFromExcelAsync(stream, mapping);
@@ -457,7 +456,7 @@ namespace TINWeb.Pages.Company
                 }
             }
 
-            return RedirectToPage(new { lastTin200Year = pendingImport.LastTin200Year, companySearch = pendingImport.CompanySearch, showTestCompanies = pendingImport.ShowTestCompanies, showImportTool = pendingImport.ShowImportTool, showImportTab = pendingImport.ShowImportTab });
+            return RedirectToPage(new { lastTin200Year = pendingImport.LastTin200Year, tinStatus, companySearch = pendingImport.CompanySearch, showTestCompanies = pendingImport.ShowTestCompanies, showImportTool = pendingImport.ShowImportTool, showImportTab = pendingImport.ShowImportTab });
         }
 
         private async Task LoadPageAsync(int? lastTin200Year, string? companySearch, bool showTestCompanies = false, int? tinStatus = null, bool hasTinStatusFilter = false)
@@ -524,6 +523,21 @@ namespace TINWeb.Pages.Company
             };
         }
 
+        private static int? ResolveDefaultContactImportTinStatus(int? tinStatus)
+        {
+            if (!TinStatusHelper.IsValidSelection(tinStatus))
+            {
+                return (int)TinStatus.Tin200;
+            }
+
+            if (!tinStatus.HasValue || tinStatus.Value == (int)TinStatus.Blank)
+            {
+                return null;
+            }
+
+            return tinStatus.Value;
+        }
+
         private static HashSet<int> ParseSelectedRowNumbers(string? selectedContactImportRows)
         {
             if (string.IsNullOrWhiteSpace(selectedContactImportRows))
@@ -563,6 +577,7 @@ namespace TINWeb.Pages.Company
             public string? CompanySearch { get; set; }
             public bool ShowTestCompanies { get; set; }
             public int ImportYear { get; set; }
+            public int? ImportTinStatus { get; set; }
             public string Kind { get; set; } = "Global";
             public string? ShowImportTool { get; set; }
             public string? ShowImportTab { get; set; }

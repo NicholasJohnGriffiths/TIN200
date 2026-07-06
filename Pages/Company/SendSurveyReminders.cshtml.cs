@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
@@ -65,8 +66,13 @@ namespace TINWeb.Pages.Company
         [BindProperty(SupportsGet = true)]
         public bool IncludeSavedSubmitted { get; set; }
 
+        [BindProperty(SupportsGet = true)]
+        public int? SelectedEmailContentId { get; set; }
+
         public List<int> AvailableSentYears { get; set; } = new();
         public List<ReminderClientRow> AvailableClients { get; set; } = new();
+        public List<SelectListItem> EmailContentOptions { get; set; } = new();
+        public SurveyEmailPreviewResult? EmailPreview { get; set; }
 
         [TempData]
         public string? StatusMessage { get; set; }
@@ -90,12 +96,23 @@ namespace TINWeb.Pages.Company
         {
             SelectedTinStatus = NormalizeTinStatusFilter(SelectedTinStatus);
             await LoadAvailableClientsAsync();
+            await LoadEmailContentOptionsAsync();
+            SelectDefaultEmailContentIfMissing();
+            await LoadEmailPreviewAsync();
             return Page();
         }
 
         public async Task<IActionResult> OnPostBulkAsync()
         {
             await LoadAvailableClientsAsync();
+            await LoadEmailContentOptionsAsync();
+            SelectDefaultEmailContentIfMissing();
+            await LoadEmailPreviewAsync();
+
+            if (!SelectedEmailContentId.HasValue)
+            {
+                ModelState.AddModelError(nameof(SelectedEmailContentId), "Select an email content before sending reminders.");
+            }
 
             if (EnableScheduleSettings)
             {
@@ -159,7 +176,7 @@ namespace TINWeb.Pages.Company
                     BulkFailedCount = 0;
                     BulkLastRunAt = DateTime.Now.ToString("MMM d, yyyy h:mm tt");
                     BulkSendSucceeded = false;
-                    return RedirectToPage(new { SelectedTinStatus, SelectedSentYear, IncludeSavedSubmitted });
+                    return RedirectToPage(new { SelectedTinStatus, SelectedSentYear, IncludeSavedSubmitted, SelectedEmailContentId });
                 }
             }
 
@@ -171,7 +188,7 @@ namespace TINWeb.Pages.Company
 
                 try
                 {
-                    await _surveyEmailService.SendSurveyReminderLinkAsync(recipientEmail, surveyUrl, clientRow.CompanyName, clientRow.Id);
+                    await _surveyEmailService.SendSurveyReminderLinkAsync(recipientEmail, surveyUrl, clientRow.CompanyName, clientRow.Id, SelectedEmailContentId!.Value);
                     sentCount++;
 
                     var companySurvey = await EnsureCompanySurveyAsync(clientRow.Id, currentSurveyId.Value);
@@ -212,7 +229,7 @@ namespace TINWeb.Pages.Company
                         BulkFailedCount = failedCount;
                         BulkLastRunAt = DateTime.Now.ToString("MMM d, yyyy h:mm tt");
                         BulkSendSucceeded = false;
-                        return RedirectToPage(new { SelectedTinStatus, SelectedSentYear, IncludeSavedSubmitted });
+                        return RedirectToPage(new { SelectedTinStatus, SelectedSentYear, IncludeSavedSubmitted, SelectedEmailContentId });
                     }
                 }
             }
@@ -245,7 +262,7 @@ namespace TINWeb.Pages.Company
             }
 
             BulkSendSucceeded = true;
-            return RedirectToPage(new { SelectedTinStatus, SelectedSentYear, IncludeSavedSubmitted });
+            return RedirectToPage(new { SelectedTinStatus, SelectedSentYear, IncludeSavedSubmitted, SelectedEmailContentId });
         }
 
         private async Task LoadAvailableClientsAsync()
@@ -388,6 +405,54 @@ namespace TINWeb.Pages.Company
                 (int)TinStatus.TinTest => (int)TinStatus.TinTest,
                 _ => (int)TinStatus.Tin200
             };
+        }
+
+        private async Task LoadEmailContentOptionsAsync()
+        {
+            EmailContentOptions = await _context.EmailContent
+                .AsNoTracking()
+                .Where(x => x.Active)
+                .OrderBy(x => x.Name)
+                .Select(x => new SelectListItem
+                {
+                    Value = x.Id.ToString(),
+                    Text = x.Name
+                })
+                .ToListAsync();
+        }
+
+        private void SelectDefaultEmailContentIfMissing()
+        {
+            if (SelectedEmailContentId.HasValue
+                && EmailContentOptions.Any(x => string.Equals(x.Value, SelectedEmailContentId.Value.ToString(), StringComparison.OrdinalIgnoreCase)))
+            {
+                return;
+            }
+
+            SelectedEmailContentId = EmailContentOptions
+                .Select(x => int.TryParse(x.Value, out var parsed) ? parsed : (int?)null)
+                .FirstOrDefault();
+        }
+
+        private async Task LoadEmailPreviewAsync()
+        {
+            EmailPreview = null;
+
+            if (!SelectedEmailContentId.HasValue)
+            {
+                return;
+            }
+
+            var previewClient = AvailableClients.FirstOrDefault();
+            var previewClientId = previewClient?.Id ?? 1;
+            var previewCompanyName = previewClient?.CompanyName ?? "Example Company";
+            var previewSurveyUrl = BuildSurveyUrl(previewClientId);
+
+            EmailPreview = await _surveyEmailService.BuildSurveyEmailPreviewAsync(
+                SelectedEmailContentId.Value,
+                previewSurveyUrl,
+                previewCompanyName,
+                previewClientId);
         }
 
         private async Task<HashSet<int>> GetLockedCompanyIdsForCurrentSurveyAsync()

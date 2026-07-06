@@ -23,15 +23,8 @@
             <div class="form-text">Use one or more addresses separated by <code>;</code> or <code>,</code>.</div>
         </div>
 
-        <div class="mb-3">
-            <label asp-for="Record.SurveyEmailSubject" class="form-label">Survey Email Subject</label>
-            <input asp-for="Record.SurveyEmailSubject" class="form-control" maxlength="255" />
-        </div>
-
-        <div class="mb-3">
-            <label asp-for="Record.SurveyReminderEmailSubject" class="form-label">Survey Reminder Email Subject</label>
-            <input asp-for="Record.SurveyReminderEmailSubject" class="form-control" maxlength="255" />
-            <div class="form-text">Used only for reminder emails. Leave blank to use the default reminder subject.</div>
+        <div class="alert alert-info" role="alert">
+            Survey email subjects and templates are now managed in <strong>Admin -> Email Content</strong>.
         </div>
 
         <div class="mb-3">
@@ -79,18 +72,6 @@
             </div>
         }
 
-        <div class="mb-3">
-            <label asp-for="Record.SurveyEmailTemplate" class="form-label">Survey Email Template</label>
-            <textarea asp-for="Record.SurveyEmailTemplate" id="surveyEmailTemplateEditor" class="form-control" rows="12"></textarea>
-            <div class="form-text">Rich text/HTML is supported. Use <code>(Company Name)</code> or <code>(Name)</code> for the company name, and add a link with <code>id="surveylink"</code> for the survey URL.</div>
-        </div>
-
-        <div class="mb-3">
-            <label asp-for="Record.SurveyReminderEmailTemplate" class="form-label">Survey Reminder Email Template</label>
-            <textarea asp-for="Record.SurveyReminderEmailTemplate" id="surveyReminderEmailTemplateEditor" class="form-control" rows="12"></textarea>
-            <div class="form-text">Rich text/HTML is supported. Use <code>(Company Name)</code> or <code>(Name)</code> for the company name, and add a link with <code>id="surveylink"</code> for the survey URL.</div>
-        </div>
-
         <div class="d-flex gap-2">
             <button type="submit" class="btn btn-primary">Save</button>
             <a asp-page="./Index" class="btn btn-secondary">Cancel</a>
@@ -100,31 +81,4 @@
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
-    <script src="~/lib/tinymce/tinymce.min.js" asp-append-version="true"></script>
-    <script>
-        (function () {
-            const tinyConfig = {
-                license_key: 'gpl',
-                plugins: 'link lists table code help wordcount',
-                toolbar: 'undo redo | blocks | bold italic underline | alignleft aligncenter alignright | bullist numlist | link table | code help',
-                menubar: 'file edit view insert format table help',
-                height: 360,
-                setup: function (editor) {
-                    editor.on('change input undo redo', function () {
-                        tinymce.triggerSave();
-                    });
-                }
-            };
-
-            tinymce.init(Object.assign({}, tinyConfig, { selector: '#surveyEmailTemplateEditor' }));
-            tinymce.init(Object.assign({}, tinyConfig, { selector: '#surveyReminderEmailTemplateEditor' }));
-
-            const form = document.querySelector('form');
-            if (form) {
-                form.addEventListener('submit', function () {
-                    tinymce.triggerSave();
-                });
-            }
-        })();
-    </script>
 }

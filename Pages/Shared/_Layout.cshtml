@@ -1,6 +1,7 @@
 @using TINWeb.Services
 @{
     var isReadOnlyUser = UserTypes.IsReadOnly(User);
+    var selectedCompanyTinStatus = Context.Request.Query["tinStatus"].FirstOrDefault();
 }
 
 <!DOCTYPE html>
@@ -32,7 +33,14 @@
                             <a class="nav-link dropdown-toggle text-dark" href="#" id="companiesMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">Companies</a>
                             <ul class="dropdown-menu" aria-labelledby="companiesMenu">
                                 <li><a class="dropdown-item" asp-area="" asp-page="/Company/Index">Companies</a></li>
-                                <li><a class="dropdown-item" asp-area="" asp-page="/Company/Index" asp-route-showImportTool="import">Import Companies</a></li>
+                                @if (!string.IsNullOrWhiteSpace(selectedCompanyTinStatus))
+                                {
+                                    <li><a class="dropdown-item" asp-area="" asp-page="/Company/Index" asp-route-showImportTool="import" asp-route-tinStatus="@selectedCompanyTinStatus">Import Companies</a></li>
+                                }
+                                else
+                                {
+                                    <li><a class="dropdown-item" asp-area="" asp-page="/Company/Index" asp-route-showImportTool="import">Import Companies</a></li>
+                                }
                             </ul>
                         </li>
                         <li class="nav-item dropdown">
@@ -88,6 +96,7 @@
                                 <ul class="dropdown-menu" aria-labelledby="adminMenu">
                                     <li><a class="dropdown-item" asp-area="" asp-page="/AppUsers/Index">App Users</a></li>
                                     <li><a class="dropdown-item" asp-area="" asp-page="/Config/Edit" asp-route-id="1">Config</a></li>
+                                    <li><a class="dropdown-item" asp-area="" asp-page="/EmailContent/Index">Email Content</a></li>
                                     <li><a class="dropdown-item" asp-area="" asp-page="/Config/NotificationStatus">Notification Status</a></li>
                                 </ul>
                             </li>

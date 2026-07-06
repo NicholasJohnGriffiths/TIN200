@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using System.Net;
 using System.Text.RegularExpressions;
 using TINWeb.Data;
+using TINWeb.Models;
 
 namespace TINWeb.Services
 {
@@ -24,7 +25,7 @@ namespace TINWeb.Services
             _surveyLinkSettings = surveyLinkOptions.Value;
         }
 
-        public async Task SendSurveyLinkAsync(string recipientEmail, string surveyUrl, string? companyName, int clientId)
+        public async Task SendSurveyLinkAsync(string recipientEmail, string surveyUrl, string? companyName, int clientId, int emailContentId)
         {
             EnsureEmailConfigured();
 
@@ -41,17 +42,19 @@ namespace TINWeb.Services
             var configuredEmailOptions = await _context.AppConfig
                 .AsNoTracking()
                 .OrderBy(c => c.Id)
-                .Select(c => new { c.SurveyEmailSubject, c.SurveyEmailTemplate, c.EmailHeaderImageId })
+                .Select(c => new { c.EmailHeaderImageId })
                 .FirstOrDefaultAsync();
+
+            var selectedContent = await GetEmailContentAsync(emailContentId);
 
             var emailHeaderImageUrl = BuildEmailHeaderImageUrl(configuredEmailOptions?.EmailHeaderImageId);
 
-            var subject = string.IsNullOrWhiteSpace(configuredEmailOptions?.SurveyEmailSubject)
+            var subject = string.IsNullOrWhiteSpace(selectedContent.Subject)
                 ? defaultSubject
-                : configuredEmailOptions.SurveyEmailSubject.Trim();
+                : selectedContent.Subject.Trim();
 
             var (plainTextBody, htmlBody) = BuildSurveyEmailBodies(
-                configuredEmailOptions?.SurveyEmailTemplate,
+                selectedContent.Template,
                 emailHeaderImageUrl,
                 recipientName,
                 surveyUrl,
@@ -62,7 +65,7 @@ namespace TINWeb.Services
             await SendEmailAsync(new[] { recipientEmail }, subject, plainTextBody, htmlBody);
         }
 
-        public async Task SendSurveyReminderLinkAsync(string recipientEmail, string surveyUrl, string? companyName, int clientId)
+        public async Task SendSurveyReminderLinkAsync(string recipientEmail, string surveyUrl, string? companyName, int clientId, int emailContentId)
         {
             EnsureEmailConfigured();
 
@@ -84,22 +87,19 @@ namespace TINWeb.Services
             var configuredEmailOptions = await _context.AppConfig
                 .AsNoTracking()
                 .OrderBy(c => c.Id)
-                .Select(c => new { c.SurveyReminderEmailSubject, c.SurveyReminderEmailTemplate, c.SurveyEmailTemplate, c.EmailHeaderImageId })
+                .Select(c => new { c.EmailHeaderImageId })
                 .FirstOrDefaultAsync();
 
-            var subject = string.IsNullOrWhiteSpace(configuredEmailOptions?.SurveyReminderEmailSubject)
+            var selectedContent = await GetEmailContentAsync(emailContentId);
+
+            var subject = string.IsNullOrWhiteSpace(selectedContent.Subject)
                 ? $"Reminder: Complete Your {currentSurveyYear} TIN Survey"
-                : configuredEmailOptions.SurveyReminderEmailSubject.Trim();
+                : selectedContent.Subject.Trim();
 
             var emailHeaderImageUrl = BuildEmailHeaderImageUrl(configuredEmailOptions?.EmailHeaderImageId);
 
-            // Use reminder template, falling back to the standard survey email template
-            var template = !string.IsNullOrWhiteSpace(configuredEmailOptions?.SurveyReminderEmailTemplate)
-                ? configuredEmailOptions.SurveyReminderEmailTemplate
-                : configuredEmailOptions?.SurveyEmailTemplate;
-
             var (plainTextBody, htmlBody) = BuildSurveyEmailBodies(
-                template,
+                selectedContent.Template,
                 emailHeaderImageUrl,
                 recipientName,
                 surveyUrl,
@@ -108,6 +108,44 @@ namespace TINWeb.Services
                 senderDisplayName);
 
             await SendEmailAsync(new[] { recipientEmail }, subject, plainTextBody, htmlBody);
+        }
+
+        public async Task<SurveyEmailPreviewResult> BuildSurveyEmailPreviewAsync(int emailContentId, string surveyUrl, string? companyName, int clientId)
+        {
+            var recipientName = string.IsNullOrWhiteSpace(companyName) ? "there" : companyName.Trim();
+            var senderDisplayName = GetSenderDisplayName();
+            var supportEmail = "tin100@tinetwork.com";
+
+            var unsubscribeToken = GenerateUnsubscribeToken(clientId);
+            var baseUrl = (_surveyLinkSettings.BaseUrl ?? string.Empty).Trim().TrimEnd('/');
+            var unsubscribeUrl = string.IsNullOrWhiteSpace(baseUrl)
+                ? string.Empty
+                : $"{baseUrl}/Company/Unsubscribe?id={clientId}&token={Uri.EscapeDataString(unsubscribeToken)}";
+
+            var configuredEmailOptions = await _context.AppConfig
+                .AsNoTracking()
+                .OrderBy(c => c.Id)
+                .Select(c => new { c.EmailHeaderImageId })
+                .FirstOrDefaultAsync();
+
+            var selectedContent = await GetEmailContentAsync(emailContentId);
+            var emailHeaderImageUrl = BuildEmailHeaderImageUrl(configuredEmailOptions?.EmailHeaderImageId);
+
+            var (plainTextBody, htmlBody) = BuildSurveyEmailBodies(
+                selectedContent.Template,
+                emailHeaderImageUrl,
+                recipientName,
+                surveyUrl,
+                unsubscribeUrl,
+                supportEmail,
+                senderDisplayName);
+
+            return new SurveyEmailPreviewResult
+            {
+                Subject = selectedContent.Subject?.Trim() ?? string.Empty,
+                PlainTextBody = plainTextBody,
+                HtmlBody = htmlBody
+            };
         }
 
         public async Task SendBounceNotificationAsync(
@@ -391,6 +429,20 @@ Open your secure survey link
             return Regex.Replace(text, @"\n{3,}", "\n\n").Trim();
         }
 
+        private async Task<TINWeb.Models.EmailContent> GetEmailContentAsync(int emailContentId)
+        {
+            var selectedContent = await _context.EmailContent
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Id == emailContentId && x.Active);
+
+            if (selectedContent == null)
+            {
+                throw new InvalidOperationException("Selected email content was not found or is inactive.");
+            }
+
+            return selectedContent;
+        }
+
         private void EnsureEmailConfigured()
         {
             if (string.IsNullOrWhiteSpace(_emailSettings.ConnectionString)
@@ -412,7 +464,7 @@ Open your secure survey link
 
             var emailMessage = new EmailMessage(
                 senderAddress: BuildSenderAddress(_emailSettings.FromEmail, _emailSettings.FromName),
-                content: new EmailContent(subject)
+                content: new Azure.Communication.Email.EmailContent(subject)
                 {
                     PlainText = plainTextBody,
                     Html = htmlBody

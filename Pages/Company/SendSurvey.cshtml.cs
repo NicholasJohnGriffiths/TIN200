@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.Extensions.Options;
 using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations;
@@ -62,8 +63,13 @@ namespace TINWeb.Pages.Company
         [BindProperty(SupportsGet = true)]
         public int? SelectedLastTin200Year { get; set; }
 
+        [BindProperty(SupportsGet = true)]
+        public int? SelectedEmailContentId { get; set; }
+
         public List<int> AvailableLastTin200Years { get; set; } = new();
         public List<SurveyClientRow> AvailableClients { get; set; } = new();
+        public List<SelectListItem> EmailContentOptions { get; set; } = new();
+        public SurveyEmailPreviewResult? EmailPreview { get; set; }
 
         public bool HasQueryPreselection { get; set; }
 
@@ -92,6 +98,9 @@ namespace TINWeb.Pages.Company
         {
             SelectedTinStatus = NormalizeTinStatusFilter(SelectedTinStatus);
             await LoadAvailableClientsAsync();
+            await LoadEmailContentOptionsAsync();
+            SelectDefaultEmailContentIfMissing();
+            await LoadEmailPreviewAsync();
 
             if (id.HasValue)
             {
@@ -109,6 +118,14 @@ namespace TINWeb.Pages.Company
         public async Task<IActionResult> OnPostBulkAsync()
         {
             await LoadAvailableClientsAsync();
+            await LoadEmailContentOptionsAsync();
+            SelectDefaultEmailContentIfMissing();
+            await LoadEmailPreviewAsync();
+
+            if (!SelectedEmailContentId.HasValue)
+            {
+                ModelState.AddModelError(nameof(SelectedEmailContentId), "Select an email content before sending surveys.");
+            }
 
             if (EnableScheduleSettings)
             {
@@ -201,7 +218,7 @@ namespace TINWeb.Pages.Company
                     BulkFailedCount = 0;
                     BulkLastRunAt = DateTime.Now.ToString("MMM d, yyyy h:mm tt");
                     BulkSendSucceeded = false;
-                    return RedirectToPage(new { SelectedTinStatus, SelectedLastTin200Year });
+                    return RedirectToPage(new { SelectedTinStatus, SelectedLastTin200Year, SelectedEmailContentId });
                 }
             }
 
@@ -214,7 +231,7 @@ namespace TINWeb.Pages.Company
 
                 try
                 {
-                    await _surveyEmailService.SendSurveyLinkAsync(recipientEmail, surveyUrl, clientRow.CompanyName, clientRow.Id);
+                    await _surveyEmailService.SendSurveyLinkAsync(recipientEmail, surveyUrl, clientRow.CompanyName, clientRow.Id, SelectedEmailContentId!.Value);
                     sentCount++;
 
                     if (currentSurveyId.HasValue)
@@ -265,7 +282,7 @@ namespace TINWeb.Pages.Company
                         BulkFailedCount = failedCount;
                         BulkLastRunAt = DateTime.Now.ToString("MMM d, yyyy h:mm tt");
                         BulkSendSucceeded = false;
-                        return RedirectToPage(new { SelectedTinStatus, SelectedLastTin200Year });
+                        return RedirectToPage(new { SelectedTinStatus, SelectedLastTin200Year, SelectedEmailContentId });
                     }
                 }
             }
@@ -305,7 +322,7 @@ namespace TINWeb.Pages.Company
 
             BulkSendSucceeded = true;
 
-            return RedirectToPage(new { SelectedTinStatus, SelectedLastTin200Year });
+            return RedirectToPage(new { SelectedTinStatus, SelectedLastTin200Year, SelectedEmailContentId });
         }
 
         private async Task DelayUntilStartAsync(DateTime sendStartTimeLocal, CancellationToken cancellationToken)
@@ -400,6 +417,54 @@ namespace TINWeb.Pages.Company
                     };
                 })
                 .ToList();
+        }
+
+        private async Task LoadEmailContentOptionsAsync()
+        {
+            EmailContentOptions = await _context.EmailContent
+                .AsNoTracking()
+                .Where(x => x.Active)
+                .OrderBy(x => x.Name)
+                .Select(x => new SelectListItem
+                {
+                    Value = x.Id.ToString(),
+                    Text = x.Name
+                })
+                .ToListAsync();
+        }
+
+        private void SelectDefaultEmailContentIfMissing()
+        {
+            if (SelectedEmailContentId.HasValue
+                && EmailContentOptions.Any(x => string.Equals(x.Value, SelectedEmailContentId.Value.ToString(), StringComparison.OrdinalIgnoreCase)))
+            {
+                return;
+            }
+
+            SelectedEmailContentId = EmailContentOptions
+                .Select(x => int.TryParse(x.Value, out var parsed) ? parsed : (int?)null)
+                .FirstOrDefault();
+        }
+
+        private async Task LoadEmailPreviewAsync()
+        {
+            EmailPreview = null;
+
+            if (!SelectedEmailContentId.HasValue)
+            {
+                return;
+            }
+
+            var previewClient = AvailableClients.FirstOrDefault();
+            var previewClientId = previewClient?.Id ?? 1;
+            var previewCompanyName = previewClient?.CompanyName ?? "Example Company";
+            var previewSurveyUrl = BuildSurveyUrl(previewClientId);
+
+            EmailPreview = await _surveyEmailService.BuildSurveyEmailPreviewAsync(
+                SelectedEmailContentId.Value,
+                previewSurveyUrl,
+                previewCompanyName,
+                previewClientId);
         }
 
         private static int NormalizeTinStatusFilter(int tinStatus)
