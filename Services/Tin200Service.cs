@@ -580,7 +580,6 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                 InsertedCount = plan.Operations.Count(x => x.Action == CompanyContactImportAction.Add),
                 PreviewRows = plan.Operations
                     .OrderBy(x => x.RowNumber)
-                    .Take(200)
                     .Select(x => new CompanyContactImportPreviewRow
                     {
                         RowNumber = x.RowNumber,
