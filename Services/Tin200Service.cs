@@ -641,10 +641,15 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
 
         public async Task<CompanyContactImportResult> ImportContactsFromExcelAsync(Stream excelStream)
         {
-            return await ImportContactsFromExcelAsync(excelStream, null);
+            return await ImportContactsFromExcelAsync(excelStream, null, null);
         }
 
         public async Task<CompanyContactImportResult> ImportContactsFromExcelAsync(Stream excelStream, CompanyContactImportMapping? mapping)
+        {
+            return await ImportContactsFromExcelAsync(excelStream, mapping, null);
+        }
+
+        public async Task<CompanyContactImportResult> ImportContactsFromExcelAsync(Stream excelStream, CompanyContactImportMapping? mapping, int? surveyYear)
         {
             var plan = await BuildCompanyContactImportPlanAsync(excelStream, mapping);
             var result = new CompanyContactImportResult
@@ -662,6 +667,9 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             var operationsToInsert = plan.Operations
                 .Where(x => x.Action == CompanyContactImportAction.Add)
                 .ToList();
+
+            var touchedCompanyIds = new HashSet<int>();
+            var insertedCompanies = new List<Tin200>();
 
             if (!operationsToUpdate.Any() && !operationsToInsert.Any())
             {
@@ -690,6 +698,7 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                     company.ContactLastName = operation.ImportedContactLastName;
                     company.ContactEmail = operation.ImportedContactEmail;
                     company.TinStatus = operation.ImportedTinStatus;
+                    touchedCompanyIds.Add(company.Id);
                 }
             }
 
@@ -705,7 +714,7 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                     var generatedExternalId = ResolveNextExternalId(null, allExternalIds);
                     allExternalIds.Add(generatedExternalId);
 
-                    _context.Tin200.Add(new Tin200
+                    var insertedCompany = new Tin200
                     {
                         CompanyName = operation.CompanyName,
                         ContactFirstName = operation.ImportedContactFirstName,
@@ -714,11 +723,77 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                         ExternalId = ClampToMaxLength(generatedExternalId, 50),
                         CompanyNameImportColumnName = plan.MatchedCompanyNameHeader,
                         TinStatus = operation.ImportedTinStatus
-                    });
+                    };
+
+                    _context.Tin200.Add(insertedCompany);
+                    insertedCompanies.Add(insertedCompany);
                 }
             }
 
             await _context.SaveChangesAsync();
+
+            foreach (var insertedCompany in insertedCompanies)
+            {
+                touchedCompanyIds.Add(insertedCompany.Id);
+            }
+
+            if (surveyYear.HasValue && surveyYear.Value > 0 && touchedCompanyIds.Any())
+            {
+                var surveyId = await _context.Survey
+                    .Where(s => s.FinancialYear == surveyYear.Value)
+                    .OrderByDescending(s => s.CurrentSurvey)
+                    .ThenByDescending(s => s.Id)
+                    .Select(s => (int?)s.Id)
+                    .FirstOrDefaultAsync();
+
+                if (!surveyId.HasValue)
+                {
+                    result.Errors.Add($"No Survey exists for year {surveyYear.Value}; skipped CompanySurvey creation.");
+                    return result;
+                }
+
+                var existingCompanySurveyCompanyIds = await _context.CompanySurvey
+                    .Where(cs => cs.SurveyId == surveyId.Value && touchedCompanyIds.Contains(cs.CompanyId))
+                    .Select(cs => cs.CompanyId)
+                    .Distinct()
+                    .ToListAsync();
+
+                var missingCompanyIds = touchedCompanyIds
+                    .Except(existingCompanySurveyCompanyIds)
+                    .ToList();
+
+                foreach (var companyId in missingCompanyIds)
+                {
+                    _context.CompanySurvey.Add(new CompanySurvey
+                    {
+                        CompanyId = companyId,
+                        SurveyId = surveyId.Value,
+                        Saved = false,
+                        Submitted = false,
+                        Requested = false,
+                        Locked = false,
+                        Estimate = false,
+                        SavedDate = null,
+                        SubmittedDate = null,
+                        RequestedDate = null,
+                        SurveyEmailSent = false,
+                        SurveyEmailSentLastDate = null,
+                        SurveyReminderEmailSent = false,
+                        SurveyReminderEmailSentLastDate = null,
+                        Unsubscribed = false,
+                        UnsubscribedDate = null,
+                        SurveyLink = null
+                    });
+                }
+
+                if (missingCompanyIds.Any())
+                {
+                    await _context.SaveChangesAsync();
+                }
+
+                result.CompanySurveyCreatedCount = missingCompanyIds.Count;
+            }
+
             return result;
         }
 
@@ -1904,6 +1979,7 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             public int UpdatedCount { get; set; }
             public int UnchangedCount { get; set; }
             public int InsertedCount { get; set; }
+            public int CompanySurveyCreatedCount { get; set; }
             public List<string> Errors { get; set; } = new();
         }
 

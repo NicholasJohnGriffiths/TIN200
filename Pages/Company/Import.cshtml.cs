@@ -29,11 +29,30 @@ namespace TINWeb.Pages.Company
             return RedirectToPage("/Company/Index", new { showImportTool = "import" });
         }
 
-        public async Task<JsonResult> OnPostPreviewAsync(IFormFile? UploadFile)
+        public async Task<JsonResult> OnPostPreviewAsync(IFormFile? UploadFile, int? SurveyYear)
         {
             if (UploadFile == null || UploadFile.Length == 0)
             {
                 return new JsonResult(new { success = false, message = "No file uploaded." });
+            }
+
+            if (!SurveyYear.HasValue || SurveyYear.Value <= 0)
+            {
+                return new JsonResult(new { success = false, message = "Survey Year is required." });
+            }
+
+            var connString = _config.GetConnectionString("DefaultConnection");
+            await using (var conn = new SqlConnection(connString))
+            {
+                await conn.OpenAsync();
+                await using var surveyCmd = conn.CreateCommand();
+                surveyCmd.CommandText = "SELECT TOP (1) [Id] FROM [Survey] WHERE [FinancialYear] = @financialYear ORDER BY [CurrentSurvey] DESC, [Id] DESC";
+                surveyCmd.Parameters.AddWithValue("@financialYear", SurveyYear.Value);
+                var surveyResult = await surveyCmd.ExecuteScalarAsync();
+                if (surveyResult == null || surveyResult == DBNull.Value)
+                {
+                    return new JsonResult(new { success = false, message = $"No Survey exists for year {SurveyYear.Value}. Please create it first." });
+                }
             }
 
             var previewRows = new List<object>();
@@ -116,23 +135,45 @@ namespace TINWeb.Pages.Company
             return new JsonResult(new { success = true, preview = previewRows, total = previewRows.Count, errors });
         }
 
-        public async Task<JsonResult> OnPostConfirmAsync(IFormFile? UploadFile)
+        public async Task<JsonResult> OnPostConfirmAsync(IFormFile? UploadFile, int? SurveyYear)
         {
             if (UploadFile == null || UploadFile.Length == 0)
             {
                 return new JsonResult(new { success = false, message = "No file uploaded." });
             }
 
+            if (!SurveyYear.HasValue || SurveyYear.Value <= 0)
+            {
+                return new JsonResult(new { success = false, message = "Survey Year is required." });
+            }
+
             var connString = _config.GetConnectionString("DefaultConnection");
             var inserted = 0;
             var updated = 0;
+            var companySurveyCreated = 0;
             var errors = new List<string>();
+            var touchedCompanyIds = new HashSet<int>();
 
             using (var stream = UploadFile.OpenReadStream())
             using (var reader = new StreamReader(stream))
             using (var conn = new SqlConnection(connString))
             {
                 await conn.OpenAsync();
+
+                int surveyId;
+                using (var surveyLookup = conn.CreateCommand())
+                {
+                    surveyLookup.CommandText = "SELECT TOP (1) [Id] FROM [Survey] WHERE [FinancialYear] = @financialYear ORDER BY [CurrentSurvey] DESC, [Id] DESC";
+                    surveyLookup.Parameters.AddWithValue("@financialYear", SurveyYear.Value);
+                    var surveyResult = await surveyLookup.ExecuteScalarAsync();
+                    if (surveyResult == null || surveyResult == DBNull.Value)
+                    {
+                        return new JsonResult(new { success = false, message = $"No Survey exists for year {SurveyYear.Value}. Please create it first." });
+                    }
+
+                    surveyId = Convert.ToInt32(surveyResult);
+                }
+
                 string? line = await reader.ReadLineAsync();
                 bool hasHeader = false;
                 if (line != null && line.Contains('\t') && line.ToLower().Contains("ceo first")) hasHeader = true;
@@ -238,7 +279,11 @@ WHERE [Id] = @id";
                                 cmd.Parameters.AddWithValue("@id", existingId.Value);
 
                                 var affected = await cmd.ExecuteNonQueryAsync();
-                                if (affected > 0) updated++;
+                                if (affected > 0)
+                                {
+                                    updated++;
+                                    touchedCompanyIds.Add(existingId.Value);
+                                }
                             }
                             else
                             {
@@ -246,6 +291,7 @@ WHERE [Id] = @id";
                                 cmd.Transaction = tran;
                                 cmd.CommandText = @"
 INSERT INTO [TIN200] ([CEOFirstName], [CEOLastName], [Email], [ExternalID], [CompanyName], [CompanyDescription], [ExternalId_ImportColumnName], [CompanyName_ImportColumnName], [CompanyDescription_ImportColumnName], [FYE2025], [FYE2024], [FYE2023], [TINStatus])
+OUTPUT INSERTED.[Id]
 VALUES (@ceoFirst, @ceoLast, @email, @externalId, @companyName, @companyDesc, @externalIdImportColumnName, @companyNameImportColumnName, @companyDescriptionImportColumnName, @fye2025, @fye2024, @fye2023, @tinStatus)";
                                 cmd.Parameters.AddWithValue("@ceoFirst", (object?)ceoFirst ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@ceoLast", (object?)ceoLast ?? DBNull.Value);
@@ -261,13 +307,48 @@ VALUES (@ceoFirst, @ceoLast, @email, @externalId, @companyName, @companyDesc, @e
                                 cmd.Parameters.AddWithValue("@fye2023", (object?)fye2023 ?? DBNull.Value);
                                 cmd.Parameters.AddWithValue("@tinStatus", (object?)tinStatus ?? DBNull.Value);
 
-                                await cmd.ExecuteNonQueryAsync();
+                                var insertedIdObj = await cmd.ExecuteScalarAsync();
+                                if (insertedIdObj != null && insertedIdObj != DBNull.Value)
+                                {
+                                    touchedCompanyIds.Add(Convert.ToInt32(insertedIdObj));
+                                }
+
                                 inserted++;
                             }
                         }
                         catch (Exception ex)
                         {
                             errors.Add($"Row {row}: error inserting/updating - {ex.Message}");
+                        }
+                    }
+
+                    if (errors.Count == 0)
+                    {
+                        foreach (var companyId in touchedCompanyIds)
+                        {
+                            using var csExistsCmd = conn.CreateCommand();
+                            csExistsCmd.Transaction = tran;
+                            csExistsCmd.CommandText = "SELECT TOP (1) [Id] FROM [CompanySurvey] WHERE [CompanyId] = @companyId AND [SurveyId] = @surveyId";
+                            csExistsCmd.Parameters.AddWithValue("@companyId", companyId);
+                            csExistsCmd.Parameters.AddWithValue("@surveyId", surveyId);
+
+                            var csExistsObj = await csExistsCmd.ExecuteScalarAsync();
+                            if (csExistsObj != null && csExistsObj != DBNull.Value)
+                            {
+                                continue;
+                            }
+
+                            using var csInsertCmd = conn.CreateCommand();
+                            csInsertCmd.Transaction = tran;
+                            csInsertCmd.CommandText = @"
+INSERT INTO [CompanySurvey]
+([CompanyId], [SurveyId], [Saved], [Submitted], [Requested], [Locked], [Estimate], [SavedDate], [SubmittedDate], [RequestedDate], [SurveyEmailSent], [SurveyEmailSentLastDate], [SurveyReminderEmailSent], [SurveyReminderEmailSentLastDate], [Unsubscribed], [UnsubscribedDate], [SurveyLink])
+VALUES
+(@companyId, @surveyId, 0, 0, 0, 0, 0, NULL, NULL, NULL, 0, NULL, 0, NULL, 0, NULL, NULL)";
+                            csInsertCmd.Parameters.AddWithValue("@companyId", companyId);
+                            csInsertCmd.Parameters.AddWithValue("@surveyId", surveyId);
+                            await csInsertCmd.ExecuteNonQueryAsync();
+                            companySurveyCreated++;
                         }
                     }
 
@@ -281,7 +362,7 @@ VALUES (@ceoFirst, @ceoLast, @email, @externalId, @companyName, @companyDesc, @e
                 }
             }
 
-            return new JsonResult(new { success = errors.Count == 0, inserted, updated, total = inserted + updated, errors });
+            return new JsonResult(new { success = errors.Count == 0, inserted, updated, total = inserted + updated, companySurveyCreated, errors });
         }
 
         private decimal? ParseDecimalNullable(string? s)

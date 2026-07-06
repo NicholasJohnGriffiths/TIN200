@@ -186,6 +186,7 @@
                     <input type="hidden" name="tinStatus" value="@Model.SelectedTinStatus" />
                     <input type="hidden" name="showImportTool" value="@(string.Equals(Model.ShowImportTool, "import", StringComparison.OrdinalIgnoreCase) ? "import" : "contacts")" />
                     <input type="hidden" name="showImportTab" value="contacts" />
+                    <input type="hidden" name="contactImportSurveyYear" value="@Model.ContactImportSurveyYear" />
                     <input type="hidden" name="selectedContactImportRows" id="selectedContactImportRows" value="" />
                     <button type="submit" class="btn btn-info text-white">Apply Companies Import</button>
                 </form>
@@ -373,6 +374,7 @@
                                 <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
                                 <input type="hidden" name="showImportTool" value="import" />
                                 <input type="hidden" name="showImportTab" value="contacts" />
+                                <input type="number" name="contactImportSurveyYear" value="@Model.ContactImportSurveyYear" class="form-control form-control-sm" style="max-width: 140px;" placeholder="Survey Year" min="1900" max="9999" required />
                                 <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="max-width: 320px;" />
                                 <button type="submit" class="btn btn-info text-white btn-sm">Load Headers</button>
                             </form>
@@ -390,6 +392,11 @@
                                 <input type="hidden" name="showImportTool" value="import" />
                                 <input type="hidden" name="showImportTab" value="contacts" />
                                 <input type="hidden" asp-for="ContactImportMappingToken" />
+
+                                <div class="col-md-3">
+                                    <label asp-for="ContactImportSurveyYear" class="form-label">Survey Year (required)</label>
+                                    <input asp-for="ContactImportSurveyYear" class="form-control form-control-sm" type="number" min="1900" max="9999" required />
+                                </div>
 
                                 <div class="col-md-3">
                                     <label asp-for="ContactMapCompanyNameHeader" class="form-label">Company Name (required)</label>

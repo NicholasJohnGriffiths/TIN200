@@ -41,6 +41,8 @@ namespace TINWeb.Pages.Company
         public string? ContactMapEmailHeader { get; set; }
         [BindProperty]
         public int? ContactImportTinStatus { get; set; } = (int)TinStatus.Tin200;
+        [BindProperty]
+        public int? ContactImportSurveyYear { get; set; }
         public int? SelectedImportYear { get; set; }
 
         [TempData]
@@ -217,7 +219,7 @@ namespace TINWeb.Pages.Company
             return RedirectToPage(new { lastTin200Year = pendingImport.LastTin200Year, tinStatus, companySearch = pendingImport.CompanySearch, showTestCompanies = pendingImport.ShowTestCompanies, showImportTool = pendingImport.ShowImportTool, showImportTab = pendingImport.ShowImportTab });
         }
 
-        public async Task<IActionResult> OnPostPreviewContactImportAsync(IFormFile? importFile, int? lastTin200Year, int? tinStatus, string? companySearch, bool showTestCompanies = false, string? showImportTool = null, string? showImportTab = null)
+        public async Task<IActionResult> OnPostPreviewContactImportAsync(IFormFile? importFile, int? lastTin200Year, int? tinStatus, int? contactImportSurveyYear, string? companySearch, bool showTestCompanies = false, string? showImportTool = null, string? showImportTab = null)
         {
             if (!User.IsInRole("1"))
             {
@@ -235,6 +237,13 @@ namespace TINWeb.Pages.Company
                 && string.Equals(mappedPending.Kind, "ContactMapping", StringComparison.OrdinalIgnoreCase))
             {
                 sourceImport = mappedPending;
+            }
+
+            var effectiveSurveyYear = contactImportSurveyYear ?? sourceImport?.ContactImportSurveyYear;
+            if (!effectiveSurveyYear.HasValue || effectiveSurveyYear.Value <= 0)
+            {
+                ErrorMessage = "Companies import failed: please select a Survey Year.";
+                return RedirectToPage(new { lastTin200Year, tinStatus, companySearch, showTestCompanies, showImportTool, showImportTab = ShowImportTab });
             }
 
             if (sourceImport == null && (importFile == null || importFile.Length == 0))
@@ -272,7 +281,8 @@ namespace TINWeb.Pages.Company
                     ShowTestCompanies = showTestCompanies,
                     Kind = "ContactPreview",
                     ShowImportTool = showImportTool,
-                    ShowImportTab = ShowImportTab
+                    ShowImportTab = ShowImportTab,
+                    ContactImportSurveyYear = effectiveSurveyYear
                 };
             }
 
@@ -312,6 +322,7 @@ namespace TINWeb.Pages.Company
             sourceImport.MappedContactEmailHeader = preview.MatchedFields.FirstOrDefault(x => x.StartsWith("Contact Email ->", StringComparison.OrdinalIgnoreCase))?.Split("->", 2).ElementAtOrDefault(1)?.Trim();
             sourceImport.ApplyTinStatus = true;
             sourceImport.ContactImportTinStatus = ContactImportTinStatus;
+            sourceImport.ContactImportSurveyYear = effectiveSurveyYear;
 
             PendingImports[sourceImport.Token] = sourceImport;
 
@@ -324,10 +335,11 @@ namespace TINWeb.Pages.Company
             ContactMapLastNameHeader = sourceImport.MappedContactLastNameHeader;
             ContactMapEmailHeader = sourceImport.MappedContactEmailHeader;
             ContactImportTinStatus = sourceImport.ContactImportTinStatus;
+            ContactImportSurveyYear = sourceImport.ContactImportSurveyYear;
             return Page();
         }
 
-        public async Task<IActionResult> OnPostLoadContactImportHeadersAsync(IFormFile? importFile, int? lastTin200Year, int? tinStatus, string? companySearch, bool showTestCompanies = false, string? showImportTool = null, string? showImportTab = null)
+        public async Task<IActionResult> OnPostLoadContactImportHeadersAsync(IFormFile? importFile, int? lastTin200Year, int? tinStatus, int? contactImportSurveyYear, string? companySearch, bool showTestCompanies = false, string? showImportTool = null, string? showImportTab = null)
         {
             if (!User.IsInRole("1"))
             {
@@ -389,7 +401,8 @@ namespace TINWeb.Pages.Company
                 ShowTestCompanies = showTestCompanies,
                 Kind = "ContactMapping",
                 ShowImportTool = showImportTool,
-                ShowImportTab = ShowImportTab
+                ShowImportTab = ShowImportTab,
+                ContactImportSurveyYear = contactImportSurveyYear
             };
 
             await LoadPageAsync(lastTin200Year, companySearch, showTestCompanies, tinStatus, hasTinStatusFilter: true);
@@ -400,11 +413,12 @@ namespace TINWeb.Pages.Company
             ContactMapLastNameHeader = headers.FirstOrDefault(x => string.Equals(x.Trim(), "Contact Person - Last Name", StringComparison.OrdinalIgnoreCase));
             ContactMapEmailHeader = headers.FirstOrDefault(x => string.Equals(x.Trim(), "Contact Email", StringComparison.OrdinalIgnoreCase));
             ContactImportTinStatus = ResolveDefaultContactImportTinStatus(tinStatus);
+            ContactImportSurveyYear = contactImportSurveyYear;
             StatusMessage = "Companies import file loaded. Review or adjust the header mappings, then preview the import.";
             return Page();
         }
 
-        public async Task<IActionResult> OnPostApplyContactImportAsync(string? previewToken, string? selectedContactImportRows, int? tinStatus)
+        public async Task<IActionResult> OnPostApplyContactImportAsync(string? previewToken, string? selectedContactImportRows, int? tinStatus, int? contactImportSurveyYear)
         {
             if (!User.IsInRole("1"))
             {
@@ -422,6 +436,13 @@ namespace TINWeb.Pages.Company
 
             var selectedRows = ParseSelectedRowNumbers(selectedContactImportRows);
             var effectiveTinStatus = pendingImport.ContactImportTinStatus ?? ResolveDefaultContactImportTinStatus(tinStatus);
+            var effectiveSurveyYear = pendingImport.ContactImportSurveyYear ?? contactImportSurveyYear;
+
+            if (!effectiveSurveyYear.HasValue || effectiveSurveyYear.Value <= 0)
+            {
+                ErrorMessage = "Apply companies import failed: please select a Survey Year during preview.";
+                return RedirectToPage(new { tinStatus, showImportTool = "import", showImportTab = "contacts" });
+            }
 
             try
             {
@@ -437,14 +458,14 @@ namespace TINWeb.Pages.Company
                     SelectedRowNumbers = selectedRows.Count > 0 ? selectedRows : null
                 };
 
-                var result = await _service.ImportContactsFromExcelAsync(stream, mapping);
+                var result = await _service.ImportContactsFromExcelAsync(stream, mapping, effectiveSurveyYear.Value);
                 if (result.Errors.Any())
                 {
-                    StatusMessage = $"Companies import completed with warnings. Updated: {result.UpdatedCount}, Added: {result.InsertedCount}, Unchanged: {result.UnchangedCount}. Warnings: {string.Join(" ", result.Errors.Take(5))}";
+                    StatusMessage = $"Companies import completed with warnings. Survey Year: {effectiveSurveyYear.Value}. Updated: {result.UpdatedCount}, Added: {result.InsertedCount}, Unchanged: {result.UnchangedCount}, CompanySurvey created: {result.CompanySurveyCreatedCount}. Warnings: {string.Join(" ", result.Errors.Take(5))}";
                 }
                 else
                 {
-                    StatusMessage = $"Companies import completed. Updated: {result.UpdatedCount}, Added: {result.InsertedCount}, Unchanged: {result.UnchangedCount}.";
+                    StatusMessage = $"Companies import completed. Survey Year: {effectiveSurveyYear.Value}. Updated: {result.UpdatedCount}, Added: {result.InsertedCount}, Unchanged: {result.UnchangedCount}, CompanySurvey created: {result.CompanySurveyCreatedCount}.";
                 }
             }
             finally
@@ -587,6 +608,7 @@ namespace TINWeb.Pages.Company
             public string? MappedContactEmailHeader { get; set; }
             public bool ApplyTinStatus { get; set; }
             public int? ContactImportTinStatus { get; set; }
+            public int? ContactImportSurveyYear { get; set; }
         }
     }
 }
