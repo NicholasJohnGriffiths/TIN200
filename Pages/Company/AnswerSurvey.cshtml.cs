@@ -363,11 +363,12 @@ namespace TINWeb.Pages.Company
         public async Task<IActionResult> OnGetAsync(int id, string token, bool saved = false, bool submitted = false)
         {
             token = GetEffectiveToken(token);
+            var hasProvidedToken = !string.IsNullOrWhiteSpace(token);
             var hasSurveyAccessCookie = Request.Cookies.TryGetValue($"{AccessCookiePrefix}{id}", out var accessCookieValue)
                 && string.Equals(accessCookieValue, "1", StringComparison.Ordinal);
-            var hasValidToken = !string.IsNullOrWhiteSpace(token) && _surveyLinkTokenService.IsTokenValid(id, token);
+            var hasValidToken = await IsTokenAuthorizedForCompanyAsync(id, token);
 
-            if (!hasValidToken && !hasSurveyAccessCookie)
+            if ((!hasValidToken && hasProvidedToken) || (!hasValidToken && !hasSurveyAccessCookie))
             {
                 return RedirectToPage("/Company/SurveyLinkInvalid", new { id, reason = "invalid-token" });
             }
@@ -384,17 +385,20 @@ namespace TINWeb.Pages.Company
             Saved = saved;
             Submitted = submitted;
 
-            Response.Cookies.Append(
-                $"{AccessCookiePrefix}{company.Id}",
-                "1",
-                new CookieOptions
-                {
-                    HttpOnly = true,
-                    IsEssential = true,
-                    Secure = Request.IsHttps,
-                    SameSite = SameSiteMode.Lax,
-                    Expires = DateTimeOffset.UtcNow.AddHours(8)
-                });
+            if (hasValidToken)
+            {
+                Response.Cookies.Append(
+                    $"{AccessCookiePrefix}{company.Id}",
+                    "1",
+                    new CookieOptions
+                    {
+                        HttpOnly = true,
+                        IsEssential = true,
+                        Secure = Request.IsHttps,
+                        SameSite = SameSiteMode.Lax,
+                        Expires = DateTimeOffset.UtcNow.AddHours(8)
+                    });
+            }
 
             var survey = await GetCurrentSurveyAsync();
             if (survey == null)
@@ -420,11 +424,12 @@ namespace TINWeb.Pages.Company
         public async Task<IActionResult> OnGetGroupImageAsync(int id, int groupId, int imageId, string? token)
         {
             var effectiveToken = GetEffectiveToken(token);
+            var hasProvidedToken = !string.IsNullOrWhiteSpace(effectiveToken);
             var hasSurveyAccessCookie = Request.Cookies.TryGetValue($"{AccessCookiePrefix}{id}", out var accessCookieValue)
                 && string.Equals(accessCookieValue, "1", StringComparison.Ordinal);
-            var hasValidToken = !string.IsNullOrWhiteSpace(effectiveToken) && _surveyLinkTokenService.IsTokenValid(id, effectiveToken);
+            var hasValidToken = await IsTokenAuthorizedForCompanyAsync(id, effectiveToken);
 
-            if (!hasValidToken && !hasSurveyAccessCookie)
+            if ((!hasValidToken && hasProvidedToken) || (!hasValidToken && !hasSurveyAccessCookie))
             {
                 return NotFound();
             }
@@ -458,11 +463,12 @@ namespace TINWeb.Pages.Company
         public async Task<IActionResult> OnGetSurveyHeaderImageAsync(int id, string? token)
         {
             var effectiveToken = GetEffectiveToken(token);
+            var hasProvidedToken = !string.IsNullOrWhiteSpace(effectiveToken);
             var hasSurveyAccessCookie = Request.Cookies.TryGetValue($"{AccessCookiePrefix}{id}", out var accessCookieValue)
                 && string.Equals(accessCookieValue, "1", StringComparison.Ordinal);
-            var hasValidToken = !string.IsNullOrWhiteSpace(effectiveToken) && _surveyLinkTokenService.IsTokenValid(id, effectiveToken);
+            var hasValidToken = await IsTokenAuthorizedForCompanyAsync(id, effectiveToken);
 
-            if (!hasValidToken && !hasSurveyAccessCookie)
+            if ((!hasValidToken && hasProvidedToken) || (!hasValidToken && !hasSurveyAccessCookie))
             {
                 return NotFound();
             }
@@ -492,16 +498,17 @@ namespace TINWeb.Pages.Company
         public async Task<IActionResult> OnPostAsync(int id, string? token)
         {
             var effectiveToken = GetEffectiveToken(string.IsNullOrWhiteSpace(Token) ? token : Token);
+            var hasProvidedToken = !string.IsNullOrWhiteSpace(effectiveToken);
             var hasSurveyAccessCookie = Request.Cookies.TryGetValue($"{AccessCookiePrefix}{id}", out var accessCookieValue)
                 && string.Equals(accessCookieValue, "1", StringComparison.Ordinal);
-            var hasValidToken = !string.IsNullOrWhiteSpace(effectiveToken) && _surveyLinkTokenService.IsTokenValid(id, effectiveToken);
+            var hasValidToken = await IsTokenAuthorizedForCompanyAsync(id, effectiveToken);
             var baseSurveyPath = $"{Request.Scheme}://{Request.Host}/Company/AnswerSurvey/{id}";
             var hasSameOriginPost = string.Equals(Request.Headers.Origin.ToString(), $"{Request.Scheme}://{Request.Host}", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(Request.Headers.Referer.ToString(), baseSurveyPath, StringComparison.OrdinalIgnoreCase)
                 || Request.Headers.Referer.ToString().StartsWith(baseSurveyPath + "?", StringComparison.OrdinalIgnoreCase)
                 || Request.Headers.Referer.ToString().StartsWith(baseSurveyPath + "/", StringComparison.OrdinalIgnoreCase);
 
-            if (!hasValidToken && !hasSurveyAccessCookie && !hasSameOriginPost)
+            if ((!hasValidToken && hasProvidedToken) || (!hasValidToken && !hasSurveyAccessCookie && !hasSameOriginPost))
             {
                 return RedirectToPage("/Company/SurveyLinkInvalid", new { id, reason = "post-auth-failed" });
             }
@@ -900,6 +907,46 @@ namespace TINWeb.Pages.Company
                 .OrderByDescending(s => s.FinancialYear)
                 .ThenByDescending(s => s.Id)
                 .FirstOrDefaultAsync();
+        }
+
+        private async Task<bool> IsTokenAuthorizedForCompanyAsync(int companyId, string? token)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return false;
+            }
+
+            if (!_surveyLinkTokenService.IsTokenValid(companyId, token))
+            {
+                return false;
+            }
+
+            var survey = await GetCurrentSurveyAsync();
+            if (survey == null)
+            {
+                return false;
+            }
+
+            var currentLink = await _context.CompanySurvey
+                .Where(cs => cs.CompanyId == companyId && cs.SurveyId == survey.Id)
+                .Select(cs => cs.SurveyLink)
+                .FirstOrDefaultAsync();
+
+            var currentToken = ExtractTokenFromSurveyLink(currentLink);
+            return !string.IsNullOrWhiteSpace(currentToken)
+                && string.Equals(currentToken, token, StringComparison.Ordinal);
+        }
+
+        private static string? ExtractTokenFromSurveyLink(string? surveyLink)
+        {
+            if (string.IsNullOrWhiteSpace(surveyLink)
+                || !Uri.TryCreate(surveyLink.Trim(), UriKind.Absolute, out var linkUri))
+            {
+                return null;
+            }
+
+            var token = linkUri.Segments.LastOrDefault()?.Trim('/');
+            return string.IsNullOrWhiteSpace(token) ? null : Uri.UnescapeDataString(token);
         }
 
         private async Task<int> EnsureCompanySurveyAsync(int companyId, int surveyId)
