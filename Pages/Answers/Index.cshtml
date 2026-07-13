@@ -1,4 +1,5 @@
 @page
+@using System.Globalization
 @model TINWeb.Pages.Answers.IndexModel
 @{
     ViewData["Title"] = "Answers by Company";
@@ -356,7 +357,7 @@
                         else
                         {
                             answerValue = row.AnswerCurrency.HasValue
-                                ? row.AnswerCurrency.Value.ToString("C")
+                                ? string.Format(CultureInfo.InvariantCulture, "${0:N2}", row.AnswerCurrency.Value)
                                 : string.Empty;
                         }
                     }
@@ -367,7 +368,7 @@
                             : row.AnswerNumber.HasValue
                                 ? row.AnswerNumber.Value.ToString()
                                 : row.AnswerCurrency.HasValue
-                                    ? row.AnswerCurrency.Value.ToString("C")
+                                    ? string.Format(CultureInfo.InvariantCulture, "${0:N2}", row.AnswerCurrency.Value)
                                     : string.Empty;
                     }
 

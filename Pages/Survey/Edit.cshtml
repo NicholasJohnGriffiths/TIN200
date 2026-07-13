@@ -8,6 +8,11 @@
     <h1>Edit Survey</h1>
     <hr />
 
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <div class="alert alert-info" role="alert">@Model.StatusMessage</div>
+    }
+
     <form method="post" enctype="multipart/form-data">
         <div asp-validation-summary="ModelOnly" class="text-danger"></div>
         <input type="hidden" asp-for="Record.Id" />
@@ -84,8 +89,118 @@
         <button type="submit" class="btn btn-primary">Save</button>
         <a asp-page="./Index" class="btn btn-secondary">Back to List</a>
     </form>
+
+    <hr class="my-4" />
+
+    <div class="card">
+        <div class="card-body">
+            <h2 class="h5 mb-3">Missing CompanySurvey Records</h2>
+
+            @if (Model.LatestSurveyYear <= 0)
+            {
+                <div class="alert alert-warning mb-0" role="alert">
+                    No survey year is available yet. Create a survey first.
+                </div>
+            }
+            else
+            {
+                <p class="mb-2">
+                    Latest survey year: <strong>@Model.LatestSurveyYear</strong>.
+                    Preview below shows companies that do not have a CompanySurvey row for year <strong>@Model.BatchSurveyYear</strong>.
+                </p>
+
+                @if (Model.MissingCompanySurveyRows.Count == 0)
+                {
+                    <div class="alert alert-success mb-0" role="alert">
+                        All companies already have a CompanySurvey record for year @Model.BatchSurveyYear.
+                    </div>
+                }
+                else
+                {
+                    <div class="alert alert-info" role="alert">
+                        Found <strong>@Model.MissingCompanySurveyRows.Count</strong> companies missing CompanySurvey for year @Model.BatchSurveyYear (preview limit 250).
+                    </div>
+
+                    <form method="post" asp-page-handler="BatchCreateMissingCompanySurveys">
+                        <input type="hidden" asp-for="Record.Id" />
+
+                        <div class="row g-2 align-items-end mb-3">
+                            <div class="col-sm-4 col-md-3">
+                                <label asp-for="BatchSurveyYear" class="form-label">Survey Year</label>
+                                <input asp-for="BatchSurveyYear" class="form-control" />
+                                <span asp-validation-for="BatchSurveyYear" class="text-danger"></span>
+                            </div>
+                            <div class="col-sm-8 col-md-9">
+                                <button type="submit" class="btn btn-primary">Create CompanySurvey For Selected</button>
+                            </div>
+                        </div>
+
+                        <div class="mb-2">
+                            <button type="button" id="selectAllMissingCompanies" class="btn btn-sm btn-outline-secondary">Select all</button>
+                            <button type="button" id="clearAllMissingCompanies" class="btn btn-sm btn-outline-secondary">Clear all</button>
+                        </div>
+
+                        <div class="table-responsive" style="max-height: 440px;">
+                            <table class="table table-sm table-striped align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 70px;">Select</th>
+                                        <th style="width: 100px;">ID</th>
+                                        <th>Company</th>
+                                        <th style="width: 180px;">External ID</th>
+                                        <th>Contact Email</th>
+                                        <th>Email</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var company in Model.MissingCompanySurveyRows)
+                                    {
+                                        <tr>
+                                            <td>
+                                                <input class="form-check-input missing-company-checkbox" type="checkbox" name="SelectedCompanyIds" value="@company.CompanyId" />
+                                            </td>
+                                            <td>@company.CompanyId</td>
+                                            <td>@(company.CompanyName ?? "(No name)")</td>
+                                            <td>@company.ExternalId</td>
+                                            <td>@company.ContactEmail</td>
+                                            <td>@company.Email</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </form>
+                }
+            }
+        </div>
+    </div>
 </div>
 
 @section Scripts {
     @{ await Html.RenderPartialAsync("_ValidationScriptsPartial"); }
+
+    <script>
+        (function () {
+            var selectAllButton = document.getElementById('selectAllMissingCompanies');
+            var clearAllButton = document.getElementById('clearAllMissingCompanies');
+
+            if (!selectAllButton || !clearAllButton) {
+                return;
+            }
+
+            function setCheckedState(value) {
+                document.querySelectorAll('.missing-company-checkbox').forEach(function (checkbox) {
+                    checkbox.checked = value;
+                });
+            }
+
+            selectAllButton.addEventListener('click', function () {
+                setCheckedState(true);
+            });
+
+            clearAllButton.addEventListener('click', function () {
+                setCheckedState(false);
+            });
+        })();
+    </script>
 }

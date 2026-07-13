@@ -65,9 +65,9 @@
                                             <td>@(row.NewCeoFirstName != null && row.CurrentCeoFirstName != row.NewCeoFirstName ? $"{row.CurrentCeoFirstName} -> {row.NewCeoFirstName}" : row.CurrentCeoFirstName ?? "")</td>
                                             <td>@(row.NewCeoLastName != null && row.CurrentCeoLastName != row.NewCeoLastName ? $"{row.CurrentCeoLastName} -> {row.NewCeoLastName}" : row.CurrentCeoLastName ?? "")</td>
                                             <td>@(row.NewEmail != null && row.CurrentEmail != row.NewEmail ? $"{row.CurrentEmail} -> {row.NewEmail}" : row.CurrentEmail ?? "")</td>
-                                            <td>@(row.CurrentFye2025?.ToString("C0") ?? "") -> @(row.NewFye2025?.ToString("C0") ?? "")</td>
-                                            <td>@(row.CurrentFye2024?.ToString("C0") ?? "") -> @(row.NewFye2024?.ToString("C0") ?? "")</td>
-                                            <td>@(row.CurrentFye2023?.ToString("C0") ?? "") -> @(row.NewFye2023?.ToString("C0") ?? "")</td>
+                                            <td>@(row.CurrentFye2025.HasValue ? string.Format(System.Globalization.CultureInfo.InvariantCulture, "${0:N0}", row.CurrentFye2025.Value) : "") -> @(row.NewFye2025.HasValue ? string.Format(System.Globalization.CultureInfo.InvariantCulture, "${0:N0}", row.NewFye2025.Value) : "")</td>
+                                            <td>@(row.CurrentFye2024.HasValue ? string.Format(System.Globalization.CultureInfo.InvariantCulture, "${0:N0}", row.CurrentFye2024.Value) : "") -> @(row.NewFye2024.HasValue ? string.Format(System.Globalization.CultureInfo.InvariantCulture, "${0:N0}", row.NewFye2024.Value) : "")</td>
+                                            <td>@(row.CurrentFye2023.HasValue ? string.Format(System.Globalization.CultureInfo.InvariantCulture, "${0:N0}", row.CurrentFye2023.Value) : "") -> @(row.NewFye2023.HasValue ? string.Format(System.Globalization.CultureInfo.InvariantCulture, "${0:N0}", row.NewFye2023.Value) : "")</td>
                                         </tr>
                                     }
                                 </tbody>
@@ -184,6 +184,7 @@
                 <form method="post" asp-page-handler="ApplyContactImport" class="d-inline" id="applyContactImportForm">
                     <input type="hidden" name="previewToken" value="@Model.PendingContactImportToken" />
                     <input type="hidden" name="tinStatus" value="@Model.SelectedTinStatus" />
+                    <input type="hidden" name="showMissingCompanySurveyOnly" value="@Model.ShowMissingCompanySurveyOnly.ToString().ToLowerInvariant()" />
                     <input type="hidden" name="showImportTool" value="@(string.Equals(Model.ShowImportTool, "import", StringComparison.OrdinalIgnoreCase) ? "import" : "contacts")" />
                     <input type="hidden" name="showImportTab" value="contacts" />
                     <input type="hidden" name="contactImportSurveyYear" value="@Model.ContactImportSurveyYear" />
@@ -301,6 +302,7 @@
                     <input type="hidden" name="previewToken" value="@Model.PendingGlobalImportToken" />
                     <input type="hidden" name="tinStatus" value="@Model.SelectedTinStatus" />
                     <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
+                    <input type="hidden" name="showMissingCompanySurveyOnly" value="@Model.ShowMissingCompanySurveyOnly.ToString().ToLowerInvariant()" />
                     <input type="hidden" name="showImportTool" value="@(string.Equals(Model.ShowImportTool, "import", StringComparison.OrdinalIgnoreCase) ? "import" : "global")" />
                     <input type="hidden" name="showImportTab" value="global" />
                     <button type="submit" class="btn btn-dark">Apply Global Import</button>
@@ -323,12 +325,14 @@
                             <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
                             <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
                             <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
+                            <input type="hidden" name="showMissingCompanySurveyOnly" value="@Model.ShowMissingCompanySurveyOnly.ToString().ToLowerInvariant()" />
                             <button type="submit" class="btn btn-outline-secondary me-2" id="companyResetPreviewButton">Preview Summary</button>
                         </form>
                         <form method="post" asp-page-handler="ResetFyeValues" class="d-inline" onsubmit="return confirm('Update company info (CEO name, email, FYE Last Financial Year / Year-1 / Year-2) from survey answers? This will overwrite existing values.');">
                             <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
                             <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
                             <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
+                            <input type="hidden" name="showMissingCompanySurveyOnly" value="@Model.ShowMissingCompanySurveyOnly.ToString().ToLowerInvariant()" />
                             <button type="submit" class="btn btn-outline-warning me-2" id="companyResetButton">Update Company Info</button>
                         </form>
                     }
@@ -372,6 +376,7 @@
                                 <input type="hidden" name="tinStatus" value="@Model.SelectedTinStatus" />
                                 <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
                                 <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
+                                <input type="hidden" name="showMissingCompanySurveyOnly" value="@Model.ShowMissingCompanySurveyOnly.ToString().ToLowerInvariant()" />
                                 <input type="hidden" name="showImportTool" value="import" />
                                 <input type="hidden" name="showImportTab" value="contacts" />
                                 <input type="number" name="contactImportSurveyYear" value="@Model.ContactImportSurveyYear" class="form-control form-control-sm" style="max-width: 140px;" placeholder="Survey Year" min="1900" max="9999" required />
@@ -389,6 +394,7 @@
                                 <input type="hidden" name="tinStatus" value="@Model.SelectedTinStatus" />
                                 <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
                                 <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
+                                <input type="hidden" name="showMissingCompanySurveyOnly" value="@Model.ShowMissingCompanySurveyOnly.ToString().ToLowerInvariant()" />
                                 <input type="hidden" name="showImportTool" value="import" />
                                 <input type="hidden" name="showImportTab" value="contacts" />
                                 <input type="hidden" asp-for="ContactImportMappingToken" />
@@ -469,6 +475,7 @@
                             <input type="hidden" name="tinStatus" value="@Model.SelectedTinStatus" />
                             <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
                             <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
+                            <input type="hidden" name="showMissingCompanySurveyOnly" value="@Model.ShowMissingCompanySurveyOnly.ToString().ToLowerInvariant()" />
                             <input type="hidden" name="showImportTool" value="import" />
                             <input type="hidden" name="showImportTab" value="global" />
                             <input type="number" name="importYear" value="@Model.SelectedImportYear" class="form-control form-control-sm" style="max-width: 120px;" placeholder="Import Year" min="1900" max="9999" />
@@ -507,6 +514,10 @@
                     }
                 </select>
                 <input type="text" name="companySearch" value="@Model.CompanySearch" class="form-control me-2" style="max-width: 340px;" placeholder="Company name or External ID" />
+                <div class="form-check form-check-inline me-2 align-self-center" style="white-space: nowrap;">
+                    <input class="form-check-input" type="checkbox" id="showMissingCompanySurveyOnly" name="showMissingCompanySurveyOnly" value="true" checked="@(Model.ShowMissingCompanySurveyOnly ? "checked" : null)" />
+                    <label class="form-check-label" for="showMissingCompanySurveyOnly">Show only missing</label>
+                </div>
                 <button class="btn btn-outline-primary" type="submit">Apply</button>
                 @if (!isImportMode)
                 {
@@ -530,6 +541,22 @@
 
     @if (Model.Records.Any())
     {
+        @if (Model.LatestSurveyYear.HasValue)
+        {
+            <div class="alert @(Model.MissingCompanySurveyCount > 0 ? "alert-warning" : "alert-success") py-2" role="alert">
+                Latest survey year <strong>@Model.LatestSurveyYear.Value</strong>:
+                <strong>@Model.MissingCompanySurveyCount</strong> of <strong>@Model.Records.Count</strong>
+                visible compan@(Model.Records.Count == 1 ? "y" : "ies")
+                @(Model.MissingCompanySurveyCount == 1 ? "is" : "are") missing a CompanySurvey record.
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-secondary py-2" role="alert">
+                No survey year is configured yet, so CompanySurvey missing status is not available.
+            </div>
+        }
+
         <div class="table-responsive">
             <table class="table table-striped table-hover company-table">
                 <thead class="table-dark">
@@ -545,6 +572,7 @@
                         <th class="sortable" data-type="number">Financial Year</th>
                         <th class="sortable" data-type="number">Last TIN200 Year</th>
                         <th class="sortable" data-type="string">Test</th>
+                        <th class="sortable" data-type="string">Latest Survey Record</th>
                         <th class="actions-header">Actions</th>
                     </tr>
                 </thead>
@@ -557,12 +585,26 @@
                             <td>@($"{record.ContactFirstName} {record.ContactLastName}".Trim())</td>
                             <td>@record.ContactEmail</td>
                             <td>@record.ExternalId</td>
-                            <td>@(record.Fye2025.HasValue ? record.Fye2025.Value.ToString("C0") : "")</td>
-                            <td>@(record.Fye2024.HasValue ? record.Fye2024.Value.ToString("C0") : "")</td>
-                            <td>@(record.Fye2023.HasValue ? record.Fye2023.Value.ToString("C0") : "")</td>
+                            <td>@(record.Fye2025.HasValue ? string.Format(System.Globalization.CultureInfo.InvariantCulture, "${0:N0}", record.Fye2025.Value) : "")</td>
+                            <td>@(record.Fye2024.HasValue ? string.Format(System.Globalization.CultureInfo.InvariantCulture, "${0:N0}", record.Fye2024.Value) : "")</td>
+                            <td>@(record.Fye2023.HasValue ? string.Format(System.Globalization.CultureInfo.InvariantCulture, "${0:N0}", record.Fye2023.Value) : "")</td>
                             <td>@record.FinancialYear</td>
                             <td>@record.LastTIN200Year</td>
                             <td>@(TINWeb.Models.TinStatusHelper.IsTestCompany(record.TinStatus) ? "Yes" : "No")</td>
+                            <td>
+                                @if (!Model.LatestSurveyYear.HasValue)
+                                {
+                                    <span class="badge text-bg-secondary">N/A</span>
+                                }
+                                else if (Model.MissingCompanySurveyCompanyIds.Contains(record.Id))
+                                {
+                                    <span class="badge text-bg-warning">Missing</span>
+                                }
+                                else
+                                {
+                                    <span class="badge text-bg-success">Exists</span>
+                                }
+                            </td>
                             <td class="actions-col">
                                 <a asp-page="./Details" asp-route-id="@record.Id" class="btn btn-sm btn-info">View</a>
                                 <a asp-page="./Edit" asp-route-id="@record.Id" asp-route-lastTin200Year="@Model.SelectedLastTin200Year" class="btn btn-sm btn-warning">Edit</a>

@@ -81,15 +81,15 @@
                         <div class="row mb-3">
                             <div class="col-md-4">
                                 <h6 class="text-muted">FYE 2025</h6>
-                                <p>@(Model.Record.Fye2025.HasValue ? Model.Record.Fye2025.Value.ToString("C0") : "N/A")</p>
+                                <p>@(Model.Record.Fye2025.HasValue ? string.Format(System.Globalization.CultureInfo.InvariantCulture, "${0:N0}", Model.Record.Fye2025.Value) : "N/A")</p>
                             </div>
                             <div class="col-md-4">
                                 <h6 class="text-muted">FYE 2024</h6>
-                                <p>@(Model.Record.Fye2024.HasValue ? Model.Record.Fye2024.Value.ToString("C0") : "N/A")</p>
+                                <p>@(Model.Record.Fye2024.HasValue ? string.Format(System.Globalization.CultureInfo.InvariantCulture, "${0:N0}", Model.Record.Fye2024.Value) : "N/A")</p>
                             </div>
                             <div class="col-md-4">
                                 <h6 class="text-muted">FYE 2023</h6>
-                                <p>@(Model.Record.Fye2023.HasValue ? Model.Record.Fye2023.Value.ToString("C0") : "N/A")</p>
+                                <p>@(Model.Record.Fye2023.HasValue ? string.Format(System.Globalization.CultureInfo.InvariantCulture, "${0:N0}", Model.Record.Fye2023.Value) : "N/A")</p>
                             </div>
                         </div>
 

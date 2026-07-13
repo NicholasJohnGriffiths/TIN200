@@ -15,17 +15,30 @@ namespace TINWeb.Pages.Survey
         private readonly ApplicationDbContext _context;
         private readonly IImageStorageService _imageStorageService;
 
+        private const int MissingCompanyPreviewLimit = 250;
+
         [BindProperty]
         public Models.Survey Record { get; set; } = new();
 
         [BindProperty]
         public IFormFile? HeaderImageFile { get; set; }
 
+        [BindProperty]
+        public int BatchSurveyYear { get; set; }
+
+        [BindProperty]
+        public List<int> SelectedCompanyIds { get; set; } = new();
+
         public List<SelectListItem> HeaderImageOptions { get; set; } = new();
         public string? HeaderImageThumbnailUrl { get; set; }
         public string? HeaderImageFileName { get; set; }
         public bool HeaderImageMissing { get; set; }
         public string? HeaderImageMissingMessage { get; set; }
+        public int LatestSurveyYear { get; set; }
+        public List<MissingCompanySurveyRow> MissingCompanySurveyRows { get; set; } = new();
+
+        [TempData]
+        public string? StatusMessage { get; set; }
 
         public EditModel(SurveyService service, ApplicationDbContext context, IImageStorageService imageStorageService)
         {
@@ -34,7 +47,7 @@ namespace TINWeb.Pages.Survey
             _imageStorageService = imageStorageService;
         }
 
-        public async Task<IActionResult> OnGetAsync(int? id)
+        public async Task<IActionResult> OnGetAsync(int? id, int? batchSurveyYear)
         {
             if (id == null)
             {
@@ -50,6 +63,7 @@ namespace TINWeb.Pages.Survey
             Record = record;
             await LoadHeaderImageOptionsAsync();
             await LoadHeaderImagePreviewAsync();
+            await LoadMissingCompanySurveyDataAsync(batchSurveyYear);
             return Page();
         }
 
@@ -82,6 +96,7 @@ namespace TINWeb.Pages.Survey
             {
                 await LoadHeaderImageOptionsAsync();
                 await LoadHeaderImagePreviewAsync();
+                await LoadMissingCompanySurveyDataAsync(BatchSurveyYear > 0 ? BatchSurveyYear : null);
                 return Page();
             }
 
@@ -97,6 +112,103 @@ namespace TINWeb.Pages.Survey
 
             await _service.UpdateAsync(Record);
             return RedirectToPage("./Index");
+        }
+
+        public async Task<IActionResult> OnPostBatchCreateMissingCompanySurveysAsync()
+        {
+            var survey = await _service.GetByIdAsync(Record.Id);
+            if (survey == null)
+            {
+                return NotFound();
+            }
+
+            Record = survey;
+            await LoadHeaderImageOptionsAsync();
+            await LoadHeaderImagePreviewAsync();
+
+            if (BatchSurveyYear <= 0)
+            {
+                ModelState.AddModelError(nameof(BatchSurveyYear), "Enter a valid survey year.");
+                await LoadMissingCompanySurveyDataAsync(null);
+                return Page();
+            }
+
+            var selectedCompanyIds = SelectedCompanyIds
+                .Where(x => x > 0)
+                .Distinct()
+                .ToList();
+
+            if (selectedCompanyIds.Count == 0)
+            {
+                ModelState.AddModelError(string.Empty, "Select at least one company.");
+                await LoadMissingCompanySurveyDataAsync(BatchSurveyYear);
+                return Page();
+            }
+
+            var targetSurveyId = await _context.Survey
+                .Where(x => x.FinancialYear == BatchSurveyYear)
+                .OrderByDescending(x => x.CurrentSurvey)
+                .ThenByDescending(x => x.Id)
+                .Select(x => (int?)x.Id)
+                .FirstOrDefaultAsync();
+
+            if (!targetSurveyId.HasValue)
+            {
+                ModelState.AddModelError(nameof(BatchSurveyYear), $"No survey record exists for year {BatchSurveyYear}.");
+                await LoadMissingCompanySurveyDataAsync(BatchSurveyYear);
+                return Page();
+            }
+
+            var selectedSet = selectedCompanyIds.ToHashSet();
+
+            var companyIdsWithSurveyForYear = await (
+                from companySurvey in _context.CompanySurvey
+                join surveyByYear in _context.Survey on companySurvey.SurveyId equals surveyByYear.Id
+                where surveyByYear.FinancialYear == BatchSurveyYear
+                select companySurvey.CompanyId
+            ).Distinct().ToListAsync();
+
+            var existingForYearSet = companyIdsWithSurveyForYear.ToHashSet();
+            var companyIdsToCreate = selectedSet
+                .Where(companyId => !existingForYearSet.Contains(companyId))
+                .ToList();
+
+            if (companyIdsToCreate.Count == 0)
+            {
+                StatusMessage = $"No records were created. Selected companies already have CompanySurvey rows for year {BatchSurveyYear}.";
+                return RedirectToPage(new { id = Record.Id, batchSurveyYear = BatchSurveyYear });
+            }
+
+            var validCompanyIds = await _context.Tin200
+                .Where(x => companyIdsToCreate.Contains(x.Id))
+                .Select(x => x.Id)
+                .ToListAsync();
+
+            if (validCompanyIds.Count == 0)
+            {
+                ModelState.AddModelError(string.Empty, "No valid companies were selected.");
+                await LoadMissingCompanySurveyDataAsync(BatchSurveyYear);
+                return Page();
+            }
+
+            var newRecords = validCompanyIds.Select(companyId => new Models.CompanySurvey
+            {
+                CompanyId = companyId,
+                SurveyId = targetSurveyId.Value,
+                Saved = false,
+                Submitted = false,
+                Requested = false,
+                Locked = false,
+                Estimate = false
+            }).ToList();
+
+            _context.CompanySurvey.AddRange(newRecords);
+            await _context.SaveChangesAsync();
+
+            var skippedCount = selectedCompanyIds.Count - newRecords.Count;
+            StatusMessage = $"Created {newRecords.Count} CompanySurvey record(s) for year {BatchSurveyYear}. Skipped {Math.Max(0, skippedCount)} already covered company(s).";
+
+            return RedirectToPage(new { id = Record.Id, batchSurveyYear = BatchSurveyYear });
         }
 
         private async Task<int?> SaveHeaderImageAsync(int surveyId, IFormFile file)
@@ -185,6 +297,44 @@ namespace TINWeb.Pages.Survey
             HeaderImageThumbnailUrl = Url.Page("./Edit", "HeaderImage", new { id = Record.Id, imageId = image.Id });
         }
 
+        private async Task LoadMissingCompanySurveyDataAsync(int? batchSurveyYear)
+        {
+            LatestSurveyYear = await _context.Survey
+                .Select(x => (int?)x.FinancialYear)
+                .MaxAsync() ?? 0;
+
+            BatchSurveyYear = batchSurveyYear.HasValue && batchSurveyYear.Value > 0
+                ? batchSurveyYear.Value
+                : LatestSurveyYear;
+
+            if (BatchSurveyYear <= 0)
+            {
+                MissingCompanySurveyRows = new List<MissingCompanySurveyRow>();
+                return;
+            }
+
+            var companyIdsWithSurveyForYear =
+                from companySurvey in _context.CompanySurvey
+                join surveyByYear in _context.Survey on companySurvey.SurveyId equals surveyByYear.Id
+                where surveyByYear.FinancialYear == BatchSurveyYear
+                select companySurvey.CompanyId;
+
+            MissingCompanySurveyRows = await _context.Tin200
+                .Where(company => !companyIdsWithSurveyForYear.Contains(company.Id))
+                .OrderBy(company => company.CompanyName)
+                .ThenBy(company => company.Id)
+                .Select(company => new MissingCompanySurveyRow
+                {
+                    CompanyId = company.Id,
+                    CompanyName = company.CompanyName,
+                    ExternalId = company.ExternalId,
+                    ContactEmail = company.ContactEmail,
+                    Email = company.Email
+                })
+                .Take(MissingCompanyPreviewLimit)
+                .ToListAsync();
+        }
+
         private static string GetContentTypeFromPath(string filePath)
         {
             var contentTypeProvider = new FileExtensionContentTypeProvider();
@@ -195,6 +345,15 @@ namespace TINWeb.Pages.Survey
             }
 
             return contentType;
+        }
+
+        public class MissingCompanySurveyRow
+        {
+            public int CompanyId { get; set; }
+            public string? CompanyName { get; set; }
+            public string? ExternalId { get; set; }
+            public string? ContactEmail { get; set; }
+            public string? Email { get; set; }
         }
     }
 }

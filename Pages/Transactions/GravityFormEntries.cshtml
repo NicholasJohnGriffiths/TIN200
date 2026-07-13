@@ -33,7 +33,7 @@
                 @Model.Result.TotalCount entries &mdash; page @Model.Result.PageNumber of @Model.Result.TotalPages
                 @if (Model.FormAmountTotal.HasValue)
                 {
-                    <span>&mdash; Amount Total: <strong>@Model.FormAmountTotal.Value.ToString("C2")</strong></span>
+                    <span>&mdash; Amount Total: <strong>@string.Format(System.Globalization.CultureInfo.InvariantCulture, "${0:N2}", Model.FormAmountTotal.Value)</strong></span>
                 }
             </div>
         }
