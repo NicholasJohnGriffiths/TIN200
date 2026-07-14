@@ -1440,6 +1440,29 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
 
             var headerByColumn = columnByHeader.ToDictionary(x => x.Value, x => x.Key);
 
+            // Heuristic: if many headers align with Question.ImportColumnNameAlt values,
+            // the user likely uploaded an Answers Global file into the Companies Global importer.
+            var normalizedAvailableHeaders = new HashSet<string>(
+                columnByHeader.Keys
+                    .Select(NormalizeHeader)
+                    .Where(x => !string.IsNullOrWhiteSpace(x)),
+                StringComparer.OrdinalIgnoreCase);
+
+            var questionAltHeaders = await _context.Question
+                .AsNoTracking()
+                .Where(q => !string.IsNullOrWhiteSpace(q.ImportColumnNameAlt))
+                .Select(q => q.ImportColumnNameAlt!)
+                .ToListAsync();
+
+            var normalizedQuestionAltHeaders = questionAltHeaders
+                .Select(NormalizeHeader)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var matchedQuestionAltHeaderCount = normalizedQuestionAltHeaders.Count(normalizedAvailableHeaders.Contains);
+            var looksLikeAnswersGlobalFile = matchedQuestionAltHeaderCount >= 10;
+
             bool TryGetColumn(List<string> aliases, out int columnNumber, out string matchedHeader)
             {
                 foreach (var alias in aliases)
@@ -1499,7 +1522,22 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
 
             if (string.IsNullOrWhiteSpace(plan.MatchedExternalIdHeader) || string.IsNullOrWhiteSpace(plan.MatchedCompanyNameHeader))
             {
+                if (looksLikeAnswersGlobalFile)
+                {
+                    plan.Errors.Add(
+                        "This file appears to be a Survey Answers Global import file (many headers match Question.ImportColumnNameAlt). "
+                        + "Use Answers -> Import Global File for question data, or include ID/Name columns for Companies -> Import Global File.");
+                }
+
                 return plan;
+            }
+
+            if (looksLikeAnswersGlobalFile)
+            {
+                plan.Errors.Add(
+                    $"Detected {matchedQuestionAltHeaderCount} column header(s) that match Question.ImportColumnNameAlt. "
+                    + "Companies -> Import Global File only imports company master fields (ID, Name, optional Description); answer-style columns are ignored here. "
+                    + "Use Answers -> Import Global File to import survey answer columns.");
             }
 
             var existingCompanies = await _context.Tin200
