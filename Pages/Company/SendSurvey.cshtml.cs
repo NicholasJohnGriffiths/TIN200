@@ -117,6 +117,23 @@ namespace TINWeb.Pages.Company
             if (id.HasValue)
             {
                 var selectedClient = AvailableClients.FirstOrDefault(c => c.Id == id.Value);
+                if (selectedClient == null)
+                {
+                    // If a direct company link was opened with a different TIN status filter,
+                    // switch to that company's status so the row can be selected.
+                    var company = await _companyService.GetCompanyByIdAsync(id.Value);
+                    if (company != null)
+                    {
+                        var candidateStatus = NormalizeTinStatusFilter(company.TinStatus ?? (int)TinStatus.Tin200);
+                        if (candidateStatus != SelectedTinStatus)
+                        {
+                            SelectedTinStatus = candidateStatus;
+                            await LoadAvailableClientsAsync();
+                            selectedClient = AvailableClients.FirstOrDefault(c => c.Id == id.Value);
+                        }
+                    }
+                }
+
                 if (selectedClient != null && !string.IsNullOrWhiteSpace(selectedClient.Email))
                 {
                     SelectedClientIds = new List<int> { id.Value };
