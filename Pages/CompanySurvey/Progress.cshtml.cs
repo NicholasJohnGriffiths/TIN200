@@ -11,7 +11,6 @@ namespace TINWeb.Pages.CompanySurvey
 
         public List<CompanySurveyService.CompanySurveyListRow> Records { get; set; } = new();
         public List<int> FinancialYears { get; set; } = new();
-        public List<int> LastTIN200Years { get; set; } = new();
         public int TotalCompanies { get; set; }
         public int SavedCompanies { get; set; }
         public int SubmittedCompanies { get; set; }
@@ -25,9 +24,6 @@ namespace TINWeb.Pages.CompanySurvey
 
         [BindProperty(SupportsGet = true)]
         public int? FinancialYear { get; set; }
-
-        [BindProperty(SupportsGet = true)]
-        public int? LastTIN200Year { get; set; }
 
         [BindProperty(SupportsGet = true)]
         public string ProgressStatusFilter { get; set; } = "all";
@@ -58,23 +54,6 @@ namespace TINWeb.Pages.CompanySurvey
 
             var rows = await _companySurveyService.GetListRowsAsync(FinancialYear);
             rows = rows.Where(r => r.TinStatus == SelectedTinStatus).ToList();
-
-            LastTIN200Years = rows
-                .Where(r => r.LastTIN200Year.HasValue)
-                .Select(r => r.LastTIN200Year!.Value)
-                .Distinct()
-                .OrderByDescending(y => y)
-                .ToList();
-
-            if (!LastTIN200Year.HasValue)
-            {
-                LastTIN200Year = LastTIN200Years.FirstOrDefault();
-            }
-
-            if (LastTIN200Year.HasValue)
-            {
-                rows = rows.Where(r => r.LastTIN200Year == LastTIN200Year.Value).ToList();
-            }
 
             TotalCompanies = rows.Count;
             SavedCompanies = rows.Count(r => r.Saved);

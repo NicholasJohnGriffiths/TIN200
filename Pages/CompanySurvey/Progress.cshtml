@@ -11,7 +11,6 @@
         new
         {
             financialYear = Model.FinancialYear,
-            lastTIN200Year = Model.LastTIN200Year,
             selectedTinStatus = Model.SelectedTinStatus,
             progressStatusFilter = Model.ProgressStatusFilter,
             sortBy = column,
@@ -70,16 +69,6 @@
                         @foreach (var year in Model.FinancialYears)
                         {
                             <option value="@year" selected="@(Model.FinancialYear == year ? "selected" : null)">@year</option>
-                        }
-                    </select>
-                </div>
-
-                <div>
-                    <label class="form-label mb-1">Company LastTIN200Year</label>
-                    <select name="lastTIN200Year" class="form-select" style="min-width: 180px;">
-                        @foreach (var year in Model.LastTIN200Years)
-                        {
-                            <option value="@year" selected="@(Model.LastTIN200Year == year ? "selected" : null)">@year</option>
                         }
                     </select>
                 </div>

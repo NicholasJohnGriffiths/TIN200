@@ -62,17 +62,6 @@
                         </div>
 
                         <div>
-                            <label asp-for="SelectedLastTin200Year" class="form-label mb-1">Filter Last TIN200 Year</label>
-                            <select asp-for="SelectedLastTin200Year" class="form-select" style="min-width: 160px;" aria-label="Last TIN200 Year">
-                                <option value="">All</option>
-                                @foreach (var y in Model.AvailableLastTin200Years)
-                                {
-                                    <option value="@y">@y</option>
-                                }
-                            </select>
-                        </div>
-
-                        <div>
                             <label asp-for="SelectedEmailContentId" class="form-label mb-1">Email Content</label>
                             <select asp-for="SelectedEmailContentId" asp-items="Model.EmailContentOptions" class="form-select" style="min-width: 260px;">
                                 <option value="">Select email content</option>
@@ -120,7 +109,6 @@
 
                     <form id="bulkSendForm" method="post" asp-page-handler="Bulk">
                         <input type="hidden" asp-for="SelectedTinStatus" />
-                        <input type="hidden" asp-for="SelectedLastTin200Year" />
                         <input type="hidden" asp-for="SelectedEmailContentId" />
                         <div class="form-check mb-3">
                             <input asp-for="SendToAllClients" class="form-check-input" />
@@ -375,6 +363,7 @@
                 : null;
             const url = new URL(window.location.href);
             const storageKey = 'tin200_send_survey_selected_clients';
+            const preserveSelectionOnNextLoadKey = 'tin200_send_survey_preserve_next_load';
             const clearSavedSelectionsAfterSend = @Model.BulkSendSucceeded.ToString().ToLowerInvariant();
             const hasQueryPreselection = @Model.HasQueryPreselection.ToString().ToLowerInvariant();
             let bulkSendInProgress = false;
@@ -395,11 +384,18 @@
             }
 
             if (clearSavedSelectionsAfterSend) {
-                localStorage.removeItem(storageKey);
                 url.searchParams.delete('search');
                 url.searchParams.delete('filter');
                 window.history.replaceState({}, '', url.toString());
             }
+
+            const preserveSelectionOnNextLoad = sessionStorage.getItem(preserveSelectionOnNextLoadKey) === 'true';
+
+            if (!preserveSelectionOnNextLoad && !hasQueryPreselection) {
+                sessionStorage.removeItem(storageKey);
+            }
+
+            sessionStorage.removeItem(preserveSelectionOnNextLoadKey);
 
             searchParam = url.searchParams.get('search');
             filterParam = url.searchParams.get('filter');
@@ -543,12 +539,12 @@
                 const selectedIds = getCheckboxes()
                     .filter(cb => cb.checked)
                     .map(cb => cb.value);
-                localStorage.setItem(storageKey, JSON.stringify(selectedIds));
+                sessionStorage.setItem(storageKey, JSON.stringify(selectedIds));
                 updateCounts();
             };
 
             const restoreSelections = () => {
-                const raw = localStorage.getItem(storageKey);
+                const raw = sessionStorage.getItem(storageKey);
                 if (!raw) {
                     return;
                 }
@@ -704,6 +700,48 @@
                 }
             };
 
+            const delayWithAbort = (milliseconds, signal) => {
+                const durationMs = Math.max(0, Math.floor(milliseconds));
+                if (durationMs === 0) {
+                    return Promise.resolve();
+                }
+
+                return new Promise((resolve, reject) => {
+                    const timerId = window.setTimeout(() => {
+                        if (signal) {
+                            signal.removeEventListener('abort', onAbort);
+                        }
+                        resolve();
+                    }, durationMs);
+
+                    const onAbort = () => {
+                        window.clearTimeout(timerId);
+                        reject(new DOMException('Aborted', 'AbortError'));
+                    };
+
+                    if (signal) {
+                        if (signal.aborted) {
+                            onAbort();
+                            return;
+                        }
+
+                        signal.addEventListener('abort', onAbort, { once: true });
+                    }
+                });
+            };
+
+            const getScheduledDelayBeforeNextRequestMs = (config, processedCount, queueCount) => {
+                if (!config.scheduleEnabled || processedCount <= 0 || processedCount >= queueCount) {
+                    return 0;
+                }
+
+                if (config.batchSize > 0 && processedCount % config.batchSize === 0) {
+                    return config.breakHours * 3600 * 1000;
+                }
+
+                return config.intervalSeconds * 1000;
+            };
+
             const setBulkSendRunningState = (isRunning) => {
                 bulkSendInProgress = isRunning;
                 if (sendSurveyEmailsBtn) {
@@ -725,34 +763,100 @@
 
                 const config = getCurrentScheduleConfig();
                 const estimatedTotalSeconds = getEstimatedTotalSeconds(config);
+                const ajaxBatchSize = config.scheduleEnabled ? 1 : 10;
 
                 setBulkSendRunningState(true);
                 startBulkSendProgress(estimatedTotalSeconds);
-
-                const formData = new FormData(bulkSendForm);
                 bulkSendAbortController = new AbortController();
 
                 try {
-                    const response = await fetch(bulkSendForm.action, {
-                        method: 'POST',
-                        body: formData,
-                        signal: bulkSendAbortController.signal,
-                        headers: {
-                            'X-Requested-With': 'XMLHttpRequest'
+                    if (config.scheduleEnabled && config.startTime && !Number.isNaN(config.startTime.getTime())) {
+                        const initialDelayMs = Math.max(0, config.startTime.getTime() - Date.now());
+                        if (initialDelayMs > 0) {
+                            stopBulkSendProgress(`Waiting to start at ${config.startTime.toLocaleString()}...`, 5);
+                            await delayWithAbort(initialDelayMs, bulkSendAbortController.signal);
                         }
-                    });
-
-                    stopBulkSendProgress('Bulk send completed.', 100);
-
-                    if (response.redirected) {
-                        window.location.href = response.url;
-                        return;
                     }
 
-                    const html = await response.text();
-                    document.open();
-                    document.write(html);
-                    document.close();
+                    let batchStartIndex = 0;
+                    let totalSentCount = 0;
+                    let totalFailedCount = 0;
+                    let totalSkippedCount = 0;
+                    let queueCount = 0;
+
+                    while (true) {
+                        const formData = new FormData(bulkSendForm);
+                        formData.set('BatchStartIndex', `${batchStartIndex}`);
+                        formData.set('BatchSize', `${ajaxBatchSize}`);
+                        formData.set('AggregateSentCount', `${totalSentCount}`);
+                        formData.set('AggregateFailedCount', `${totalFailedCount}`);
+
+                        const response = await fetch(bulkSendForm.action, {
+                            method: 'POST',
+                            body: formData,
+                            signal: bulkSendAbortController.signal,
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest'
+                            }
+                        });
+
+                        if (response.redirected) {
+                            window.location.href = response.url;
+                            return;
+                        }
+
+                        const contentType = response.headers.get('content-type') || '';
+
+                        if (!contentType.toLowerCase().includes('application/json')) {
+                            const html = await response.text();
+                            document.open();
+                            document.write(html);
+                            document.close();
+                            return;
+                        }
+
+                        const result = await response.json();
+
+                        if (!response.ok) {
+                            throw new Error((result && result.errorMessage) || 'An unexpected error occurred while sending survey emails.');
+                        }
+
+                        totalSentCount = typeof result.totalSentCount === 'number' ? result.totalSentCount : totalSentCount;
+                        totalFailedCount = typeof result.totalFailedCount === 'number' ? result.totalFailedCount : totalFailedCount;
+                        totalSkippedCount = typeof result.totalSkippedCount === 'number' ? result.totalSkippedCount : totalSkippedCount;
+                        queueCount = typeof result.queueCount === 'number' ? result.queueCount : queueCount;
+
+                        const processedCount = typeof result.processedCount === 'number'
+                            ? result.processedCount
+                            : (result.isComplete ? queueCount : batchStartIndex);
+                        const percent = queueCount > 0
+                            ? Math.min(99, Math.max(5, Math.round((processedCount / queueCount) * 100)))
+                            : 95;
+
+                        stopBulkSendProgress(`Sending survey emails... ${processedCount}/${queueCount || processedCount}`, percent);
+
+                        if (result.isComplete) {
+                            stopBulkSendProgress(`Bulk send completed. Sent ${totalSentCount}, skipped ${totalSkippedCount}, failed ${totalFailedCount}.`, 100);
+
+                            if (result.redirectUrl) {
+                                window.location.href = result.redirectUrl;
+                                return;
+                            }
+
+                            window.location.reload();
+                            return;
+                        }
+
+                        batchStartIndex = typeof result.nextBatchStartIndex === 'number'
+                            ? result.nextBatchStartIndex
+                            : batchStartIndex + ajaxBatchSize;
+
+                        const delayBeforeNextRequestMs = getScheduledDelayBeforeNextRequestMs(config, processedCount, queueCount);
+                        if (delayBeforeNextRequestMs > 0) {
+                            stopBulkSendProgress(`Scheduled pause... next send in ${formatDuration(delayBeforeNextRequestMs / 1000)}.`, percent);
+                            await delayWithAbort(delayBeforeNextRequestMs, bulkSendAbortController.signal);
+                        }
+                    }
                 } catch (error) {
                     if (error && error.name === 'AbortError') {
                         stopBulkSendProgress('Bulk send cancelled.', 0);
@@ -760,7 +864,7 @@
                     }
 
                     stopBulkSendProgress('Bulk send failed.', 0);
-                    window.alert('An unexpected error occurred while sending survey emails. Please try again.');
+                    window.alert((error && error.message) || 'An unexpected error occurred while sending survey emails. Please try again.');
                 } finally {
                     bulkSendAbortController = null;
                     setBulkSendRunningState(false);
@@ -898,7 +1002,7 @@
 
             if (hasQueryPreselection) {
                 saveSelections();
-            } else {
+            } else if (preserveSelectionOnNextLoad) {
                 restoreSelections();
             }
 
@@ -997,6 +1101,7 @@
                         return;
                     }
 
+                    sessionStorage.setItem(preserveSelectionOnNextLoadKey, 'true');
                     submitBulkSendAsync();
                 });
             }
@@ -1006,6 +1111,7 @@
                     if (warningModal) {
                         warningModal.hide();
                     }
+                    sessionStorage.setItem(preserveSelectionOnNextLoadKey, 'true');
                     submitBulkSendAsync();
                 });
             }

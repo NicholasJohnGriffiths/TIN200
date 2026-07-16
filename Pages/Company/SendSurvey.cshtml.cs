@@ -57,16 +57,28 @@ namespace TINWeb.Pages.Company
         [Range(0, 3600)]
         public int IntervalBetweenEachEmailSendSeconds { get; set; }
 
+        [BindProperty]
+        [Range(0, int.MaxValue)]
+        public int BatchStartIndex { get; set; }
+
+        [BindProperty]
+        [Range(1, 100)]
+        public int BatchSize { get; set; } = 10;
+
+        [BindProperty]
+        [Range(0, int.MaxValue)]
+        public int AggregateSentCount { get; set; }
+
+        [BindProperty]
+        [Range(0, int.MaxValue)]
+        public int AggregateFailedCount { get; set; }
+
         [BindProperty(SupportsGet = true)]
         public int SelectedTinStatus { get; set; } = (int)TinStatus.Tin200;
 
         [BindProperty(SupportsGet = true)]
-        public int? SelectedLastTin200Year { get; set; }
-
-        [BindProperty(SupportsGet = true)]
         public int? SelectedEmailContentId { get; set; }
 
-        public List<int> AvailableLastTin200Years { get; set; } = new();
         public List<SurveyClientRow> AvailableClients { get; set; } = new();
         public List<SelectListItem> EmailContentOptions { get; set; } = new();
         public SurveyEmailPreviewResult? EmailPreview { get; set; }
@@ -117,6 +129,7 @@ namespace TINWeb.Pages.Company
 
         public async Task<IActionResult> OnPostBulkAsync()
         {
+            var isAjaxRequest = IsAjaxRequest();
             await LoadAvailableClientsAsync();
             await LoadEmailContentOptionsAsync();
             SelectDefaultEmailContentIfMissing();
@@ -151,6 +164,11 @@ namespace TINWeb.Pages.Company
 
                 if (!ModelState.IsValid)
                 {
+                    if (isAjaxRequest)
+                    {
+                        return BadRequest(new { errorMessage = GetModelStateErrorMessage() });
+                    }
+
                     return Page();
                 }
             }
@@ -162,6 +180,12 @@ namespace TINWeb.Pages.Company
             if (!selected.Any())
             {
                 ModelState.AddModelError(string.Empty, "Select at least one client, or choose Send to all clients.");
+
+                if (isAjaxRequest)
+                {
+                    return BadRequest(new { errorMessage = GetModelStateErrorMessage() });
+                }
+
                 return Page();
             }
 
@@ -178,6 +202,12 @@ namespace TINWeb.Pages.Company
             if (!currentSurveyId.HasValue)
             {
                 ModelState.AddModelError(string.Empty, "No survey record exists. Unable to send survey emails.");
+
+                if (isAjaxRequest)
+                {
+                    return BadRequest(new { errorMessage = GetModelStateErrorMessage() });
+                }
+
                 return Page();
             }
 
@@ -204,7 +234,17 @@ namespace TINWeb.Pages.Company
                 sendQueue.Add(clientRow);
             }
 
-            if (EnableScheduleSettings && SendStartTime.HasValue)
+            var totalSkippedCount = skippedNoEmailCount + skippedLockedCount + skippedUnsubscribedCount;
+            var useAjaxBatching = isAjaxRequest;
+            var batchStartIndex = useAjaxBatching ? Math.Max(0, BatchStartIndex) : 0;
+            var batchSize = useAjaxBatching ? Math.Clamp(BatchSize, 1, 100) : sendQueue.Count;
+            var clientsToSendThisRequest = useAjaxBatching
+                ? sendQueue.Skip(batchStartIndex).Take(batchSize).ToList()
+                : sendQueue;
+            var aggregateSentCount = Math.Max(0, AggregateSentCount);
+            var aggregateFailedCount = Math.Max(0, AggregateFailedCount);
+
+            if (EnableScheduleSettings && SendStartTime.HasValue && !useAjaxBatching)
             {
                 try
                 {
@@ -214,17 +254,30 @@ namespace TINWeb.Pages.Company
                 {
                     StatusMessage = "Bulk send was cancelled before sending started.";
                     BulkSentCount = 0;
-                    BulkSkippedCount = skippedNoEmailCount + skippedLockedCount + skippedUnsubscribedCount;
+                    BulkSkippedCount = totalSkippedCount;
                     BulkFailedCount = 0;
                     BulkLastRunAt = DateTime.Now.ToString("MMM d, yyyy h:mm tt");
                     BulkSendSucceeded = false;
-                    return RedirectToPage(new { SelectedTinStatus, SelectedLastTin200Year, SelectedEmailContentId });
+
+                    if (isAjaxRequest)
+                    {
+                        return new JsonResult(new
+                        {
+                            isComplete = true,
+                            totalSentCount = 0,
+                            totalFailedCount = 0,
+                            totalSkippedCount,
+                            redirectUrl = Url.Page(pageName: null, pageHandler: null, values: new { SelectedTinStatus, SelectedEmailContentId }, protocol: null)
+                        });
+                    }
+
+                    return RedirectToPage(new { SelectedTinStatus, SelectedEmailContentId });
                 }
             }
 
-            for (var index = 0; index < sendQueue.Count; index++)
+            for (var index = 0; index < clientsToSendThisRequest.Count; index++)
             {
-                var clientRow = sendQueue[index];
+                var clientRow = clientsToSendThisRequest[index];
                 var recipientEmail = clientRow.Email!;
 
                 var surveyUrl = BuildSurveyUrl(clientRow.Id);
@@ -263,7 +316,7 @@ namespace TINWeb.Pages.Company
                     firstFailureReason ??= ex.Message;
                 }
 
-                if (EnableScheduleSettings && index < sendQueue.Count - 1)
+                if (EnableScheduleSettings && !useAjaxBatching && index < clientsToSendThisRequest.Count - 1)
                 {
                     try
                     {
@@ -277,12 +330,25 @@ namespace TINWeb.Pages.Company
                         }
 
                         StatusMessage = $"Bulk send was cancelled. Sent before cancellation: {sentCount}, Skipped (no email): {skippedNoEmailCount}, Skipped (locked): {skippedLockedCount}, Skipped (unsubscribed): {skippedUnsubscribedCount}, Failed: {failedCount}.";
-                        BulkSentCount = sentCount;
-                        BulkSkippedCount = skippedNoEmailCount + skippedLockedCount + skippedUnsubscribedCount;
-                        BulkFailedCount = failedCount;
+                        BulkSentCount = aggregateSentCount + sentCount;
+                        BulkSkippedCount = totalSkippedCount;
+                        BulkFailedCount = aggregateFailedCount + failedCount;
                         BulkLastRunAt = DateTime.Now.ToString("MMM d, yyyy h:mm tt");
                         BulkSendSucceeded = false;
-                        return RedirectToPage(new { SelectedTinStatus, SelectedLastTin200Year, SelectedEmailContentId });
+
+                        if (isAjaxRequest)
+                        {
+                            return new JsonResult(new
+                            {
+                                isComplete = true,
+                                totalSentCount = aggregateSentCount + sentCount,
+                                totalFailedCount = aggregateFailedCount + failedCount,
+                                totalSkippedCount,
+                                redirectUrl = Url.Page(pageName: null, pageHandler: null, values: new { SelectedTinStatus, SelectedEmailContentId }, protocol: null)
+                            });
+                        }
+
+                        return RedirectToPage(new { SelectedTinStatus, SelectedEmailContentId });
                     }
                 }
             }
@@ -293,11 +359,44 @@ namespace TINWeb.Pages.Company
                 await _context.SaveChangesAsync();
             }
 
-            StatusMessage = $"Bulk send complete. Sent: {sentCount}, Skipped (no email): {skippedNoEmailCount}, Skipped (locked): {skippedLockedCount}, Skipped (unsubscribed): {skippedUnsubscribedCount}, Failed: {failedCount}.";
-            BulkSentCount = sentCount;
-            BulkSkippedCount = skippedNoEmailCount + skippedLockedCount + skippedUnsubscribedCount;
-            BulkFailedCount = failedCount;
+            var totalSentCount = aggregateSentCount + sentCount;
+            var totalFailedCount = aggregateFailedCount + failedCount;
+            var nextBatchStartIndex = batchStartIndex + clientsToSendThisRequest.Count;
+            var hasMoreAjaxBatches = useAjaxBatching && nextBatchStartIndex < sendQueue.Count;
+
+            if (hasMoreAjaxBatches)
+            {
+                return new JsonResult(new
+                {
+                    isComplete = false,
+                    nextBatchStartIndex,
+                    queueCount = sendQueue.Count,
+                    totalSentCount,
+                    totalFailedCount,
+                    totalSkippedCount,
+                    processedCount = nextBatchStartIndex
+                });
+            }
+
+            StatusMessage = $"Bulk send complete. Sent: {totalSentCount}, Skipped (no email): {skippedNoEmailCount}, Skipped (locked): {skippedLockedCount}, Skipped (unsubscribed): {skippedUnsubscribedCount}, Failed: {totalFailedCount}.";
+            BulkSentCount = totalSentCount;
+            BulkSkippedCount = totalSkippedCount;
+            BulkFailedCount = totalFailedCount;
             BulkLastRunAt = DateTime.Now.ToString("MMM d, yyyy h:mm tt");
+
+            if (isAjaxRequest)
+            {
+                BulkSendSucceeded = totalFailedCount == 0 && skippedLockedCount == 0 && skippedUnsubscribedCount == 0;
+                return new JsonResult(new
+                {
+                    isComplete = true,
+                    queueCount = sendQueue.Count,
+                    totalSentCount,
+                    totalFailedCount,
+                    totalSkippedCount,
+                    redirectUrl = Url.Page(pageName: null, pageHandler: null, values: new { SelectedTinStatus, SelectedEmailContentId }, protocol: null)
+                });
+            }
 
             if (failedCount > 0)
             {
@@ -322,7 +421,7 @@ namespace TINWeb.Pages.Company
 
             BulkSendSucceeded = true;
 
-            return RedirectToPage(new { SelectedTinStatus, SelectedLastTin200Year, SelectedEmailContentId });
+            return RedirectToPage(new { SelectedTinStatus, SelectedEmailContentId });
         }
 
         private async Task DelayUntilStartAsync(DateTime sendStartTimeLocal, CancellationToken cancellationToken)
@@ -384,9 +483,7 @@ namespace TINWeb.Pages.Company
 
         private async Task LoadAvailableClientsAsync()
         {
-            AvailableLastTin200Years = await _companyService.GetAvailableLastTin200YearsAsync();
-
-            var clients = await _companyService.GetAllCompaniesAsync(SelectedLastTin200Year);
+            var clients = await _companyService.GetAllCompaniesAsync(null);
             clients = clients.Where(c => c.TinStatus == SelectedTinStatus).ToList();
 
             var lockedCompanyIds = await GetLockedCompanyIdsForCurrentSurveyAsync();
@@ -417,6 +514,24 @@ namespace TINWeb.Pages.Company
                     };
                 })
                 .ToList();
+        }
+
+        private bool IsAjaxRequest()
+        {
+            return string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private string GetModelStateErrorMessage()
+        {
+            var errors = ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => string.IsNullOrWhiteSpace(e.ErrorMessage) ? "The request could not be completed." : e.ErrorMessage)
+                .Distinct()
+                .ToList();
+
+            return errors.Count == 0
+                ? "The request could not be completed."
+                : string.Join(" ", errors);
         }
 
         private async Task LoadEmailContentOptionsAsync()
