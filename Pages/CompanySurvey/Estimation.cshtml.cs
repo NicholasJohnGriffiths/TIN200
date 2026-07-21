@@ -301,8 +301,12 @@ namespace TINWeb.Pages.CompanySurvey
             // Save the applied value to the Answer table in the database
             await SaveAppliedAnswerAsync(metricKey, regionQuestionTitle, valueToApply.Value, TargetFinancialYear);
 
-            // Reload the historical data for the applied metric so the table reflects the new 2026 value
-            await ReloadHistoricalDataForMetricAsync(metricKey, regionQuestionTitle);
+            // Rebuild all page-backed history/card data so rendered tables immediately reflect the applied value.
+            loaded = await LoadPageDataAsync();
+            if (!loaded)
+            {
+                return NotFound();
+            }
 
             GeneratedSummary = BuildSingleMetricSummary(
                 metricName: calculation.MetricLabel,
@@ -2025,7 +2029,14 @@ namespace TINWeb.Pages.CompanySurvey
             }
             else
             {
-                fallbackDetail = $"Missing ratio or revenue forecast (ratio: {(sectorRatio.HasValue ? sectorRatio.Value.ToString("P2") : "n/a")}, revenue forecast: {(revenueForecast.Value.HasValue ? revenueForecast.Value.Value.ToString("N2") : "n/a")}).";
+                var ratioReason = sectorRatio.HasValue
+                    ? $"Ratio: {sectorRatio.Value:P2}."
+                    : await GetRegionalExportRatioUnavailableReasonAsync(primarySector, questionTitle, TargetFinancialYear);
+                var revenueReason = revenueForecast.Value.HasValue
+                    ? $"Revenue forecast: {revenueForecast.Value.Value:N2}."
+                    : $"Revenue forecast unavailable: {revenueForecast.Reason}";
+
+                fallbackDetail = $"{ratioReason} {revenueReason}";
             }
 
             var candidates = BuildCandidates(actual, trend, fallback,
@@ -2621,6 +2632,18 @@ namespace TINWeb.Pages.CompanySurvey
             return null;
         }
 
+        private static string? NormalizeSectorKey(string? sector)
+        {
+            if (string.IsNullOrWhiteSpace(sector))
+            {
+                return null;
+            }
+
+            var trimmed = sector.Trim();
+            var colonIndex = trimmed.IndexOf(':');
+            return (colonIndex > 0 ? trimmed[..colonIndex] : trimmed).Trim();
+        }
+
         private static bool HasMoreThanTwoDecimalPlaces(decimal value)
         {
             return decimal.Round(value, 2, MidpointRounding.AwayFromZero) != value;
@@ -2668,7 +2691,8 @@ namespace TINWeb.Pages.CompanySurvey
 
         private async Task<decimal?> CalculateSectorCAGRAsync(string? secondarySector, int targetYear)
         {
-            if (string.IsNullOrWhiteSpace(secondarySector))
+            var secondarySectorKey = NormalizeSectorKey(secondarySector);
+            if (string.IsNullOrWhiteSpace(secondarySectorKey))
             {
                 return null;
             }
@@ -2682,7 +2706,8 @@ namespace TINWeb.Pages.CompanySurvey
                 join revenueQuestion in _context.Question on revenueAnswer.QuestionId equals revenueQuestion.Id
                 join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
                 where question.Title == "Secondary Sector" 
-                    && (answer.AnswerText ?? string.Empty) == secondarySector
+                    && !string.IsNullOrWhiteSpace(answer.AnswerText)
+                    && ((answer.AnswerText ?? string.Empty) == secondarySectorKey || (answer.AnswerText ?? string.Empty).StartsWith(secondarySectorKey + ":"))
                     && revenueQuestion.Title == RevenueQuestionTitle
                     && survey.FinancialYear < targetYear
                 select new
@@ -2734,7 +2759,8 @@ namespace TINWeb.Pages.CompanySurvey
 
         private async Task<decimal?> CalculateSectorCAGREmploymentAsync(string? secondarySector, int targetYear)
         {
-            if (string.IsNullOrWhiteSpace(secondarySector))
+            var secondarySectorKey = NormalizeSectorKey(secondarySector);
+            if (string.IsNullOrWhiteSpace(secondarySectorKey))
             {
                 return null;
             }
@@ -2748,7 +2774,8 @@ namespace TINWeb.Pages.CompanySurvey
                 join employmentQuestion in _context.Question on employmentAnswer.QuestionId equals employmentQuestion.Id
                 join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
                 where question.Title == "Secondary Sector" 
-                    && (answer.AnswerText ?? string.Empty) == secondarySector
+                    && !string.IsNullOrWhiteSpace(answer.AnswerText)
+                    && ((answer.AnswerText ?? string.Empty) == secondarySectorKey || (answer.AnswerText ?? string.Empty).StartsWith(secondarySectorKey + ":"))
                     && (employmentQuestion.Title == EmploymentQuestionTitle || employmentQuestion.Title == EmploymentQuestionTitleLegacy)
                     && survey.FinancialYear < targetYear
                 select new
@@ -2940,7 +2967,8 @@ namespace TINWeb.Pages.CompanySurvey
 
         private async Task<decimal?> CalculateSectorRegionalExportRatioAsync(string? primarySector, string regionQuestionTitle, int targetYear)
         {
-            if (string.IsNullOrWhiteSpace(primarySector))
+            var primarySectorKey = NormalizeSectorKey(primarySector);
+            if (string.IsNullOrWhiteSpace(primarySectorKey))
             {
                 return null;
             }
@@ -2956,7 +2984,8 @@ namespace TINWeb.Pages.CompanySurvey
                 join revenueQuestion in _context.Question on revenueAnswer.QuestionId equals revenueQuestion.Id
                 join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
                 where sectorQuestion.Title == "Primary Sector"
-                    && (sectorAnswer.AnswerText ?? string.Empty) == primarySector
+                    && !string.IsNullOrWhiteSpace(sectorAnswer.AnswerText)
+                    && ((sectorAnswer.AnswerText ?? string.Empty) == primarySectorKey || (sectorAnswer.AnswerText ?? string.Empty).StartsWith(primarySectorKey + ":"))
                     && regionQuestion.Title == regionQuestionTitle
                     && revenueQuestion.Title == RevenueQuestionTitle
                     && survey.FinancialYear < targetYear
@@ -3058,15 +3087,107 @@ namespace TINWeb.Pages.CompanySurvey
                     var forecastValue = revenueForecast.Value.Value * sectorExportRatio.Value;
                     return (forecastValue, $"Insufficient regional history ({trendPoints.Count} points, minimum 2 required). Using primary-sector export ratio ({sectorExportRatio:P2}) for {regionLabel} and applying it to forecasted total revenue.");
                 }
+
+                return (null, $"Insufficient regional history ({trendPoints.Count} points, minimum 2 required). Sector ratio is available ({sectorExportRatio:P2}) but total revenue forecast is unavailable: {revenueForecast.Reason}");
             }
 
             // 4. No result
-            return (null, $"No actual value and insufficient positive historical points ({trendPoints.Count}, minimum 2 required) for growth fit. Sector-specific export ratio fallback not available (missing sector ratio or total revenue forecast).");
+            var ratioUnavailableReason = await GetRegionalExportRatioUnavailableReasonAsync(primarySector, regionQuestionTitle, targetYear);
+            return (null, $"No actual value and insufficient positive historical points ({trendPoints.Count}, minimum 2 required) for growth fit. {ratioUnavailableReason}");
+        }
+
+        private async Task<string> GetRegionalExportRatioUnavailableReasonAsync(string? primarySector, string regionQuestionTitle, int targetYear)
+        {
+            var primarySectorKey = NormalizeSectorKey(primarySector);
+            if (string.IsNullOrWhiteSpace(primarySectorKey))
+            {
+                return $"Sector-specific export ratio fallback not available: no Primary Sector answer found for FY {targetYear} or FY {targetYear - 1}.";
+            }
+
+            var peerSurveyIds = await (
+                from companySurvey in _context.CompanySurvey
+                join sectorAnswer in _context.Answer on companySurvey.Id equals sectorAnswer.CompanySurveyId
+                join sectorQuestion in _context.Question on sectorAnswer.QuestionId equals sectorQuestion.Id
+                join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
+                where sectorQuestion.Title == "Primary Sector"
+                    && !string.IsNullOrWhiteSpace(sectorAnswer.AnswerText)
+                    && ((sectorAnswer.AnswerText ?? string.Empty) == primarySectorKey || (sectorAnswer.AnswerText ?? string.Empty).StartsWith(primarySectorKey + ":"))
+                    && survey.FinancialYear < targetYear
+                select companySurvey.Id
+            ).Distinct().ToListAsync();
+
+            if (peerSurveyIds.Count == 0)
+            {
+                return $"Sector-specific export ratio fallback not available: no peer survey records found for primary sector '{primarySector}' before FY {targetYear}.";
+            }
+
+            var peerWithRegionCount = await (
+                from answer in _context.Answer
+                join question in _context.Question on answer.QuestionId equals question.Id
+                where peerSurveyIds.Contains(answer.CompanySurveyId)
+                    && question.Title == regionQuestionTitle
+                select answer.CompanySurveyId
+            ).Distinct().CountAsync();
+
+            var peerWithRevenueCount = await (
+                from answer in _context.Answer
+                join question in _context.Question on answer.QuestionId equals question.Id
+                where peerSurveyIds.Contains(answer.CompanySurveyId)
+                    && question.Title == RevenueQuestionTitle
+                select answer.CompanySurveyId
+            ).Distinct().CountAsync();
+
+            var sectorData = await (
+                from companySurvey in _context.CompanySurvey
+                join sectorAnswer in _context.Answer on companySurvey.Id equals sectorAnswer.CompanySurveyId
+                join sectorQuestion in _context.Question on sectorAnswer.QuestionId equals sectorQuestion.Id
+                join regionAnswer in _context.Answer on companySurvey.Id equals regionAnswer.CompanySurveyId
+                join regionQuestion in _context.Question on regionAnswer.QuestionId equals regionQuestion.Id
+                join revenueAnswer in _context.Answer on companySurvey.Id equals revenueAnswer.CompanySurveyId
+                join revenueQuestion in _context.Question on revenueAnswer.QuestionId equals revenueQuestion.Id
+                join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
+                where sectorQuestion.Title == "Primary Sector"
+                    && !string.IsNullOrWhiteSpace(sectorAnswer.AnswerText)
+                    && ((sectorAnswer.AnswerText ?? string.Empty) == primarySectorKey || (sectorAnswer.AnswerText ?? string.Empty).StartsWith(primarySectorKey + ":"))
+                    && regionQuestion.Title == regionQuestionTitle
+                    && revenueQuestion.Title == RevenueQuestionTitle
+                    && survey.FinancialYear < targetYear
+                select new
+                {
+                    RegionCurrency = regionAnswer.AnswerCurrency,
+                    RegionNumber = regionAnswer.AnswerNumber,
+                    RegionText = regionAnswer.AnswerText,
+                    RevenueCurrency = revenueAnswer.AnswerCurrency,
+                    RevenueNumber = revenueAnswer.AnswerNumber,
+                    RevenueText = revenueAnswer.AnswerText
+                }
+            ).ToListAsync();
+
+            if (sectorData.Count == 0)
+            {
+                return $"Sector-specific export ratio fallback not available: peers exist for primary sector '{primarySector}' (peer surveys: {peerSurveyIds.Count}), but none have both '{regionQuestionTitle}' and '{RevenueQuestionTitle}' before FY {targetYear} (with region: {peerWithRegionCount}, with revenue: {peerWithRevenueCount}).";
+            }
+
+            var validPairs = sectorData
+                .Select(x => new
+                {
+                    RegionValue = ResolveMetricValue(x.RegionCurrency, x.RegionNumber, x.RegionText),
+                    RevenueValue = ResolveMetricValue(x.RevenueCurrency, x.RevenueNumber, x.RevenueText)
+                })
+                .Count(x => x.RegionValue.HasValue && x.RevenueValue.HasValue && x.RevenueValue.Value > 0);
+
+            if (validPairs == 0)
+            {
+                return $"Sector-specific export ratio fallback not available: peers with both answers were found ({sectorData.Count} row(s)), but none contain valid numeric regional revenue with positive total revenue (peer surveys: {peerSurveyIds.Count}, with region: {peerWithRegionCount}, with revenue: {peerWithRevenueCount}).";
+            }
+
+            return "Sector-specific export ratio fallback not available due to insufficient peer data after validation.";
         }
 
         private async Task<decimal?> CalculateSectorRegionalEmploymentRatioAsync(string? primarySector, string regionalEmploymentQuestionTitle, int targetYear)
         {
-            if (string.IsNullOrWhiteSpace(primarySector))
+            var primarySectorKey = NormalizeSectorKey(primarySector);
+            if (string.IsNullOrWhiteSpace(primarySectorKey))
             {
                 return null;
             }
@@ -3082,7 +3203,8 @@ namespace TINWeb.Pages.CompanySurvey
                 join totalEmploymentQuestion in _context.Question on totalEmploymentAnswer.QuestionId equals totalEmploymentQuestion.Id
                 join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
                 where sectorQuestion.Title == "Primary Sector"
-                    && (sectorAnswer.AnswerText ?? string.Empty) == primarySector
+                    && !string.IsNullOrWhiteSpace(sectorAnswer.AnswerText)
+                    && ((sectorAnswer.AnswerText ?? string.Empty) == primarySectorKey || (sectorAnswer.AnswerText ?? string.Empty).StartsWith(primarySectorKey + ":"))
                     && regionalEmploymentQuestion.Title == regionalEmploymentQuestionTitle
                     && (totalEmploymentQuestion.Title == EmploymentQuestionTitle || totalEmploymentQuestion.Title == EmploymentQuestionTitleLegacy)
                     && survey.FinancialYear < targetYear
@@ -3192,7 +3314,8 @@ namespace TINWeb.Pages.CompanySurvey
 
         private async Task<decimal?> CalculateSectorEbitdaRatioAsync(string? primarySector, int targetYear)
         {
-            if (string.IsNullOrWhiteSpace(primarySector))
+            var primarySectorKey = NormalizeSectorKey(primarySector);
+            if (string.IsNullOrWhiteSpace(primarySectorKey))
             {
                 return null;
             }
@@ -3208,7 +3331,8 @@ namespace TINWeb.Pages.CompanySurvey
                 join revenueQuestion in _context.Question on revenueAnswer.QuestionId equals revenueQuestion.Id
                 join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
                 where sectorQuestion.Title == "Primary Sector"
-                    && (sectorAnswer.AnswerText ?? string.Empty) == primarySector
+                    && !string.IsNullOrWhiteSpace(sectorAnswer.AnswerText)
+                    && ((sectorAnswer.AnswerText ?? string.Empty) == primarySectorKey || (sectorAnswer.AnswerText ?? string.Empty).StartsWith(primarySectorKey + ":"))
                     && ebitdaQuestion.Title == EbitdaQuestionTitle
                     && revenueQuestion.Title == RevenueQuestionTitle
                     && survey.FinancialYear < targetYear
@@ -3320,7 +3444,8 @@ namespace TINWeb.Pages.CompanySurvey
 
         private async Task<decimal?> CalculateSectorWagesRatioAsync(string? primarySector, int targetYear)
         {
-            if (string.IsNullOrWhiteSpace(primarySector))
+            var primarySectorKey = NormalizeSectorKey(primarySector);
+            if (string.IsNullOrWhiteSpace(primarySectorKey))
             {
                 return null;
             }
@@ -3336,7 +3461,8 @@ namespace TINWeb.Pages.CompanySurvey
                 join revenueQuestion in _context.Question on revenueAnswer.QuestionId equals revenueQuestion.Id
                 join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
                 where question.Title == "Primary Sector" 
-                    && (answer.AnswerText ?? string.Empty) == primarySector
+                    && !string.IsNullOrWhiteSpace(answer.AnswerText)
+                    && ((answer.AnswerText ?? string.Empty) == primarySectorKey || (answer.AnswerText ?? string.Empty).StartsWith(primarySectorKey + ":"))
                     && wagesQuestion.Title == WagesQuestionTitle
                     && revenueQuestion.Title == RevenueQuestionTitle
                     && survey.FinancialYear < targetYear
@@ -3390,7 +3516,8 @@ namespace TINWeb.Pages.CompanySurvey
 
         private async Task<decimal?> CalculateSectorResearchDevelopmentRatioAsync(string? primarySector, int targetYear)
         {
-            if (string.IsNullOrWhiteSpace(primarySector))
+            var primarySectorKey = NormalizeSectorKey(primarySector);
+            if (string.IsNullOrWhiteSpace(primarySectorKey))
             {
                 return null;
             }
@@ -3406,7 +3533,8 @@ namespace TINWeb.Pages.CompanySurvey
                 join revenueQuestion in _context.Question on revenueAnswer.QuestionId equals revenueQuestion.Id
                 join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
                 where question.Title == "Primary Sector" 
-                    && (answer.AnswerText ?? string.Empty) == primarySector
+                    && !string.IsNullOrWhiteSpace(answer.AnswerText)
+                    && ((answer.AnswerText ?? string.Empty) == primarySectorKey || (answer.AnswerText ?? string.Empty).StartsWith(primarySectorKey + ":"))
                     && rdQuestion.Title == ResearchDevelopmentQuestionTitle
                     && revenueQuestion.Title == RevenueQuestionTitle
                     && survey.FinancialYear < targetYear
@@ -3460,7 +3588,8 @@ namespace TINWeb.Pages.CompanySurvey
 
         private async Task<decimal?> CalculateSectorSalesMarketingRatioAsync(string? primarySector, int targetYear)
         {
-            if (string.IsNullOrWhiteSpace(primarySector))
+            var primarySectorKey = NormalizeSectorKey(primarySector);
+            if (string.IsNullOrWhiteSpace(primarySectorKey))
             {
                 return null;
             }
@@ -3476,7 +3605,8 @@ namespace TINWeb.Pages.CompanySurvey
                 join revenueQuestion in _context.Question on revenueAnswer.QuestionId equals revenueQuestion.Id
                 join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
                 where question.Title == "Primary Sector" 
-                    && (answer.AnswerText ?? string.Empty) == primarySector
+                    && !string.IsNullOrWhiteSpace(answer.AnswerText)
+                    && ((answer.AnswerText ?? string.Empty) == primarySectorKey || (answer.AnswerText ?? string.Empty).StartsWith(primarySectorKey + ":"))
                     && smQuestion.Title == SalesMarketingQuestionTitle
                     && revenueQuestion.Title == RevenueQuestionTitle
                     && survey.FinancialYear < targetYear

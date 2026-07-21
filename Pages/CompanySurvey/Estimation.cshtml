@@ -586,12 +586,28 @@
                 var appliedRegionQuestionTitle = container ? (container.getAttribute('data-applied-region-question-title') || '') : '';
                 var targetFinancialYear = container ? (container.getAttribute('data-target-financial-year') || '') : '';
                 var currentCompanySurveyId = container ? (container.getAttribute('data-company-survey-id') || '') : '';
+                var scrollStateKey = 'estimation:apply-scroll:' + (currentCompanySurveyId || 'unknown');
                 var previewCard = document.querySelector('.estimation-preview-global');
                 var previewMoved = false;
                 var checkedTargetCard = null;
                 var checkedManualInput = null;
                 var appliedTargetCard = null;
                 var appliedManualInput = null;
+                var restoredFromApplyScroll = false;
+
+                try {
+                    var rawScrollState = window.sessionStorage.getItem(scrollStateKey);
+                    if (rawScrollState) {
+                        var parsedState = JSON.parse(rawScrollState);
+                        if (parsedState && Number.isFinite(parsedState.y)) {
+                            window.scrollTo({ top: Math.max(0, parsedState.y), behavior: 'auto' });
+                            restoredFromApplyScroll = true;
+                        }
+                        window.sessionStorage.removeItem(scrollStateKey);
+                    }
+                } catch (e) {
+                    window.sessionStorage.removeItem(scrollStateKey);
+                }
 
                 var headers = Array.from(document.querySelectorAll('.card-header.estimation-header'));
                 headers.forEach(function (header) {
@@ -675,6 +691,14 @@
                         updateApplyState(generateForm, manualInput);
                     });
 
+                    generateForm.addEventListener('submit', function () {
+                        try {
+                            window.sessionStorage.setItem(scrollStateKey, JSON.stringify({ y: window.scrollY || window.pageYOffset || 0 }));
+                        } catch (e) {
+                            // Best-effort UX enhancement only.
+                        }
+                    });
+
                     var checkButton = document.createElement('button');
                     checkButton.type = 'button';
                     checkButton.className = 'btn btn-sm btn-outline-primary estimation-check-btn';
@@ -739,7 +763,7 @@
                     previewCard.classList.remove('estimation-preview-global');
                 }
 
-                if (checkedMetricKey && checkedTargetCard) {
+                if (!restoredFromApplyScroll && checkedMetricKey && checkedTargetCard) {
                     expandAncestorCollapse(checkedTargetCard);
                     checkedTargetCard.classList.add('estimation-focus-card');
                     checkedTargetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -752,7 +776,7 @@
                     window.setTimeout(function () {
                         checkedTargetCard.classList.remove('estimation-focus-card');
                     }, 1800);
-                } else if (appliedMetricKey && appliedTargetCard) {
+                } else if (!restoredFromApplyScroll && appliedMetricKey && appliedTargetCard) {
                     expandAncestorCollapse(appliedTargetCard);
                     appliedTargetCard.classList.add('estimation-focus-card');
                     appliedTargetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
