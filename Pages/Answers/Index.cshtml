@@ -3,6 +3,7 @@
 @model TINWeb.Pages.Answers.IndexModel
 @{
     ViewData["Title"] = "Answers by Company";
+    var isGlobalImportMode = string.Equals(Model.ShowImportTool, "global", StringComparison.OrdinalIgnoreCase);
 }
 
 <div class="container-fluid px-0 mt-3">
@@ -20,36 +21,39 @@
         </div>
     }
 
-    <div class="row mb-3">
-        <div class="col-md-8">
-            <h1>Answers by Company Survey</h1>
-            <p class="text-muted mb-0">Select a Company Survey record to view and edit its answers.</p>
-            <p class="mb-0"><strong>Questions total:</strong> @Model.QuestionCount</p>
-            <p class="mb-0"><strong>Rows shown:</strong> @Model.Rows.Count</p>
-            <p class="mb-0"><strong>Answered:</strong> @Model.AnsweredCount</p>
-        </div>
-        <div class="col-md-4 text-end">
-            <div class="d-inline-flex align-items-center gap-2 flex-wrap justify-content-end">
-                <form method="post" asp-page-handler="CreateMissingAnswers" id="createMissingAnswersForm" class="d-inline">
-                    <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
-                    <input type="hidden" name="selectedTinStatus" value="@Model.SelectedTinStatus" />
-                    <button type="submit" class="btn btn-outline-secondary btn-sm">Create Missing Answers</button>
-                </form>
+    @if (!isGlobalImportMode)
+    {
+        <div class="row mb-3">
+            <div class="col-md-8">
+                <h1>Answers by Company Survey</h1>
+                <p class="text-muted mb-0">Select a Company Survey record to view and edit its answers.</p>
+                <p class="mb-0"><strong>Questions total:</strong> @Model.QuestionCount</p>
+                <p class="mb-0"><strong>Rows shown:</strong> @Model.Rows.Count</p>
+                <p class="mb-0"><strong>Answered:</strong> @Model.AnsweredCount</p>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="d-inline-flex align-items-center gap-2 flex-wrap justify-content-end">
+                    <form method="post" asp-page-handler="CreateMissingAnswers" id="createMissingAnswersForm" class="d-inline">
+                        <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
+                        <input type="hidden" name="selectedTinStatus" value="@Model.SelectedTinStatus" />
+                        <button type="submit" class="btn btn-outline-secondary btn-sm">Create Missing Answers</button>
+                    </form>
 
-                <form method="get" asp-page="./Index" asp-page-handler="Export" id="answersExportForm" class="d-inline">
-                    <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
-                    <input type="hidden" name="selectedTinStatus" value="@Model.SelectedTinStatus" />
-                    <button type="submit" class="btn btn-outline-success btn-sm">Export</button>
-                </form>
+                    <form method="get" asp-page="./Index" asp-page-handler="Export" id="answersExportForm" class="d-inline">
+                        <input type="hidden" name="financialYear" value="@Model.SelectedFinancialYear" />
+                        <input type="hidden" name="selectedTinStatus" value="@Model.SelectedTinStatus" />
+                        <button type="submit" class="btn btn-outline-success btn-sm">Export</button>
+                    </form>
 
-                <form method="post" asp-page-handler="DeleteAllAnswers" id="deleteAllAnswersForm" class="d-inline">
-                    <input type="hidden" name="deleteConfirmation" id="deleteConfirmationInput" />
-                    <input type="hidden" name="selectedTinStatus" value="@Model.SelectedTinStatus" />
-                    <button type="button" class="btn btn-danger btn-sm" id="deleteAllAnswersButton" disabled="@(!Model.IsAdmin)" title="@(!Model.IsAdmin ? "Admin only" : null)">Delete All Answers</button>
-                </form>
+                    <form method="post" asp-page-handler="DeleteAllAnswers" id="deleteAllAnswersForm" class="d-inline">
+                        <input type="hidden" name="deleteConfirmation" id="deleteConfirmationInput" />
+                        <input type="hidden" name="selectedTinStatus" value="@Model.SelectedTinStatus" />
+                        <button type="button" class="btn btn-danger btn-sm" id="deleteAllAnswersButton" disabled="@(!Model.IsAdmin)" title="@(!Model.IsAdmin ? "Admin only" : null)">Delete All Answers</button>
+                    </form>
+                </div>
             </div>
         </div>
-    </div>
+    }
 
     @if (string.Equals(Model.ShowImportTool, "qualtrics", StringComparison.OrdinalIgnoreCase))
     {
@@ -300,58 +304,60 @@
         </div>
     }
 
-    <div class="row mb-3">
-        <div class="col-12">
-            <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
-                <input type="hidden" name="showImportTool" value="@Model.ShowImportTool" />
-                <input type="hidden" name="importFinancialYear" value="@Model.ImportFinancialYear" />
-                <input type="hidden" name="currentImportFinancialYear" value="@Model.CurrentImportFinancialYear" />
-                <input type="hidden" name="blankCurrentFinancialYearData" value="@Model.BlankCurrentFinancialYearData" />
-                <label class="me-1">Financial Year:</label>
-                <select name="financialYear" class="form-select" aria-label="Financial Year" style="max-width: 180px;">
-                    <option value="">All</option>
-                    @foreach (var year in Model.FinancialYears)
-                    {
-                        <option value="@year" selected="@(Model.SelectedFinancialYear == year ? "selected" : null)">@year</option>
-                    }
-                </select>
+    @if (!isGlobalImportMode)
+    {
+        <div class="row mb-3">
+            <div class="col-12">
+                <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
+                    <input type="hidden" name="showImportTool" value="@Model.ShowImportTool" />
+                    <input type="hidden" name="importFinancialYear" value="@Model.ImportFinancialYear" />
+                    <input type="hidden" name="currentImportFinancialYear" value="@Model.CurrentImportFinancialYear" />
+                    <input type="hidden" name="blankCurrentFinancialYearData" value="@Model.BlankCurrentFinancialYearData" />
+                    <label class="me-1">Financial Year:</label>
+                    <select name="financialYear" class="form-select" aria-label="Financial Year" style="max-width: 180px;">
+                        <option value="">All</option>
+                        @foreach (var year in Model.FinancialYears)
+                        {
+                            <option value="@year" selected="@(Model.SelectedFinancialYear == year ? "selected" : null)">@year</option>
+                        }
+                    </select>
 
-                <label class="ms-2 me-1">TIN Status:</label>
-                <select name="selectedTinStatus" class="form-select" aria-label="TIN Status" style="max-width: 220px;">
-                    @foreach (var option in TINWeb.Models.TinStatusHelper.DropdownOptions)
-                    {
-                        <option value="@option.Value" selected="@(Model.SelectedTinStatus == option.Value ? "selected" : null)">@option.Label</option>
-                    }
-                </select>
+                    <label class="ms-2 me-1">TIN Status:</label>
+                    <select name="selectedTinStatus" class="form-select" aria-label="TIN Status" style="max-width: 220px;">
+                        @foreach (var option in TINWeb.Models.TinStatusHelper.DropdownOptions)
+                        {
+                            <option value="@option.Value" selected="@(Model.SelectedTinStatus == option.Value ? "selected" : null)">@option.Label</option>
+                        }
+                    </select>
 
-                <label class="ms-2 me-1">Company Survey:</label>
-                <select name="companySurveyId" class="form-select" aria-label="Company Survey" style="max-width: 980px; min-width: 760px;">
-                    <option value="">Select Company Survey</option>
-                    @foreach (var option in Model.CompanySurveyOptions)
-                    {
-                        var savedDate = option.SavedDate?.ToString("dd/MM/yyyy") ?? string.Empty;
-                        var submittedDate = option.SubmittedDate?.ToString("dd/MM/yyyy") ?? string.Empty;
-                        var requestedDate = option.RequestedDate?.ToString("dd/MM/yyyy") ?? string.Empty;
-                        var estimate = option.Estimate ? "Yes" : "No";
-                        var externalId = option.ExternalId ?? string.Empty;
-                        <option value="@option.CompanySurveyId" selected="@(Model.SelectedCompanySurveyId == option.CompanySurveyId ? "selected" : null)">
-                            CompanySurvey: #@option.CompanySurveyId | @option.CompanyName | ExternalID: @externalId | FY: @option.FinancialYear | Estimate: @estimate | Answers: @option.AnswerCount | SavedDate: @savedDate | SubmittedDate: @submittedDate | RequestedDate: @requestedDate
-                        </option>
-                    }
-                </select>
+                    <label class="ms-2 me-1">Company Survey:</label>
+                    <select name="companySurveyId" class="form-select" aria-label="Company Survey" style="max-width: 980px; min-width: 760px;">
+                        <option value="">Select Company Survey</option>
+                        @foreach (var option in Model.CompanySurveyOptions)
+                        {
+                            var savedDate = option.SavedDate?.ToString("dd/MM/yyyy") ?? string.Empty;
+                            var submittedDate = option.SubmittedDate?.ToString("dd/MM/yyyy") ?? string.Empty;
+                            var requestedDate = option.RequestedDate?.ToString("dd/MM/yyyy") ?? string.Empty;
+                            var estimate = option.Estimate ? "Yes" : "No";
+                            var externalId = option.ExternalId ?? string.Empty;
+                            <option value="@option.CompanySurveyId" selected="@(Model.SelectedCompanySurveyId == option.CompanySurveyId ? "selected" : null)">
+                                CompanySurvey: #@option.CompanySurveyId | @option.CompanyName | ExternalID: @externalId | FY: @option.FinancialYear | Estimate: @estimate | Answers: @option.AnswerCount | SavedDate: @savedDate | SubmittedDate: @submittedDate | RequestedDate: @requestedDate
+                            </option>
+                        }
+                    </select>
 
-                <button class="btn btn-outline-primary" type="submit">Apply</button>
-                <a class="btn btn-link ms-2" asp-page="./Index">Clear</a>
-            </form>
+                    <button class="btn btn-outline-primary" type="submit">Apply</button>
+                    <a class="btn btn-link ms-2" asp-page="./Index">Clear</a>
+                </form>
+            </div>
         </div>
-    </div>
 
-    @if (!Model.SelectedCompanySurveyId.HasValue)
-    {
-        <div class="alert alert-info">Select a Company Survey record to view answers.</div>
-    }
-    else if (Model.Rows.Any())
-    {
+        @if (!Model.SelectedCompanySurveyId.HasValue)
+        {
+            <div class="alert alert-info">Select a Company Survey record to view answers.</div>
+        }
+        else if (Model.Rows.Any())
+        {
         <div class="table-responsive">
             <table class="table table-striped table-hover company-table answers-table">
                 <thead class="table-dark">
@@ -462,6 +468,7 @@
     {
         <div class="alert alert-info">No answers found for the selected Company Survey.</div>
     }
+}
 </div>
 
 <script>

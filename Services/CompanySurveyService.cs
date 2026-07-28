@@ -64,6 +64,7 @@ namespace TINWeb.Services
                     Requested = companySurvey.Requested,
                     Locked = companySurvey.Locked ?? false,
                     Estimate = companySurvey.Estimate ?? false,
+                    TIN200 = companySurvey.TIN200 ?? false,
                     SurveyEmailSent = companySurvey.SurveyEmailSent ?? false,
                     SurveyEmailSentLastDate = companySurvey.SurveyEmailSentLastDate,
                     SurveyReminderEmailSent = companySurvey.SurveyReminderEmailSent ?? false,
@@ -239,6 +240,30 @@ namespace TINWeb.Services
             foreach (var row in rows)
             {
                 row.Locked = locked;
+            }
+
+            await _context.SaveChangesAsync();
+            return rows.Count;
+        }
+
+        public async Task<int> SetTin200Async(IEnumerable<int> companySurveyIds, bool tin200)
+        {
+            var ids = companySurveyIds
+                .Distinct()
+                .ToList();
+
+            if (!ids.Any())
+            {
+                return 0;
+            }
+
+            var rows = await _context.CompanySurvey
+                .Where(cs => ids.Contains(cs.Id))
+                .ToListAsync();
+
+            foreach (var row in rows)
+            {
+                row.TIN200 = tin200;
             }
 
             await _context.SaveChangesAsync();
@@ -902,6 +927,7 @@ namespace TINWeb.Services
             public bool Requested { get; set; }
             public bool Locked { get; set; }
             public bool Estimate { get; set; }
+            public bool TIN200 { get; set; }
             public bool SurveyEmailSent { get; set; }
             public DateTime? SurveyEmailSentLastDate { get; set; }
             public bool SurveyReminderEmailSent { get; set; }

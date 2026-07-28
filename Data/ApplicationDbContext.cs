@@ -204,6 +204,10 @@ namespace TINWeb.Data
                     .HasColumnName("Estimate")
                     .HasColumnType("bit");
 
+                entity.Property(e => e.TIN200)
+                    .HasColumnName("TIN200")
+                    .HasColumnType("bit");
+
                 entity.Property(e => e.Locked)
                     .HasColumnName("Locked")
                     .HasColumnType("bit");

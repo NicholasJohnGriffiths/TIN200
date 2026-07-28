@@ -27,6 +27,9 @@
         <dt class="col-sm-3">Requested</dt>
         <dd class="col-sm-9">@Model.Record.Requested</dd>
 
+        <dt class="col-sm-3">TIN200</dt>
+        <dd class="col-sm-9">@(Model.Record.TIN200 == true ? "Yes" : "No")</dd>
+
         <dt class="col-sm-3">Survey Link</dt>
         <dd class="col-sm-9">
             @if (!string.IsNullOrWhiteSpace(Model.Record.SurveyLink))

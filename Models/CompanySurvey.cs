@@ -30,6 +30,9 @@ namespace TINWeb.Models
 
         public bool? Estimate { get; set; }
 
+        [Display(Name = "TIN200")]
+        public bool? TIN200 { get; set; }
+
         public DateTime? SavedDate { get; set; }
 
         public DateTime? SubmittedDate { get; set; }
