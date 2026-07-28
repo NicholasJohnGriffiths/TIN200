@@ -1,6 +1,7 @@
 @using TINWeb.Services
 @{
     var isReadOnlyUser = UserTypes.IsReadOnly(User);
+    var isSurveyEstimationsUser = UserTypes.IsSurveyEstimations(User);
     var selectedCompanyTinStatus = Context.Request.Query["tinStatus"].FirstOrDefault();
 }
 
@@ -15,7 +16,7 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/TINWeb.styles.css" asp-append-version="true" />
 </head>
-<body data-read-only-user="@(isReadOnlyUser ? "true" : "false")">
+<body data-read-only-user="@(isReadOnlyUser ? "true" : "false")" data-survey-estimations-user="@(isSurveyEstimationsUser ? "true" : "false")">
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
             <div class="container-fluid wider-container">
@@ -143,6 +144,12 @@
                         <li class="nav-item">
                             <a class="nav-link text-dark" asp-area="" asp-page="/Privacy">Privacy</a>
                         </li>
+                        @if (User.Identity?.IsAuthenticated == true && isSurveyEstimationsUser)
+                        {
+                            <li class="nav-item d-flex align-items-center me-2">
+                                <span class="badge text-bg-warning">Survey/Estimations</span>
+                            </li>
+                        }
                         @if (User.Identity?.IsAuthenticated == true)
                         {
                             <li class="nav-item">
@@ -218,6 +225,13 @@
                 function shouldDisableElement(element) {
                     var label = (element.textContent || element.value || element.getAttribute("aria-label") || element.getAttribute("title") || "").trim();
                     if (isEditOrDeleteLabel(label)) {
+                        var hrefForSpecialCase = element.getAttribute && element.getAttribute("href");
+                        if (document.body.getAttribute("data-survey-estimations-user") === "true"
+                            && hrefForSpecialCase
+                            && hrefForSpecialCase.toLowerCase().indexOf("/companysurvey/edit") >= 0) {
+                            return false;
+                        }
+
                         return true;
                     }
 

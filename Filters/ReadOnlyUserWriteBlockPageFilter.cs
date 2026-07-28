@@ -32,6 +32,9 @@ public sealed class ReadOnlyUserWriteBlockPageFilter : IAsyncPageFilter
         "OnPostCancel"
     };
 
+    private const string CompanySurveyEditPathPrefix = "/CompanySurvey/Edit";
+    private const string CompanySurveyEstimationPathPrefix = "/CompanySurvey/Estimation";
+
     public Task OnPageHandlerSelectionAsync(PageHandlerSelectedContext context)
     {
         return Task.CompletedTask;
@@ -39,16 +42,27 @@ public sealed class ReadOnlyUserWriteBlockPageFilter : IAsyncPageFilter
 
     public async Task OnPageHandlerExecutionAsync(PageHandlerExecutingContext context, PageHandlerExecutionDelegate next)
     {
-        if (!UserTypes.IsReadOnly(context.HttpContext.User))
+        var user = context.HttpContext.User;
+        if (!UserTypes.IsReadOnly(user))
         {
             await next();
             return;
         }
 
+        var isSurveyEstimationsUser = UserTypes.IsSurveyEstimations(user);
+
         var request = context.HttpContext.Request;
+        var path = request.Path.Value ?? string.Empty;
+        var handlerMethodName = context.HandlerMethod?.MethodInfo?.Name ?? string.Empty;
 
         if (HttpMethods.IsGet(request.Method) && IsBlockedReadOnlyGetPath(request.Path.Value))
         {
+            if (isSurveyEstimationsUser && IsSurveyEstimationsAllowedGetPath(path))
+            {
+                await next();
+                return;
+            }
+
             context.Result = new ForbidResult();
             return;
         }
@@ -59,7 +73,6 @@ public sealed class ReadOnlyUserWriteBlockPageFilter : IAsyncPageFilter
             return;
         }
 
-        var path = request.Path.Value ?? string.Empty;
         if (AllowedMutatingPaths.Contains(path)
             || AllowedMutatingPathPrefixes.Any(prefix =>
                 path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
@@ -68,7 +81,12 @@ public sealed class ReadOnlyUserWriteBlockPageFilter : IAsyncPageFilter
             return;
         }
 
-        var handlerMethodName = context.HandlerMethod?.MethodInfo?.Name ?? string.Empty;
+        if (isSurveyEstimationsUser && IsSurveyEstimationsAllowedMutatingRequest(path, handlerMethodName))
+        {
+            await next();
+            return;
+        }
+
         if (AllowedReadOnlyPostHandlerPrefixes.Any(prefix =>
                 handlerMethodName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
         {
@@ -98,5 +116,27 @@ public sealed class ReadOnlyUserWriteBlockPageFilter : IAsyncPageFilter
             .Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         return segments.Any(segment => ReadOnlyBlockedGetPathSegments.Contains(segment));
+    }
+
+    private static bool IsSurveyEstimationsAllowedGetPath(string path)
+    {
+        return path.StartsWith(CompanySurveyEditPathPrefix, StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith(CompanySurveyEstimationPathPrefix, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsSurveyEstimationsAllowedMutatingRequest(string path, string handlerMethodName)
+    {
+        if (path.StartsWith(CompanySurveyEstimationPathPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (path.StartsWith(CompanySurveyEditPathPrefix, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(handlerMethodName, "OnPost", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
     }
 }

@@ -89,7 +89,8 @@ public class CreateModel : PageModel
 
         if (Record.UserType != UserTypes.StandardUser
             && Record.UserType != UserTypes.Admin
-            && Record.UserType != UserTypes.StandardUserReadOnly)
+            && Record.UserType != UserTypes.StandardUserReadOnly
+            && Record.UserType != UserTypes.SurveyEstimations)
         {
             ModelState.AddModelError("Record.UserType", "Invalid user type.");
         }

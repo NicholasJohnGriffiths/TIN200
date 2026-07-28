@@ -62,6 +62,7 @@ namespace TINWeb.Pages.CompanySurvey
             Record = record;
             Record.Locked ??= false;
             Record.Estimate ??= false;
+            Record.TIN200 ??= false;
             SelectedLinkExpiryDateUtc = SurveyLinkExpiryUtc?.UtcDateTime.Date ?? GetDefaultLinkExpiryDateUtc();
             await LoadCompanyNameAsync(record.CompanyId);
             return Page();
@@ -69,6 +70,8 @@ namespace TINWeb.Pages.CompanySurvey
 
         public async Task<IActionResult> OnPostAsync()
         {
+            var isSurveyEstimationsUser = UserTypes.IsSurveyEstimations(User);
+
             if (!ModelState.IsValid)
             {
                 await LoadCompanyNameAsync(Record.CompanyId);
@@ -80,14 +83,33 @@ namespace TINWeb.Pages.CompanySurvey
                 return NotFound();
             }
 
+            if (isSurveyEstimationsUser)
+            {
+                var existing = await _service.GetByIdAsync(Record.Id);
+                if (existing == null)
+                {
+                    return NotFound();
+                }
+
+                existing.Estimate = Record.Estimate ?? false;
+                await _service.UpdateAsync(existing);
+                return RedirectToPage("./Index", null, new { financialYear = FinancialYear }, $"record-{Record.Id}");
+            }
+
             Record.Locked ??= false;
             Record.Estimate ??= false;
+            Record.TIN200 ??= false;
             await _service.UpdateAsync(Record);
             return RedirectToPage("./Index", null, new { financialYear = FinancialYear }, $"record-{Record.Id}");
         }
 
         public async Task<IActionResult> OnPostRegenerateLinkAsync()
         {
+            if (UserTypes.IsSurveyEstimations(User))
+            {
+                return Forbid();
+            }
+
             var existing = await _service.GetByIdAsync(Record.Id);
             if (existing == null)
             {
@@ -99,6 +121,7 @@ namespace TINWeb.Pages.CompanySurvey
                 Record = existing;
                 Record.Locked ??= false;
                 Record.Estimate ??= false;
+                Record.TIN200 ??= false;
                 await LoadCompanyNameAsync(existing.CompanyId);
                 ModelState.AddModelError(nameof(SelectedLinkExpiryDateUtc), expiryValidationMessage ?? "Invalid expiry date.");
                 return Page();
@@ -125,6 +148,7 @@ namespace TINWeb.Pages.CompanySurvey
                 Record = existing;
                 Record.Locked ??= false;
                 Record.Estimate ??= false;
+                Record.TIN200 ??= false;
                 await LoadCompanyNameAsync(existing.CompanyId);
                 ModelState.AddModelError(string.Empty, ex.Message);
                 return Page();

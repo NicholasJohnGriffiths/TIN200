@@ -2,6 +2,7 @@
 @model TINWeb.Pages.CompanySurvey.EditModel
 @{
     ViewData["Title"] = "Edit Company Survey";
+    var isSurveyEstimationsUser = TINWeb.Services.UserTypes.IsSurveyEstimations(User);
 }
 
 <div class="container mt-4">
@@ -24,28 +25,28 @@
         </div>
         <div class="form-group mb-3">
             <label asp-for="Record.CompanyId" class="form-label"></label>
-            <input asp-for="Record.CompanyId" class="form-control" />
+            <input asp-for="Record.CompanyId" class="form-control" readonly="@(isSurveyEstimationsUser ? "readonly" : null)" />
             <span asp-validation-for="Record.CompanyId" class="text-danger"></span>
         </div>
 
         <div class="form-group mb-3">
             <label asp-for="Record.SurveyId" class="form-label"></label>
-            <input asp-for="Record.SurveyId" class="form-control" />
+            <input asp-for="Record.SurveyId" class="form-control" readonly="@(isSurveyEstimationsUser ? "readonly" : null)" />
             <span asp-validation-for="Record.SurveyId" class="text-danger"></span>
         </div>
 
         <div class="form-check mb-2">
-            <input asp-for="Record.Saved" class="form-check-input" />
+            <input asp-for="Record.Saved" class="form-check-input" disabled="@(isSurveyEstimationsUser ? "disabled" : null)" />
             <label asp-for="Record.Saved" class="form-check-label"></label>
         </div>
 
         <div class="form-check mb-2">
-            <input asp-for="Record.Submitted" class="form-check-input" />
+            <input asp-for="Record.Submitted" class="form-check-input" disabled="@(isSurveyEstimationsUser ? "disabled" : null)" />
             <label asp-for="Record.Submitted" class="form-check-label"></label>
         </div>
 
         <div class="form-check mb-3">
-            <input asp-for="Record.Requested" class="form-check-input" />
+            <input asp-for="Record.Requested" class="form-check-input" disabled="@(isSurveyEstimationsUser ? "disabled" : null)" />
             <label asp-for="Record.Requested" class="form-check-label"></label>
         </div>
 
@@ -55,8 +56,12 @@
                    id="Record_Locked"
                    name="Record.Locked"
                    value="true"
-                     checked="@(Model.Record.Locked == true ? "checked" : null)" />
-            <input type="hidden" name="Record.Locked" value="false" />
+                   checked="@(Model.Record.Locked == true ? "checked" : null)"
+                   disabled="@(isSurveyEstimationsUser ? "disabled" : null)" />
+            @if (!isSurveyEstimationsUser)
+            {
+                <input type="hidden" name="Record.Locked" value="false" />
+            }
             <label class="form-check-label" for="Record_Locked">Locked</label>
         </div>
 
@@ -71,19 +76,40 @@
             <label class="form-check-label" for="Record_Estimate">Estimate</label>
         </div>
 
+        <div class="form-check mb-3">
+            <input type="checkbox"
+                   class="form-check-input"
+                   id="Record_TIN200"
+                   name="Record.TIN200"
+                   value="true"
+                   checked="@(Model.Record.TIN200 == true ? "checked" : null)"
+                   disabled="@(isSurveyEstimationsUser ? "disabled" : null)" />
+            @if (!isSurveyEstimationsUser)
+            {
+                <input type="hidden" name="Record.TIN200" value="false" />
+            }
+            <label class="form-check-label" for="Record_TIN200">TIN200</label>
+        </div>
+
         <div class="form-group mb-3">
             <label asp-for="Record.SurveyLink" class="form-label"></label>
             <input asp-for="Record.SurveyLink" class="form-control" readonly />
-            <div class="row g-2 mt-2 align-items-end">
-                <div class="col-sm-6 col-md-4">
-                    <label for="SelectedLinkExpiryDateUtc" class="form-label">Survey Link Expiry Date</label>
-                    <input asp-for="SelectedLinkExpiryDateUtc" type="date" asp-format="{0:yyyy-MM-dd}" class="form-control" />
-                    <span asp-validation-for="SelectedLinkExpiryDateUtc" class="text-danger"></span>
-                    <small class="text-muted">Choose the date above for when this survey link should expire.</small>
+            @if (!isSurveyEstimationsUser)
+            {
+                <div class="row g-2 mt-2 align-items-end">
+                    <div class="col-sm-6 col-md-4">
+                        <label for="SelectedLinkExpiryDateUtc" class="form-label">Survey Link Expiry Date</label>
+                        <input asp-for="SelectedLinkExpiryDateUtc" type="date" asp-format="{0:yyyy-MM-dd}" class="form-control" />
+                        <span asp-validation-for="SelectedLinkExpiryDateUtc" class="text-danger"></span>
+                        <small class="text-muted">Choose the date above for when this survey link should expire.</small>
+                    </div>
                 </div>
-            </div>
+            }
             <div class="d-flex flex-wrap gap-2 mt-2">
-                <button type="submit" asp-page-handler="RegenerateLink" formnovalidate class="btn btn-outline-primary">Regenerate Survey Link</button>
+                @if (!isSurveyEstimationsUser)
+                {
+                    <button type="submit" asp-page-handler="RegenerateLink" formnovalidate class="btn btn-outline-primary">Regenerate Survey Link</button>
+                }
                 @if (!string.IsNullOrWhiteSpace(Model.Record.SurveyLink))
                 {
                     <a href="@Model.Record.SurveyLink" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary">Open Link</a>
@@ -96,7 +122,10 @@
                     <span class="ms-2 text-muted">Expires: @Model.SurveyLinkExpiryUtc.Value.ToString("dd/MM/yyyy HH:mm 'UTC'")</span>
                 </div>
             }
-            <small class="text-muted d-block mt-1">The expiry is based on the date you select above. By default, we suggest a date using the current @Model.LinkExpiryDays day(s) (@Model.LinkExpiryHours hours) setting. If a newer link shows as invalid, the token signing secret may have changed.</small>
+            @if (!isSurveyEstimationsUser)
+            {
+                <small class="text-muted d-block mt-1">The expiry is based on the date you select above. By default, we suggest a date using the current @Model.LinkExpiryDays day(s) (@Model.LinkExpiryHours hours) setting. If a newer link shows as invalid, the token signing secret may have changed.</small>
+            }
         </div>
 
         <button type="submit" class="btn btn-primary">Save</button>
