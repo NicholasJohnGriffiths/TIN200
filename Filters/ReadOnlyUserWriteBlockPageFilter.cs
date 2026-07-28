@@ -132,7 +132,8 @@ public sealed class ReadOnlyUserWriteBlockPageFilter : IAsyncPageFilter
         }
 
         if (path.StartsWith(CompanySurveyEditPathPrefix, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(handlerMethodName, "OnPost", StringComparison.OrdinalIgnoreCase))
+            && (string.Equals(handlerMethodName, "OnPost", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(handlerMethodName, "OnPostAsync", StringComparison.OrdinalIgnoreCase)))
         {
             return true;
         }
