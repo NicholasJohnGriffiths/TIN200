@@ -27,5 +27,9 @@ namespace TINWeb.Models
 
         [Display(Name = "Email Header Image")]
         public int? EmailHeaderImageId { get; set; }
+
+        [Display(Name = "Revenue Forecast Method")]
+        [StringLength(32)]
+        public string? RevenueForecastMethod { get; set; } = "LogLinear";
     }
 }

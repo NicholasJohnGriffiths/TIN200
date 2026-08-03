@@ -14,6 +14,9 @@ namespace TINWeb.Pages.Config;
 [Authorize(Policy = "AdminOnly")]
 public class EditModel : PageModel
 {
+    private const string RevenueForecastMethodLogLinear = "LogLinear";
+    private const string RevenueForecastMethodRecencyWeighted = "RecencyWeighted";
+
     private readonly ApplicationDbContext _context;
     private readonly IImageStorageService _imageStorageService;
 
@@ -24,6 +27,7 @@ public class EditModel : PageModel
     public IFormFile? EmailHeaderImageFile { get; set; }
 
     public List<SelectListItem> EmailHeaderImageOptions { get; set; } = new();
+    public List<SelectListItem> RevenueForecastMethodOptions { get; set; } = new();
     public string? EmailHeaderImageThumbnailUrl { get; set; }
     public string? EmailHeaderImageFileName { get; set; }
     public bool EmailHeaderImageMissing { get; set; }
@@ -46,8 +50,10 @@ public class EditModel : PageModel
             return NotFound();
         }
 
+        record.RevenueForecastMethod = NormalizeRevenueForecastMethod(record.RevenueForecastMethod);
         Record = record;
         await LoadEmailHeaderImageOptionsAsync();
+        LoadRevenueForecastMethodOptions();
         await LoadEmailHeaderImagePreviewAsync();
         return Page();
     }
@@ -91,6 +97,7 @@ public class EditModel : PageModel
         if (!ModelState.IsValid)
         {
             await LoadEmailHeaderImageOptionsAsync();
+            LoadRevenueForecastMethodOptions();
             await LoadEmailHeaderImagePreviewAsync();
             return Page();
         }
@@ -108,6 +115,7 @@ public class EditModel : PageModel
 
         existing.AdminEmail = Record.AdminEmail;
         existing.EmailHeaderImageId = Record.EmailHeaderImageId;
+        existing.RevenueForecastMethod = NormalizeRevenueForecastMethod(Record.RevenueForecastMethod);
         await _context.SaveChangesAsync();
 
         StatusMessage = "Config updated successfully.";
@@ -158,6 +166,22 @@ public class EditModel : PageModel
         });
 
         EmailHeaderImageOptions = options;
+    }
+
+    private void LoadRevenueForecastMethodOptions()
+    {
+        RevenueForecastMethodOptions = new List<SelectListItem>
+        {
+            new() { Value = RevenueForecastMethodLogLinear, Text = "Log-linear" },
+            new() { Value = RevenueForecastMethodRecencyWeighted, Text = "Recency weighted" }
+        };
+    }
+
+    private static string NormalizeRevenueForecastMethod(string? method)
+    {
+        return string.Equals(method, RevenueForecastMethodRecencyWeighted, StringComparison.OrdinalIgnoreCase)
+            ? RevenueForecastMethodRecencyWeighted
+            : RevenueForecastMethodLogLinear;
     }
 
     private async Task LoadEmailHeaderImagePreviewAsync()

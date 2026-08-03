@@ -14,6 +14,9 @@ namespace TINWeb.Pages.Config;
 [Authorize(Policy = "AdminOnly")]
 public class CreateModel : PageModel
 {
+    private const string RevenueForecastMethodLogLinear = "LogLinear";
+    private const string RevenueForecastMethodRecencyWeighted = "RecencyWeighted";
+
     private readonly ApplicationDbContext _context;
     private readonly IImageStorageService _imageStorageService;
 
@@ -24,6 +27,7 @@ public class CreateModel : PageModel
     public IFormFile? EmailHeaderImageFile { get; set; }
 
     public List<SelectListItem> EmailHeaderImageOptions { get; set; } = new();
+    public List<SelectListItem> RevenueForecastMethodOptions { get; set; } = new();
     public string? EmailHeaderImageThumbnailUrl { get; set; }
     public string? EmailHeaderImageFileName { get; set; }
     public bool EmailHeaderImageMissing { get; set; }
@@ -41,6 +45,7 @@ public class CreateModel : PageModel
     public async Task<IActionResult> OnGetAsync()
     {
         await LoadEmailHeaderImageOptionsAsync();
+        LoadRevenueForecastMethodOptions();
         return Page();
     }
 
@@ -78,6 +83,7 @@ public class CreateModel : PageModel
         if (!ModelState.IsValid)
         {
             await LoadEmailHeaderImageOptionsAsync();
+            LoadRevenueForecastMethodOptions();
             await LoadEmailHeaderImagePreviewAsync();
             return Page();
         }
@@ -87,6 +93,7 @@ public class CreateModel : PageModel
         {
             ModelState.AddModelError(string.Empty, "A config row already exists. Edit the existing row instead.");
             await LoadEmailHeaderImageOptionsAsync();
+            LoadRevenueForecastMethodOptions();
             await LoadEmailHeaderImagePreviewAsync();
             return Page();
         }
@@ -95,6 +102,8 @@ public class CreateModel : PageModel
         {
             Record.EmailHeaderImageId = await SaveEmailHeaderImageAsync(Record.Id, EmailHeaderImageFile);
         }
+
+        Record.RevenueForecastMethod = NormalizeRevenueForecastMethod(Record.RevenueForecastMethod);
 
         _context.AppConfig.Add(Record);
         await _context.SaveChangesAsync();
@@ -147,6 +156,22 @@ public class CreateModel : PageModel
         });
 
         EmailHeaderImageOptions = options;
+    }
+
+    private void LoadRevenueForecastMethodOptions()
+    {
+        RevenueForecastMethodOptions = new List<SelectListItem>
+        {
+            new() { Value = RevenueForecastMethodLogLinear, Text = "Log-linear" },
+            new() { Value = RevenueForecastMethodRecencyWeighted, Text = "Recency weighted" }
+        };
+    }
+
+    private static string NormalizeRevenueForecastMethod(string? method)
+    {
+        return string.Equals(method, RevenueForecastMethodRecencyWeighted, StringComparison.OrdinalIgnoreCase)
+            ? RevenueForecastMethodRecencyWeighted
+            : RevenueForecastMethodLogLinear;
     }
 
     private async Task LoadEmailHeaderImagePreviewAsync()

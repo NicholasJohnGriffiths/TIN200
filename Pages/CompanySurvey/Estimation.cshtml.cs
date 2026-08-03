@@ -26,6 +26,7 @@ namespace TINWeb.Pages.CompanySurvey
         private const string RevenueAfricaQuestionTitle = "Global Revenue Africa Last Financial Year";
         private const string RevenueOtherQuestionTitle = "Global Revenue Other Last Financial Year";
         private const string RegionalEmploymentQuestionPrefix = "Regional Employment ";
+        private const string GlobalEmploymentQuestionPrefix = "Global Employment ";
         private const string RegionalEmploymentQuestionSuffix = " Last Financial Year";
         private static readonly bool EnableWagesSectorFallback = true;
         private const decimal WagesPrimaryRatio = 0.6m;
@@ -53,8 +54,12 @@ namespace TINWeb.Pages.CompanySurvey
     private const decimal RevenueAfricaExportRatio = 0.20m;
     private static readonly bool EnableRevenueOtherSectorFallback = false;
     private const decimal RevenueOtherExportRatio = 0.20m;
+    private const string RevenueForecastMethodLogLinear = "LogLinear";
+    private const string RevenueForecastMethodRecencyWeighted = "RecencyWeighted";
+    private const double RevenueForecastRecencyLambda = 0.25;
 
         private readonly ApplicationDbContext _context;
+    private readonly IConfiguration _configuration;
 
         public int CompanySurveyId { get; set; }
         public int CompanyId { get; set; }
@@ -132,9 +137,10 @@ namespace TINWeb.Pages.CompanySurvey
         public Dictionary<string, decimal> GroupQuestionAppliedValues { get; set; } = new(StringComparer.OrdinalIgnoreCase);
         public Dictionary<string, string> GroupQuestionAppliedReasons { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
-        public EstimationModel(ApplicationDbContext context)
+        public EstimationModel(ApplicationDbContext context, IConfiguration configuration)
         {
             _context = context;
+            _configuration = configuration;
         }
 
         public async Task<IActionResult> OnGetAsync(int? companySurveyId, int? financialYear)
@@ -544,7 +550,7 @@ namespace TINWeb.Pages.CompanySurvey
             }
 
             var gqHistory = await GetCompanyMetricHistoryAsync(CompanyId, regionQuestionTitle);
-            var calc = CalculateSimpleTrendForecast(gqHistory, TargetFinancialYear);
+            var calc = await CalculateSimpleTrendForecast(gqHistory, TargetFinancialYear);
 
             ClearForecastOutputs();
             if (calc.Value.HasValue)
@@ -1394,7 +1400,7 @@ namespace TINWeb.Pages.CompanySurvey
                 case "Revenue":
                 {
                     var history = await GetCompanyMetricHistoryAsync(CompanyId, RevenueQuestionTitle);
-                    return await BuildSectorCagrPreviewAsync("Revenue", history, RevenueQuestionTitle);
+                    return await BuildRevenueForecastPreviewAsync(history);
                 }
                 case "Employment":
                 {
@@ -1570,7 +1576,7 @@ namespace TINWeb.Pages.CompanySurvey
                     if (string.IsNullOrWhiteSpace(regionQuestionTitle))
                         return ("Group Question", new List<MetricHistoryRow>(), null, "Question title is required.");
                     var gqHistory = await GetCompanyMetricHistoryAsync(CompanyId, regionQuestionTitle);
-                    var gqCalc = CalculateSimpleTrendForecast(gqHistory, TargetFinancialYear);
+                    var gqCalc = await CalculateSimpleTrendForecast(gqHistory, TargetFinancialYear);
                     return (regionQuestionTitle, gqHistory, gqCalc.Value, gqCalc.Reason);
                 }
                 default:
@@ -1881,7 +1887,8 @@ namespace TINWeb.Pages.CompanySurvey
         private async Task<(string MetricLabel, List<CalculationCandidate> Candidates)> BuildSectorCagrPreviewAsync(string metricLabel, List<MetricHistoryRow> history, params string[] questionTitles)
         {
             var actual = GetActualValueForTargetYear(history, TargetFinancialYear);
-            var trend = TryCalculateLogLinearTrend(history, TargetFinancialYear, 3, out var trendDetail);
+            var forecastMethod = await GetRevenueForecastMethodAsync();
+            var trend = TryCalculateConfiguredTrend(history, TargetFinancialYear, 3, forecastMethod, out var trendDetail);
 
             var secondarySector = await GetCompanySecondarySectorAsync(CompanyId, TargetFinancialYear);
             var sectorCagr = questionTitles.Contains(EmploymentQuestionTitle) || questionTitles.Contains(EmploymentQuestionTitleLegacy)
@@ -1936,6 +1943,74 @@ namespace TINWeb.Pages.CompanySurvey
             return (metricLabel, candidates);
         }
 
+        private async Task<(string MetricLabel, List<CalculationCandidate> Candidates)> BuildRevenueForecastPreviewAsync(List<MetricHistoryRow> history)
+        {
+            var actual = GetActualValueForTargetYear(history, TargetFinancialYear);
+
+            var trendPoints = history
+                .Where(x => x.FinancialYear < TargetFinancialYear && x.Value.HasValue && x.Value.Value > 0)
+                .OrderByDescending(x => x.FinancialYear)
+                .Take(5)
+                .Select(x => (Year: (double)x.FinancialYear, Value: (double)x.Value!.Value))
+                .ToList();
+
+            var forecastMethod = await GetRevenueForecastMethodAsync();
+            decimal? trend = null;
+            string trendDetail;
+
+            if (string.Equals(forecastMethod, RevenueForecastMethodRecencyWeighted, StringComparison.OrdinalIgnoreCase))
+            {
+                trend = TryCalculateRecencyWeightedTrend(trendPoints, TargetFinancialYear, out trendDetail);
+                if (trend.HasValue)
+                {
+                    trendDetail = $"Selected revenue forecast method: RecencyWeighted. Recency-weighted trend from {trendPoints.Count} point(s): {trendDetail}";
+                }
+                else
+                {
+                    trendDetail = $"Selected revenue forecast method: RecencyWeighted. {trendDetail}";
+                }
+            }
+            else
+            {
+                trend = TryCalculateConfiguredTrend(trendPoints, TargetFinancialYear, 3, RevenueForecastMethodLogLinear, out trendDetail);
+                if (trend.HasValue)
+                {
+                    trendDetail = $"Selected revenue forecast method: LogLinear. Log-linear trend from {trendPoints.Count} point(s): {trendDetail}";
+                }
+                else
+                {
+                    trendDetail = $"Selected revenue forecast method: LogLinear. {trendDetail}";
+                }
+            }
+
+            var secondarySector = await GetCompanySecondarySectorAsync(CompanyId, TargetFinancialYear);
+            var sectorCagr = await CalculateSectorCAGRAsync(secondarySector, TargetFinancialYear);
+            var fallback = TryCalculateSectorCagrFallback(history, TargetFinancialYear, sectorCagr, out var fallbackDetail);
+
+            if (!fallback.HasValue)
+            {
+                fallbackDetail = $"Secondary sector: {(string.IsNullOrWhiteSpace(secondarySector) ? "n/a" : secondarySector)}. "
+                    + $"Latest positive company value before FY {TargetFinancialYear}: {(history.Where(x => x.FinancialYear < TargetFinancialYear && x.Value.HasValue && x.Value.Value > 0).OrderByDescending(x => x.FinancialYear).FirstOrDefault()?.Value.HasValue == true ? history.Where(x => x.FinancialYear < TargetFinancialYear && x.Value.HasValue && x.Value.Value > 0).OrderByDescending(x => x.FinancialYear).FirstOrDefault()!.Value!.Value.ToString("N2") : "n/a")}. "
+                    + $"Sector CAGR: {(sectorCagr.HasValue ? sectorCagr.Value.ToString("P2") : "n/a")}. "
+                    + fallbackDetail;
+            }
+            else
+            {
+                fallbackDetail = $"Secondary sector: {(string.IsNullOrWhiteSpace(secondarySector) ? "n/a" : secondarySector)}. Sector CAGR: {(sectorCagr.HasValue ? sectorCagr.Value.ToString("P2") : "n/a")}. {fallbackDetail}";
+            }
+
+            var candidates = BuildCandidates(actual, trend, fallback,
+                "Actual",
+                actual.HasValue ? $"Actual Revenue for FY {TargetFinancialYear}." : $"No actual Revenue for FY {TargetFinancialYear}.",
+                "Trend",
+                trend.HasValue ? trendDetail : $"No trend available for {forecastMethod}.",
+                "Fallback",
+                fallbackDetail,
+                new List<string>());
+
+            return ("Revenue", candidates);
+        }
+
         private async Task<(string MetricLabel, List<CalculationCandidate> Candidates)> BuildRevenueRatioPreviewAsync(
             string metricLabel,
             List<MetricHistoryRow> metricHistory,
@@ -1945,7 +2020,8 @@ namespace TINWeb.Pages.CompanySurvey
             Func<string?, int, Task<decimal?>> sectorRatioFunc)
         {
             var actual = GetActualValueForTargetYear(metricHistory, TargetFinancialYear);
-            var trend = TryCalculateLogLinearTrend(metricHistory, TargetFinancialYear, minimumTrendPoints, out var trendDetail);
+            var forecastMethod = await GetRevenueForecastMethodAsync();
+            var trend = TryCalculateConfiguredTrend(metricHistory, TargetFinancialYear, minimumTrendPoints, forecastMethod, out var trendDetail);
 
             var primarySector = await GetCompanyPrimarySectorAsync(CompanyId, TargetFinancialYear);
             var sectorRatio = await sectorRatioFunc(primarySector, TargetFinancialYear);
@@ -1979,7 +2055,33 @@ namespace TINWeb.Pages.CompanySurvey
             List<MetricHistoryRow> revenueHistory)
         {
             var actual = GetActualValueForTargetYear(ebitdaHistory, TargetFinancialYear);
-            var trend = TryCalculateLinearTrend(ebitdaHistory, TargetFinancialYear, 4, out var trendDetail);
+            var positiveTrendHistory = ebitdaHistory
+                .Where(x => x.FinancialYear < TargetFinancialYear && x.Value.HasValue && x.Value.Value > 0)
+                .Select(x => new MetricHistoryRow
+                {
+                    FinancialYear = x.FinancialYear,
+                    Value = x.Value
+                })
+                .ToList();
+
+            decimal? trend;
+            string trendDetail;
+            if (positiveTrendHistory.Count >= 4)
+            {
+                trend = TryCalculateConfiguredTrend(positiveTrendHistory, TargetFinancialYear, 4, RevenueForecastMethodLogLinear, out trendDetail);
+                if (trend.HasValue)
+                {
+                    trendDetail = $"Log-linear trend fit from {positiveTrendHistory.Count} positive point(s) for EBITDA. {trendDetail}";
+                }
+                else
+                {
+                    trendDetail = $"Log-linear trend fit from {positiveTrendHistory.Count} positive point(s) for EBITDA. {trendDetail}";
+                }
+            }
+            else
+            {
+                trend = TryCalculateLinearTrend(ebitdaHistory, TargetFinancialYear, 4, out trendDetail);
+            }
 
             var primarySector = await GetCompanyPrimarySectorAsync(CompanyId, TargetFinancialYear);
             var sectorRatio = await CalculateSectorEbitdaRatioAsync(primarySector, TargetFinancialYear);
@@ -2014,7 +2116,8 @@ namespace TINWeb.Pages.CompanySurvey
             var revenueHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueQuestionTitle);
 
             var actual = GetActualValueForTargetYear(regionalHistory, TargetFinancialYear);
-            var trend = TryCalculateLogLinearTrend(regionalHistory, TargetFinancialYear, 2, out var trendDetail);
+            var forecastMethod = await GetRevenueForecastMethodAsync();
+            var trend = TryCalculateConfiguredTrend(regionalHistory, TargetFinancialYear, 2, forecastMethod, out var trendDetail);
 
             var primarySector = await GetCompanyPrimarySectorAsync(CompanyId, TargetFinancialYear);
             var sectorRatio = await CalculateSectorRegionalExportRatioAsync(primarySector, questionTitle, TargetFinancialYear);
@@ -2057,7 +2160,8 @@ namespace TINWeb.Pages.CompanySurvey
             string questionTitle)
         {
             var actual = GetActualValueForTargetYear(regionalHistory, TargetFinancialYear);
-            var trend = TryCalculateLogLinearTrend(regionalHistory, TargetFinancialYear, 2, out var trendDetail);
+            var forecastMethod = await GetRevenueForecastMethodAsync();
+            var trend = TryCalculateConfiguredTrend(regionalHistory, TargetFinancialYear, 2, forecastMethod, out var trendDetail);
 
             var primarySector = await GetCompanyPrimarySectorAsync(CompanyId, TargetFinancialYear);
             var sectorRatio = await CalculateSectorRegionalEmploymentRatioAsync(primarySector, questionTitle, TargetFinancialYear);
@@ -2095,15 +2199,16 @@ namespace TINWeb.Pages.CompanySurvey
                 .FirstOrDefault();
         }
 
-        private static (decimal? Value, string Reason) CalculateSimpleTrendForecast(List<MetricHistoryRow> history, int targetYear)
+        private async Task<(decimal? Value, string Reason)> CalculateSimpleTrendForecast(List<MetricHistoryRow> history, int targetYear)
         {
             var actual = GetActualValueForTargetYear(history, targetYear);
             if (actual.HasValue)
                 return (actual, $"Actual value exists for FY {targetYear}.");
 
-            var trend = TryCalculateLogLinearTrend(history, targetYear, 3, out var trendDetail);
+            var forecastMethod = await GetRevenueForecastMethodAsync();
+            var trend = TryCalculateConfiguredTrend(history, targetYear, 3, forecastMethod, out var trendDetail);
             if (trend.HasValue)
-                return (trend, $"Log-linear trend (3-year): {trendDetail}");
+                return (trend, $"{forecastMethod} trend (3-year): {trendDetail}");
 
             var lastKnown = history
                 .Where(x => x.FinancialYear < targetYear && x.Value.HasValue)
@@ -2115,7 +2220,7 @@ namespace TINWeb.Pages.CompanySurvey
             return (null, "No historical data available to calculate a forecast.");
         }
 
-        private static decimal? TryCalculateLogLinearTrend(List<MetricHistoryRow> history, int targetYear, int minimumPoints, out string details)
+        private static decimal? TryCalculateConfiguredTrend(List<MetricHistoryRow> history, int targetYear, int minimumPoints, string forecastMethod, out string details)
         {
             var points = history
                 .Where(x => x.FinancialYear < targetYear && x.Value.HasValue && x.Value.Value > 0)
@@ -2124,10 +2229,24 @@ namespace TINWeb.Pages.CompanySurvey
                 .Select(x => (Year: (double)x.FinancialYear, Value: (double)x.Value!.Value))
                 .ToList();
 
+            return TryCalculateConfiguredTrend(points, targetYear, minimumPoints, forecastMethod, out details);
+        }
+
+        private static decimal? TryCalculateConfiguredTrend(List<(double Year, double Value)> points, int targetYear, int minimumPoints, string forecastMethod, out string details)
+        {
             if (points.Count < minimumPoints)
             {
-                details = $"Insufficient positive points ({points.Count}, minimum {minimumPoints}).";
+                details = string.Equals(forecastMethod, RevenueForecastMethodRecencyWeighted, StringComparison.OrdinalIgnoreCase)
+                    ? $"Method: RecencyWeighted. Insufficient positive points ({points.Count}, minimum {minimumPoints})."
+                    : $"Method: LogLinear. Insufficient positive points ({points.Count}, minimum {minimumPoints}).";
                 return null;
+            }
+
+            if (string.Equals(forecastMethod, RevenueForecastMethodRecencyWeighted, StringComparison.OrdinalIgnoreCase))
+            {
+                var recencyFit = TryCalculateRecencyWeightedTrend(points, targetYear, out details);
+                details = $"Method: RecencyWeighted. {details}";
+                return recencyFit;
             }
 
             var meanYear = points.Average(d => d.Year);
@@ -2312,7 +2431,8 @@ namespace TINWeb.Pages.CompanySurvey
                 .AsNoTracking()
                 .Where(q => !string.IsNullOrWhiteSpace(q.Title)
                     && q.IncludeInEstimation == true
-                    && q.Title!.StartsWith(RegionalEmploymentQuestionPrefix))
+                    && (q.Title!.StartsWith(RegionalEmploymentQuestionPrefix)
+                        || q.Title!.StartsWith(GlobalEmploymentQuestionPrefix)))
                 .Select(q => q.Title!)
                 .Distinct()
                 .OrderBy(x => x)
@@ -2533,8 +2653,7 @@ namespace TINWeb.Pages.CompanySurvey
                     new[] { RevenueOtherQuestionTitle });
             }
 
-            if (!string.IsNullOrWhiteSpace(questionTitle)
-                && questionTitle.StartsWith(RegionalEmploymentQuestionPrefix, StringComparison.OrdinalIgnoreCase))
+            if (IsRegionalEmploymentQuestionTitle(questionTitle))
             {
                 var regionLabel = GetRegionalEmploymentRegionLabel(questionTitle);
                 return (
@@ -2603,6 +2722,10 @@ namespace TINWeb.Pages.CompanySurvey
             {
                 label = label.Substring(RegionalEmploymentQuestionPrefix.Length);
             }
+            else if (label.StartsWith(GlobalEmploymentQuestionPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                label = label.Substring(GlobalEmploymentQuestionPrefix.Length);
+            }
 
             if (label.EndsWith(RegionalEmploymentQuestionSuffix, StringComparison.OrdinalIgnoreCase))
             {
@@ -2610,6 +2733,13 @@ namespace TINWeb.Pages.CompanySurvey
             }
 
             return label.Trim();
+        }
+
+        private static bool IsRegionalEmploymentQuestionTitle(string? questionTitle)
+        {
+            return !string.IsNullOrWhiteSpace(questionTitle)
+                && (questionTitle.StartsWith(RegionalEmploymentQuestionPrefix, StringComparison.OrdinalIgnoreCase)
+                    || questionTitle.StartsWith(GlobalEmploymentQuestionPrefix, StringComparison.OrdinalIgnoreCase));
         }
 
         private static decimal? ResolveMetricValue(decimal? answerCurrency, double? answerNumber, string? answerText)
@@ -2841,7 +2971,6 @@ namespace TINWeb.Pages.CompanySurvey
                 return (actual.Value, "Using actual employment for target financial year.");
             }
 
-            // Step 2: Log-linear trend fit (>= 3 positive points)
             var trendPoints = employmentHistory
                 .Where(x => x.FinancialYear < targetYear && x.Value.HasValue && x.Value.Value > 0)
                 .OrderByDescending(x => x.FinancialYear)
@@ -2849,21 +2978,11 @@ namespace TINWeb.Pages.CompanySurvey
                 .Select(x => (Year: (double)x.FinancialYear, Value: (double)x.Value!.Value))
                 .ToList();
 
-            if (trendPoints.Count >= 3)
+            var forecastMethod = await GetRevenueForecastMethodAsync();
+            var trend = TryCalculateConfiguredTrend(trendPoints, targetYear, 3, forecastMethod, out var trendDetail);
+            if (trend.HasValue)
             {
-                double meanYear = trendPoints.Average(d => d.Year);
-                double meanLnValue = trendPoints.Average(d => Math.Log(d.Value));
-                double numerator = trendPoints.Sum(d => (d.Year - meanYear) * (Math.Log(d.Value) - meanLnValue));
-                double denominator = trendPoints.Sum(d => Math.Pow(d.Year - meanYear, 2));
-
-                if (denominator > 0)
-                {
-                    double slope = numerator / denominator;
-                    double lnForecast = meanLnValue + slope * (targetYear - meanYear);
-                    double growthFit = Math.Exp(lnForecast);
-                    decimal result = growthFit < 0 ? 0m : Convert.ToDecimal(growthFit);
-                    return (result, $"Log-linear trend fit from {trendPoints.Count} historical data point(s) (minimum 3 positive points).");
-                }
+                return (trend, $"{forecastMethod} trend fit from {trendPoints.Count} historical data point(s) (minimum 3 positive points).");
             }
 
             // Step 3: Sector CAGR fallback (now active)
@@ -2911,7 +3030,6 @@ namespace TINWeb.Pages.CompanySurvey
                 return (actual.Value, "Using actual revenue for target financial year.");
             }
 
-            // Step 2: Log-linear trend fit (>= 3 positive points)
             var trendPoints = revenueHistory
                 .Where(x => x.FinancialYear < targetYear && x.Value.HasValue && x.Value.Value > 0)
                 .OrderByDescending(x => x.FinancialYear)
@@ -2919,20 +3037,21 @@ namespace TINWeb.Pages.CompanySurvey
                 .Select(x => (Year: (double)x.FinancialYear, Value: (double)x.Value!.Value))
                 .ToList();
 
-            if (trendPoints.Count >= 3)
+            var forecastMethod = await GetRevenueForecastMethodAsync();
+            if (string.Equals(forecastMethod, RevenueForecastMethodRecencyWeighted, StringComparison.OrdinalIgnoreCase))
             {
-                double meanYear = trendPoints.Average(d => d.Year);
-                double meanLnValue = trendPoints.Average(d => Math.Log(d.Value));
-                double numerator = trendPoints.Sum(d => (d.Year - meanYear) * (Math.Log(d.Value) - meanLnValue));
-                double denominator = trendPoints.Sum(d => Math.Pow(d.Year - meanYear, 2));
-
-                if (denominator > 0)
+                var recencyForecast = TryCalculateRecencyWeightedTrend(trendPoints, targetYear, out var trendDetail);
+                if (recencyForecast.HasValue)
                 {
-                    double slope = numerator / denominator;
-                    double lnForecast = meanLnValue + slope * (targetYear - meanYear);
-                    double growthFit = Math.Exp(lnForecast);
-                    decimal result = growthFit < 0 ? 0m : Convert.ToDecimal(growthFit);
-                    return (result, $"Log-linear trend fit from {trendPoints.Count} historical data point(s) (minimum 3 positive points).");
+                    return (recencyForecast, $"Recency-weighted trend fit from {trendPoints.Count} historical data point(s): {trendDetail}");
+                }
+            }
+            else
+            {
+                var logLinearForecast = TryCalculateConfiguredTrend(trendPoints, targetYear, 3, RevenueForecastMethodLogLinear, out var trendDetail);
+                if (logLinearForecast.HasValue)
+                {
+                    return (logLinearForecast, $"Log-linear trend fit from {trendPoints.Count} historical data point(s): {trendDetail}");
                 }
             }
 
@@ -2964,6 +3083,134 @@ namespace TINWeb.Pages.CompanySurvey
             // Step 4: No result
             return (null, $"No actual value and insufficient positive historical points ({trendPoints.Count}, minimum 3 required) for trend fit. Sector CAGR fallback not available (no sector data or insufficient sector history).");
         }
+
+        private async Task<string> GetRevenueForecastMethodAsync()
+        {
+            var configuredMethod = await _context.AppConfig
+                .AsNoTracking()
+                .OrderBy(c => c.Id)
+                .Select(c => c.RevenueForecastMethod)
+                .FirstOrDefaultAsync();
+
+            var envMethod = _configuration["RevenueForecastMethod"];
+            if (!string.IsNullOrWhiteSpace(envMethod))
+            {
+                return envMethod.Trim();
+            }
+
+            return string.IsNullOrWhiteSpace(configuredMethod)
+                ? RevenueForecastMethodLogLinear
+                : configuredMethod.Trim();
+        }
+
+        private static decimal? TryCalculateLogLinearTrend(List<(double Year, double Value)> points, int targetYear, out string details)
+        {
+            if (points.Count < 3)
+            {
+                details = $"Insufficient positive points ({points.Count}, minimum 3).";
+                return null;
+            }
+
+            var fit = FitLogLinearTrend(points, Enumerable.Repeat(1d, points.Count).ToList());
+            if (fit == null)
+            {
+                details = "Cannot fit trend (year variance is zero).";
+                return null;
+            }
+
+            var forecast = Math.Exp(fit.Intercept + fit.Slope * targetYear);
+            details = $"Method: LogLinear. Trend from {points.Count} point(s).";
+            return forecast < 0 ? 0m : Convert.ToDecimal(forecast);
+        }
+
+        private static decimal? TryCalculateRecencyWeightedTrend(List<(double Year, double Value)> points, int targetYear, out string details)
+        {
+            if (points.Count < 3)
+            {
+                details = $"Insufficient positive points ({points.Count}, minimum 3).";
+                return null;
+            }
+
+            var baselineFit = FitLogLinearTrend(points, Enumerable.Repeat(1d, points.Count).ToList());
+            if (baselineFit == null)
+            {
+                details = "Unable to fit baseline log-linear trend for residual weighting.";
+                return null;
+            }
+
+            var residuals = points
+                .Select(point => Math.Log(point.Value) - (baselineFit.Intercept + baselineFit.Slope * point.Year))
+                .ToList();
+
+            var medianAbsResidual = GetMedian(residuals.Select(Math.Abs).ToList());
+            var tuningConstant = medianAbsResidual > 0 ? 1.5 * medianAbsResidual : 1.0;
+            var maxYear = points.Max(point => point.Year);
+
+            var weights = points
+                .Select((point, index) =>
+                {
+                    var recencyWeight = Math.Exp(RevenueForecastRecencyLambda * (point.Year - maxYear));
+                    var residualWeight = 1d / (1d + Math.Pow(Math.Abs(residuals[index]) / tuningConstant, 2));
+                    return recencyWeight * residualWeight;
+                })
+                .ToList();
+
+            var weightedFit = FitLogLinearTrend(points, weights);
+            if (weightedFit == null)
+            {
+                details = "Unable to fit weighted log-linear trend.";
+                return null;
+            }
+
+            var forecast = Math.Exp(weightedFit.Intercept + weightedFit.Slope * targetYear);
+            details = $"Method: RecencyWeighted. lambda={RevenueForecastRecencyLambda:0.##}, c={tuningConstant:N4}.";
+            return forecast < 0 ? 0m : Convert.ToDecimal(forecast);
+        }
+
+        private static LogLinearFit? FitLogLinearTrend(List<(double Year, double Value)> points, List<double> weights)
+        {
+            if (points.Count == 0 || points.Count != weights.Count)
+            {
+                return null;
+            }
+
+            var sumWeights = weights.Sum();
+            if (sumWeights <= 0)
+            {
+                return null;
+            }
+
+            var meanYear = points.Zip(weights, (point, weight) => point.Year * weight).Sum() / sumWeights;
+            var meanLogValue = points.Zip(weights, (point, weight) => Math.Log(point.Value) * weight).Sum() / sumWeights;
+
+            var numerator = points.Zip(weights, (point, weight) => weight * (point.Year - meanYear) * (Math.Log(point.Value) - meanLogValue)).Sum();
+            var denominator = points.Zip(weights, (point, weight) => weight * Math.Pow(point.Year - meanYear, 2)).Sum();
+
+            if (denominator <= 0)
+            {
+                return null;
+            }
+
+            var slope = numerator / denominator;
+            var intercept = meanLogValue - slope * meanYear;
+            return new LogLinearFit(slope, intercept);
+        }
+
+        private static double GetMedian(List<double> values)
+        {
+            if (values.Count == 0)
+            {
+                return 0;
+            }
+
+            values.Sort();
+            var middle = values.Count / 2;
+            return values.Count % 2 == 0
+                ? (values[middle - 1] + values[middle]) / 2.0
+                : values[middle];
+        }
+
+        private sealed record LogLinearFit(double Slope, double Intercept);
 
         private async Task<decimal?> CalculateSectorRegionalExportRatioAsync(string? primarySector, string regionQuestionTitle, int targetYear)
         {
@@ -3049,7 +3296,6 @@ namespace TINWeb.Pages.CompanySurvey
                 return (actual.Value, $"Using actual {regionLabel} for target financial year.");
             }
 
-            // 2. Log-linear growth fit (>= 2 positive historical points)
             var trendPoints = regionalHistory
                 .Where(x => x.FinancialYear < targetYear && x.Value.HasValue && x.Value.Value > 0)
                 .OrderByDescending(x => x.FinancialYear)
@@ -3057,21 +3303,11 @@ namespace TINWeb.Pages.CompanySurvey
                 .Select(x => (Year: (double)x.FinancialYear, Value: (double)x.Value!.Value))
                 .ToList();
 
-            if (trendPoints.Count >= 2)
+            var forecastMethod = await GetRevenueForecastMethodAsync();
+            var trend = TryCalculateConfiguredTrend(trendPoints, targetYear, 2, forecastMethod, out var trendDetail);
+            if (trend.HasValue)
             {
-                double meanYear = trendPoints.Average(d => d.Year);
-                double meanLnValue = trendPoints.Average(d => Math.Log(d.Value));
-                double numerator = trendPoints.Sum(d => (d.Year - meanYear) * (Math.Log(d.Value) - meanLnValue));
-                double denominator = trendPoints.Sum(d => Math.Pow(d.Year - meanYear, 2));
-
-                if (denominator > 0)
-                {
-                    double slope = numerator / denominator;
-                    double lnForecast = meanLnValue + slope * (targetYear - meanYear);
-                    double growthFit = Math.Exp(lnForecast);
-                    decimal result = growthFit < 0 ? 0m : Convert.ToDecimal(growthFit);
-                    return (result, $"Log-linear growth fit from {trendPoints.Count} historical data point(s) (minimum 2 positive points).");
-                }
+                return (trend, $"{forecastMethod} trend fit from {trendPoints.Count} historical data point(s) (minimum 2 positive points).");
             }
 
             // 3. Sector-specific export ratio fallback (active)
@@ -3269,7 +3505,6 @@ namespace TINWeb.Pages.CompanySurvey
                 return (actual.Value, $"Using actual Regional Employment {regionLabel} for target financial year.");
             }
 
-            // 2. Log-linear growth fit (>= 2 positive historical points).
             var trendPoints = regionalEmploymentHistory
                 .Where(x => x.FinancialYear < targetYear && x.Value.HasValue && x.Value.Value > 0)
                 .OrderByDescending(x => x.FinancialYear)
@@ -3277,21 +3512,11 @@ namespace TINWeb.Pages.CompanySurvey
                 .Select(x => (Year: (double)x.FinancialYear, Value: (double)x.Value!.Value))
                 .ToList();
 
-            if (trendPoints.Count >= 2)
+            var forecastMethod = await GetRevenueForecastMethodAsync();
+            var trend = TryCalculateConfiguredTrend(trendPoints, targetYear, 2, forecastMethod, out var trendDetail);
+            if (trend.HasValue)
             {
-                double meanYear = trendPoints.Average(d => d.Year);
-                double meanLnValue = trendPoints.Average(d => Math.Log(d.Value));
-                double numerator = trendPoints.Sum(d => (d.Year - meanYear) * (Math.Log(d.Value) - meanLnValue));
-                double denominator = trendPoints.Sum(d => Math.Pow(d.Year - meanYear, 2));
-
-                if (denominator > 0)
-                {
-                    double slope = numerator / denominator;
-                    double lnForecast = meanLnValue + slope * (targetYear - meanYear);
-                    double growthFit = Math.Exp(lnForecast);
-                    decimal result = growthFit < 0 ? 0m : Convert.ToDecimal(growthFit);
-                    return (result, $"Log-linear growth fit from {trendPoints.Count} historical data point(s) (minimum 2 positive points) for Regional Employment {regionLabel}.");
-                }
+                return (trend, $"{forecastMethod} trend fit from {trendPoints.Count} historical data point(s) (minimum 2 positive points) for Regional Employment {regionLabel}. {trendDetail}");
             }
 
             // 3. Sector-percentage fallback (active): Regional Employment = Sector % × Total Employment.
@@ -3394,13 +3619,16 @@ namespace TINWeb.Pages.CompanySurvey
                 return (actual.Value, "Using actual EBITDA for target financial year.");
             }
 
-            // Historical data for linear regression (years < targetYear, non-null)
-            var trendPoints = ebitdaHistory
-                .Where(x => x.FinancialYear < targetYear && x.Value.HasValue)
-                .Select(x => (Year: (double)x.FinancialYear, Value: (double)x.Value!.Value))
+            var positiveTrendHistory = ebitdaHistory
+                .Where(x => x.FinancialYear < targetYear && x.Value.HasValue && x.Value.Value > 0)
+                .Select(x => new MetricHistoryRow
+                {
+                    FinancialYear = x.FinancialYear,
+                    Value = x.Value
+                })
                 .ToList();
 
-            int numPoints = trendPoints.Count;
+            int numPoints = ebitdaHistory.Count(x => x.FinancialYear < targetYear && x.Value.HasValue);
 
             if (numPoints <= 3)
             {
@@ -3421,7 +3649,21 @@ namespace TINWeb.Pages.CompanySurvey
                 return (null, $"Insufficient historical data ({numPoints} data points, minimum 4 required for linear trend). Sector-based fallback could not be applied due to missing sector ratio or revenue forecast.");
             }
 
+            if (positiveTrendHistory.Count >= 4)
+            {
+                var logLinearTrend = TryCalculateConfiguredTrend(positiveTrendHistory, targetYear, 4, RevenueForecastMethodLogLinear, out var trendDetail);
+                if (logLinearTrend.HasValue)
+                {
+                    return (logLinearTrend, $"Log-linear trend fitted on {positiveTrendHistory.Count} historical positive data point(s) for EBITDA. {trendDetail}");
+                }
+            }
+
             // Linear regression (FORECAST.LINEAR equivalent)
+            var trendPoints = ebitdaHistory
+                .Where(x => x.FinancialYear < targetYear && x.Value.HasValue)
+                .Select(x => (Year: (double)x.FinancialYear, Value: (double)x.Value!.Value))
+                .ToList();
+
             double avgX = trendPoints.Average(d => d.Year);
             double avgY = trendPoints.Average(d => d.Value);
             double numerator = trendPoints.Sum(d => (d.Year - avgX) * (d.Value - avgY));
@@ -3675,7 +3917,6 @@ namespace TINWeb.Pages.CompanySurvey
                 return (actual.Value, "Using actual wages and salaries for target financial year.");
             }
 
-            // Step 2: Log-linear trend fit (> 3 positive points)
             var trendPoints = wagesHistory
                 .Where(x => x.FinancialYear < targetYear && x.Value.HasValue && x.Value.Value > 0)
                 .OrderByDescending(x => x.FinancialYear)
@@ -3687,22 +3928,21 @@ namespace TINWeb.Pages.CompanySurvey
                 })
                 .ToList();
 
-            if (trendPoints.Count > 3)
-            {
-                var meanYear = trendPoints.Average(x => (double)x.FinancialYear);
-                var meanLnValue = trendPoints.Average(x => Math.Log(x.Value));
-
-                var numerator = trendPoints.Sum(x => ((double)x.FinancialYear - meanYear) * (Math.Log(x.Value) - meanLnValue));
-                var denominator = trendPoints.Sum(x => Math.Pow((double)x.FinancialYear - meanYear, 2));
-
-                if (denominator > 0)
+            var forecastMethod = await GetRevenueForecastMethodAsync();
+            var trend = TryCalculateConfiguredTrend(
+                trendPoints.Select(x => new MetricHistoryRow
                 {
-                    var slope = numerator / denominator;
-                    var lnForecast = meanLnValue + slope * (targetYear - meanYear);
-                    var trendFit = Math.Exp(lnForecast);
+                    FinancialYear = x.FinancialYear,
+                    Value = Convert.ToDecimal(x.Value)
+                }).ToList(),
+                targetYear,
+                4,
+                forecastMethod,
+                out var trendDetail);
 
-                    return (Convert.ToDecimal(trendFit), "Using log-linear trend fit from previous years for wages and salaries (more than 3 points).");
-                }
+            if (trend.HasValue)
+            {
+                return (trend, $"{forecastMethod} trend fit from previous years for wages and salaries (more than 3 points). {trendDetail}");
             }
 
             // Step 3: Sector-ratio fallback (active)
@@ -3741,7 +3981,6 @@ namespace TINWeb.Pages.CompanySurvey
                 return (actual.Value, "Using actual research and development for target financial year.");
             }
 
-            // Step 2: Log-linear trend fit (>= 3 positive points)
             var trendPoints = researchDevelopmentHistory
                 .Where(x => x.FinancialYear < targetYear && x.Value.HasValue && x.Value.Value > 0)
                 .OrderByDescending(x => x.FinancialYear)
@@ -3753,22 +3992,21 @@ namespace TINWeb.Pages.CompanySurvey
                 })
                 .ToList();
 
-            if (trendPoints.Count >= 3)
-            {
-                var meanYear = trendPoints.Average(x => (double)x.FinancialYear);
-                var meanLnValue = trendPoints.Average(x => Math.Log(x.Value));
-
-                var numerator = trendPoints.Sum(x => ((double)x.FinancialYear - meanYear) * (Math.Log(x.Value) - meanLnValue));
-                var denominator = trendPoints.Sum(x => Math.Pow((double)x.FinancialYear - meanYear, 2));
-
-                if (denominator > 0)
+            var forecastMethod = await GetRevenueForecastMethodAsync();
+            var trend = TryCalculateConfiguredTrend(
+                trendPoints.Select(x => new MetricHistoryRow
                 {
-                    var slope = numerator / denominator;
-                    var lnForecast = meanLnValue + slope * (targetYear - meanYear);
-                    var trendFit = Math.Exp(lnForecast);
+                    FinancialYear = x.FinancialYear,
+                    Value = Convert.ToDecimal(x.Value)
+                }).ToList(),
+                targetYear,
+                3,
+                forecastMethod,
+                out var trendDetail);
 
-                    return (Convert.ToDecimal(trendFit), "Using log-linear trend fit from previous years for research and development (minimum 3 points).");
-                }
+            if (trend.HasValue)
+            {
+                return (trend, $"{forecastMethod} trend fit from previous years for research and development (minimum 3 points). {trendDetail}");
             }
 
             // Step 3: Sector-ratio fallback (active)
@@ -3807,7 +4045,6 @@ namespace TINWeb.Pages.CompanySurvey
                 return (actual.Value, "Using actual sales and marketing for target financial year.");
             }
 
-            // Step 2: Log-linear trend fit (>= 3 positive points)
             var trendPoints = salesMarketingHistory
                 .Where(x => x.FinancialYear < targetYear && x.Value.HasValue && x.Value.Value > 0)
                 .OrderByDescending(x => x.FinancialYear)
@@ -3819,22 +4056,21 @@ namespace TINWeb.Pages.CompanySurvey
                 })
                 .ToList();
 
-            if (trendPoints.Count >= 3)
-            {
-                var meanYear = trendPoints.Average(x => (double)x.FinancialYear);
-                var meanLnValue = trendPoints.Average(x => Math.Log(x.Value));
-
-                var numerator = trendPoints.Sum(x => ((double)x.FinancialYear - meanYear) * (Math.Log(x.Value) - meanLnValue));
-                var denominator = trendPoints.Sum(x => Math.Pow((double)x.FinancialYear - meanYear, 2));
-
-                if (denominator > 0)
+            var forecastMethod = await GetRevenueForecastMethodAsync();
+            var trend = TryCalculateConfiguredTrend(
+                trendPoints.Select(x => new MetricHistoryRow
                 {
-                    var slope = numerator / denominator;
-                    var lnForecast = meanLnValue + slope * (targetYear - meanYear);
-                    var trendFit = Math.Exp(lnForecast);
+                    FinancialYear = x.FinancialYear,
+                    Value = Convert.ToDecimal(x.Value)
+                }).ToList(),
+                targetYear,
+                3,
+                forecastMethod,
+                out var trendDetail);
 
-                    return (Convert.ToDecimal(trendFit), "Using log-linear trend fit from previous years for sales and marketing (minimum 3 points).");
-                }
+            if (trend.HasValue)
+            {
+                return (trend, $"{forecastMethod} trend fit from previous years for sales and marketing (minimum 3 points). {trendDetail}");
             }
 
             // Step 3: Sector-ratio fallback (active)

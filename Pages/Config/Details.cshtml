@@ -16,6 +16,9 @@
 
         <dt class="col-sm-3">Email Header Image</dt>
         <dd class="col-sm-9">@(Model.Record.EmailHeaderImageId.HasValue ? $"Image #{Model.Record.EmailHeaderImageId.Value}" : "Not set")</dd>
+
+        <dt class="col-sm-3">Revenue Forecast Method</dt>
+        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Record.RevenueForecastMethod) ? "LogLinear" : Model.Record.RevenueForecastMethod)</dd>
     </dl>
 
     <div class="d-flex gap-2">

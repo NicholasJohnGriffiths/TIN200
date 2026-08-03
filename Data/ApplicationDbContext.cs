@@ -711,6 +711,13 @@ namespace TINWeb.Data
                     .HasColumnType("int")
                     .IsRequired(false);
 
+                entity.Property(e => e.RevenueForecastMethod)
+                    .HasColumnName("RevenueForecastMethod")
+                    .HasColumnType("varchar(32)")
+                    .HasMaxLength(32)
+                    .HasDefaultValue("LogLinear")
+                    .IsRequired(false);
+
                 entity.HasOne<Image>()
                     .WithMany()
                     .HasForeignKey(e => e.EmailHeaderImageId)

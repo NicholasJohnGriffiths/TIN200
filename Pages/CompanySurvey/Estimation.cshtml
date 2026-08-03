@@ -587,6 +587,7 @@
                 var targetFinancialYear = container ? (container.getAttribute('data-target-financial-year') || '') : '';
                 var currentCompanySurveyId = container ? (container.getAttribute('data-company-survey-id') || '') : '';
                 var scrollStateKey = 'estimation:apply-scroll:' + (currentCompanySurveyId || 'unknown');
+                var restoreDelayMs = 450;
                 var previewCard = document.querySelector('.estimation-preview-global');
                 var previewMoved = false;
                 var checkedTargetCard = null;
@@ -594,14 +595,82 @@
                 var appliedTargetCard = null;
                 var appliedManualInput = null;
                 var restoredFromApplyScroll = false;
+                var pendingScrollY = null;
+                var pendingOpenCollapseIds = [];
+
+                function getCurrentScrollY() {
+                    return window.scrollY || window.pageYOffset || 0;
+                }
+
+                function getOpenCollapseIds() {
+                    return Array.from(document.querySelectorAll('.collapse.show[id]'))
+                        .map(function (collapseElement) {
+                            return collapseElement.id;
+                        })
+                        .filter(function (id) {
+                            return !!id;
+                        });
+                }
+
+                function restoreOpenCollapses(ids) {
+                    if (!Array.isArray(ids) || ids.length === 0) {
+                        return;
+                    }
+
+                    ids.forEach(function (id) {
+                        if (!id) {
+                            return;
+                        }
+
+                        var collapseElement = document.getElementById(id);
+                        if (!collapseElement || collapseElement.classList.contains('show')) {
+                            return;
+                        }
+
+                        if (window.bootstrap && window.bootstrap.Collapse) {
+                            var collapseInstance = window.bootstrap.Collapse.getOrCreateInstance(collapseElement, { toggle: false });
+                            collapseInstance.show();
+                        } else {
+                            collapseElement.classList.add('show');
+                        }
+
+                        var toggleButton = document.querySelector('[data-bs-target="#' + id + '"]');
+                        if (toggleButton) {
+                            toggleButton.setAttribute('aria-expanded', 'true');
+                        }
+                    });
+                }
+
+                function saveScrollPosition() {
+                    try {
+                        window.sessionStorage.setItem(scrollStateKey, JSON.stringify({ y: getCurrentScrollY(), openCollapseIds: getOpenCollapseIds() }));
+                    } catch (e) {
+                        // Best-effort UX enhancement only.
+                    }
+                }
+
+                function restoreScrollPosition(y) {
+                    var targetY = Math.max(0, y);
+
+                    window.requestAnimationFrame(function () {
+                        window.scrollTo({ top: targetY, behavior: 'auto' });
+                    });
+
+                    window.setTimeout(function () {
+                        window.scrollTo({ top: targetY, behavior: 'auto' });
+                    }, restoreDelayMs);
+                }
 
                 try {
                     var rawScrollState = window.sessionStorage.getItem(scrollStateKey);
                     if (rawScrollState) {
                         var parsedState = JSON.parse(rawScrollState);
                         if (parsedState && Number.isFinite(parsedState.y)) {
-                            window.scrollTo({ top: Math.max(0, parsedState.y), behavior: 'auto' });
+                            pendingScrollY = parsedState.y;
                             restoredFromApplyScroll = true;
+                        }
+                        if (parsedState && Array.isArray(parsedState.openCollapseIds)) {
+                            pendingOpenCollapseIds = parsedState.openCollapseIds;
                         }
                         window.sessionStorage.removeItem(scrollStateKey);
                     }
@@ -692,11 +761,7 @@
                     });
 
                     generateForm.addEventListener('submit', function () {
-                        try {
-                            window.sessionStorage.setItem(scrollStateKey, JSON.stringify({ y: window.scrollY || window.pageYOffset || 0 }));
-                        } catch (e) {
-                            // Best-effort UX enhancement only.
-                        }
+                        saveScrollPosition();
                     });
 
                     var checkButton = document.createElement('button');
@@ -708,6 +773,8 @@
                         if (!companySurveyInput) {
                             return;
                         }
+
+                        saveScrollPosition();
 
                         var postForm = document.createElement('form');
                         postForm.method = 'post';
@@ -763,32 +830,42 @@
                     previewCard.classList.remove('estimation-preview-global');
                 }
 
-                if (!restoredFromApplyScroll && checkedMetricKey && checkedTargetCard) {
+                restoreOpenCollapses(pendingOpenCollapseIds);
+
+                if (checkedMetricKey && checkedTargetCard) {
                     expandAncestorCollapse(checkedTargetCard);
-                    checkedTargetCard.classList.add('estimation-focus-card');
-                    checkedTargetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    if (!restoredFromApplyScroll) {
+                        checkedTargetCard.classList.add('estimation-focus-card');
+                        checkedTargetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-                    if (checkedManualInput) {
-                        checkedManualInput.focus({ preventScroll: true });
-                        checkedManualInput.select();
+                        if (checkedManualInput) {
+                            checkedManualInput.focus({ preventScroll: true });
+                            checkedManualInput.select();
+                        }
+
+                        window.setTimeout(function () {
+                            checkedTargetCard.classList.remove('estimation-focus-card');
+                        }, 1800);
                     }
-
-                    window.setTimeout(function () {
-                        checkedTargetCard.classList.remove('estimation-focus-card');
-                    }, 1800);
-                } else if (!restoredFromApplyScroll && appliedMetricKey && appliedTargetCard) {
+                } else if (appliedMetricKey && appliedTargetCard) {
                     expandAncestorCollapse(appliedTargetCard);
-                    appliedTargetCard.classList.add('estimation-focus-card');
-                    appliedTargetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    if (!restoredFromApplyScroll) {
+                        appliedTargetCard.classList.add('estimation-focus-card');
+                        appliedTargetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-                    if (appliedManualInput) {
-                        appliedManualInput.focus({ preventScroll: true });
-                        appliedManualInput.select();
+                        if (appliedManualInput) {
+                            appliedManualInput.focus({ preventScroll: true });
+                            appliedManualInput.select();
+                        }
+
+                        window.setTimeout(function () {
+                            appliedTargetCard.classList.remove('estimation-focus-card');
+                        }, 1800);
                     }
+                }
 
-                    window.setTimeout(function () {
-                        appliedTargetCard.classList.remove('estimation-focus-card');
-                    }, 1800);
+                if (restoredFromApplyScroll && Number.isFinite(pendingScrollY)) {
+                    restoreScrollPosition(pendingScrollY);
                 }
 
                 if (targetFinancialYear) {
