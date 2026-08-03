@@ -12,8 +12,13 @@
         <strong>General principle:</strong> All calculations first check whether an actual recorded value exists for the target financial year. If one is found it is used directly. If not, the system falls back through a defined algorithm chain specific to each metric.
     </div>
 
+    <div class="alert alert-secondary">
+        <strong>Trend method configuration:</strong> Most trend-based estimates use the configured Revenue Forecast Method (<strong>LogLinear</strong> or <strong>RecencyWeighted</strong>) from Admin Config. If an app setting named <code>RevenueForecastMethod</code> is set, it overrides the database value. If neither is set, the default is <strong>LogLinear</strong>.
+    </div>
+
     <nav class="mb-4">
         <ul class="list-unstyled d-flex flex-wrap gap-2">
+            <li><a href="#workflow" class="btn btn-outline-secondary btn-sm">Check / Apply Workflow</a></li>
             <li><a href="#revenue" class="btn btn-outline-secondary btn-sm">Total Revenue</a></li>
             <li><a href="#employment" class="btn btn-outline-secondary btn-sm">Employment</a></li>
             <li><a href="#regionalemployment" class="btn btn-outline-secondary btn-sm">Regional Employment</a></li>
@@ -25,21 +30,35 @@
         </ul>
     </nav>
 
+    <div class="card mb-4" id="workflow">
+        <div class="card-header fw-semibold">Check / Apply Workflow</div>
+        <div class="card-body">
+            <ol>
+                <li><strong>Check</strong> shows a preview of Actual, Trend, and Fallback candidates for one metric without writing data.</li>
+                <li><strong>Apply</strong> writes the selected value (manual override or calculated value) for the target year.</li>
+                <li>Trend details include the method used (for example, <code>Method: LogLinear</code> or <code>Method: RecencyWeighted</code>).</li>
+                <li>After Check/Apply postback, the page restores your previous scroll position and reopens previously expanded sections.</li>
+            </ol>
+        </div>
+    </div>
+
     
     <div class="card mb-4" id="revenue">
         <div class="card-header fw-semibold">Total Revenue</div>
         <div class="card-body">
-            <p class="mb-2">Uses the <strong>log-linear trend fit</strong> algorithm. Steps in priority order:</p>
+            <p class="mb-2">Uses the configured trend method (<strong>LogLinear</strong> or <strong>RecencyWeighted</strong>) with the same fallback chain. Steps in priority order:</p>
             <ol>
                 <li>
                     <strong>Actual value</strong> — if the company has a recorded Total Revenue answer for the target financial year, that value is returned immediately.
                 </li>
                 <li>
-                    <strong>Log-linear trend (minimum 3 positive points)</strong> — takes up to the 5 most recent prior-year positive values and fits an OLS regression on <code>ln(value)</code> vs financial year:
+                    <strong>Configured trend (minimum 3 positive points)</strong> — takes up to the 5 most recent prior-year positive values and applies the selected method:
+                    <div class="mt-2 mb-1"><strong>LogLinear:</strong> OLS regression on <code>ln(value)</code> vs financial year.</div>
                     <div class="bg-light border rounded p-3 my-2 font-monospace small">
                         slope = Σ[(year − meanYear) × (ln(value) − meanLnValue)] / Σ[(year − meanYear)²]<br />
                         forecast = exp(meanLnValue + slope × (targetYear − meanYear))
                     </div>
+                    <div class="mt-2 mb-1"><strong>RecencyWeighted:</strong> weighted log-linear trend that gives more importance to recent years and down-weights outliers.</div>
                     Requires <strong>≥ 3</strong> positive historical points. Result is unclamped (can be negative in theory, though practical values will not be).
                 </li>
                 <li>
@@ -62,13 +81,13 @@
     <div class="card mb-4" id="employment">
         <div class="card-header fw-semibold">Total Employment</div>
         <div class="card-body">
-            <p class=\"mb-2\">Uses the same <strong>log-linear trend fit</strong> algorithm as Total Revenue. Steps in priority order:</p>
+            <p class=\"mb-2\">Uses the same configured trend method as Total Revenue (<strong>LogLinear</strong> or <strong>RecencyWeighted</strong>). Steps in priority order:</p>
             <ol>
                 <li>
                     <strong>Actual value</strong> — if the company has a recorded Total Employment answer for the target financial year, that value is returned immediately. Historical data from both the current and legacy employment question titles are combined.
                 </li>
                 <li>
-                    <strong>Log-linear trend (minimum 3 positive points)</strong> — takes up to the 5 most recent prior-year positive values and fits an OLS regression on <code>ln(value)</code> vs financial year:
+                    <strong>Configured trend (minimum 3 positive points)</strong> — takes up to the 5 most recent prior-year positive values and applies the selected method on positive points:
                     <div class=\"bg-light border rounded p-3 my-2 font-monospace small\">
                         slope = Σ[(year − meanYear) × (ln(value) − meanLnValue)] / Σ[(year − meanYear)²]<br />
                         forecast = exp(meanLnValue + slope × (targetYear − meanYear))
@@ -98,7 +117,7 @@
             <ol>
                 <li><strong>Actual value</strong> for the target year → returned directly.</li>
                 <li>
-                    <strong>Log-linear growth fit (minimum 2 positive points)</strong> — takes up to 5 recent prior-year positive values and applies OLS on <code>ln(value)</code> vs financial year.
+                    <strong>Configured trend (minimum 2 positive points)</strong> — takes up to 5 recent prior-year positive values and applies the selected method.
                 </li>
                 <li>
                     <strong>Sector-percentage fallback (active)</strong> — when fewer than 2 positive historical points are available, the system computes the sector share for that specific region and applies it to forecasted total employment:
@@ -117,11 +136,11 @@
     <div class="card mb-4" id="wages">
         <div class="card-header fw-semibold">Wages &amp; Salaries</div>
         <div class="card-body">
-                <p class="mb-2">Uses <strong>log-linear trend fit</strong> with a higher minimum and an active sector-ratio fallback. Ratios are calculated from the primary sector using the last 5 years of wages-to-revenue data.</p>
+                <p class="mb-2">Uses the configured trend method (<strong>LogLinear</strong> or <strong>RecencyWeighted</strong>) with a higher minimum and an active sector-ratio fallback. Ratios are calculated from the primary sector using the last 5 years of wages-to-revenue data.</p>
             <ol>
                 <li><strong>Actual value</strong> for target year → returned directly.</li>
                 <li>
-                        <strong>Log-linear trend (&gt; 3 positive points)</strong> — same OLS on <code>ln(value)</code> as Total Revenue, but requires <strong>more than 3</strong> data points (i.e. ≥ 4).
+                        <strong>Configured trend (&gt; 3 positive points)</strong> — same threshold as before, but uses the selected method on positive points and requires <strong>more than 3</strong> data points (i.e. ≥ 4).
                 </li>
                 <li>
                         <strong>Sector-ratio fallback (active)</strong> — when fewer than 4 positive historical points are available for the company, calculates the average ratio of <em>wages-to-revenue</em> from all companies in the same primary sector over the last 5 years and applies that ratio to the company's forecasted revenue:
@@ -140,11 +159,11 @@
     <div class="card mb-4" id="rd">
         <div class="card-header fw-semibold">Research &amp; Development</div>
         <div class="card-body">
-                <p class="mb-2">Uses the <strong>log-linear trend fit</strong> algorithm with an active sector-ratio fallback. Ratios are calculated from the primary sector using the last 5 years of R&D-to-revenue data.</p>
+                <p class="mb-2">Uses the configured trend method (<strong>LogLinear</strong> or <strong>RecencyWeighted</strong>) with an active sector-ratio fallback. Ratios are calculated from the primary sector using the last 5 years of R&D-to-revenue data.</p>
             <ol>
                 <li><strong>Actual value</strong> for target year → returned directly.</li>
                     <li>
-                        <strong>Log-linear trend (≥ 3 positive points)</strong> — same OLS on <code>ln(value)</code> as Total Revenue across up to 5 prior years.
+                        <strong>Configured trend (≥ 3 positive points)</strong> — uses the selected method across up to 5 prior years.
                     </li>
                     <li>
                         <strong>Sector-ratio fallback (active)</strong> — when fewer than 3 positive historical points are available for the company, calculates the average ratio of <em>R&D-to-revenue</em> from all companies in the same primary sector over the last 5 years and applies that ratio to the company's forecasted revenue:
@@ -163,11 +182,11 @@
     <div class="card mb-4" id="salesmarketing">
         <div class="card-header fw-semibold">Sales &amp; Marketing</div>
         <div class="card-body">
-                <p class="mb-2">Uses the <strong>log-linear trend fit</strong> algorithm with an active sector-ratio fallback. Ratios are calculated from the primary sector using the last 5 years of S&M-to-revenue data.</p>
+                <p class="mb-2">Uses the configured trend method (<strong>LogLinear</strong> or <strong>RecencyWeighted</strong>) with an active sector-ratio fallback. Ratios are calculated from the primary sector using the last 5 years of S&M-to-revenue data.</p>
             <ol>
                 <li><strong>Actual value</strong> for target year → returned directly.</li>
                     <li>
-                        <strong>Log-linear trend (≥ 3 positive points)</strong> — same OLS on <code>ln(value)</code> as Total Revenue across up to 5 prior years.
+                        <strong>Configured trend (≥ 3 positive points)</strong> — uses the selected method across up to 5 prior years.
                     </li>
                     <li>
                         <strong>Sector-ratio fallback (active)</strong> — when fewer than 3 positive historical points are available for the company, calculates the average ratio of <em>S&M-to-revenue</em> from all companies in the same primary sector over the last 5 years and applies that ratio to the company's forecasted revenue:
@@ -186,7 +205,7 @@
     <div class="card mb-4" id="ebitda">
         <div class="card-header fw-semibold">EBITDA</div>
         <div class="card-body">
-            <p class="mb-2">Uses <strong>linear regression</strong> (equivalent to Excel's <code>FORECAST.LINEAR</code>), not log-linear, because EBITDA can be negative.</p>
+            <p class="mb-2">EBITDA is kept on a <strong>LogLinear-first path</strong> (fixed behavior), with linear fallback only when needed.</p>
             <ol>
                 <li><strong>Actual value</strong> for target year → returned directly.</li>
                 <li>
@@ -197,7 +216,10 @@
                     </div>
                 </li>
                 <li>
-                    <strong>Linear regression (≥ 4 historical points)</strong> — OLS on raw values vs financial year across all prior-year non-null points:
+                    <strong>Log-linear trend (≥ 4 positive points)</strong> — OLS on <code>ln(value)</code> vs financial year using positive points.
+                </li>
+                <li>
+                    <strong>Linear regression fallback (if log-linear cannot be fit)</strong> — OLS on raw values vs financial year across all prior-year non-null points:
                     <div class="bg-light border rounded p-3 my-2 font-monospace small">
                         slope = Σ[(year − avgYear) × (value − avgValue)] / Σ[(year − avgYear)²]<br />
                         intercept = avgValue − slope × avgYear<br />
@@ -206,7 +228,7 @@
                     </div>
                     The result is floored at <code>0</code> (negative EBITDA estimates are zeroed).
                 </li>
-                <li><strong>No result</strong> if fewer than 4 points and sector fallback cannot be computed.</li>
+                <li><strong>No result</strong> if neither sector fallback nor trend path can produce a value.</li>
             </ol>
         </div>
     </div>
@@ -215,11 +237,11 @@
     <div class="card mb-4" id="regions">
         <div class="card-header fw-semibold">Regional Revenue (NZ, Australia, China, Rest of Asia, North America, Europe, Middle East, Latin America, Africa, Other)</div>
         <div class="card-body">
-            <p class="mb-2">All 10 regional revenue metrics share the <strong>same log-linear growth fit algorithm</strong> with a <em>lower</em> minimum threshold than the total revenue metric, plus an active sector-specific export-ratio fallback.</p>
+            <p class="mb-2">All 10 regional revenue metrics share the same configured trend method (<strong>LogLinear</strong> or <strong>RecencyWeighted</strong>) with a <em>lower</em> minimum threshold than the total revenue metric, plus an active sector-specific export-ratio fallback.</p>
             <ol>
                 <li><strong>Actual value</strong> for the target year → returned directly.</li>
                 <li>
-                    <strong>Log-linear growth fit (minimum 2 positive points)</strong> — takes up to the 5 most recent prior-year positive values:
+                    <strong>Configured trend (minimum 2 positive points)</strong> — takes up to the 5 most recent prior-year positive values and applies the selected method:
                     <div class="bg-light border rounded p-3 my-2 font-monospace small">
                         slope = Σ[(year − meanYear) × (ln(value) − meanLnValue)] / Σ[(year − meanYear)²]<br />
                         forecast = exp(meanLnValue + slope × (targetYear − meanYear))<br />
@@ -245,7 +267,8 @@
                 <tbody>
                     <tr><td>Minimum positive points</td><td>3</td><td>2</td></tr>
                     <tr><td>Floor at 0</td><td>No</td><td>Yes</td></tr>
-                    <tr><td>Sector fallback</td><td>No</td><td>Yes (active: primary-sector + region export ratio)</td></tr>
+                    <tr><td>Trend method</td><td>Configured (LogLinear or RecencyWeighted)</td><td>Configured (LogLinear or RecencyWeighted)</td></tr>
+                    <tr><td>Sector fallback</td><td>Yes (active in current implementation)</td><td>Yes (active: primary-sector + region export ratio)</td></tr>
                 </tbody>
             </table>
         </div>
