@@ -47,6 +47,30 @@ namespace TINWeb.Models
         [StringLength(255)]
         public string? CompanyDescription { get; set; }
 
+        [Display(Name = "Street")]
+        [StringLength(255)]
+        public string? AddStreet { get; set; }
+
+        [Display(Name = "Suburb")]
+        [StringLength(255)]
+        public string? AddSuburb { get; set; }
+
+        [Display(Name = "City")]
+        [StringLength(50)]
+        public string? AddCity { get; set; }
+
+        [Display(Name = "Postcode")]
+        [StringLength(50)]
+        public string? AddPostcode { get; set; }
+
+        [Display(Name = "Phone")]
+        [StringLength(50)]
+        public string? Phone { get; set; }
+
+        [Display(Name = "Website")]
+        [StringLength(255)]
+        public string? Website { get; set; }
+
         [Display(Name = "External ID Import Column Name")]
         [StringLength(255)]
         public string? ExternalIdImportColumnName { get; set; }

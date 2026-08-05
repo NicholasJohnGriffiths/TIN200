@@ -46,15 +46,18 @@ namespace TINWeb.Services
                 .FirstOrDefaultAsync();
 
             var selectedContent = await GetEmailContentAsync(emailContentId);
+            var templateFieldValues = await BuildTemplateFieldValuesAsync(clientId, companyName);
 
             var emailHeaderImageUrl = BuildEmailHeaderImageUrl(configuredEmailOptions?.EmailHeaderImageId);
 
-            var subject = string.IsNullOrWhiteSpace(selectedContent.Subject)
+            var subjectTemplate = string.IsNullOrWhiteSpace(selectedContent.Subject)
                 ? defaultSubject
                 : selectedContent.Subject.Trim();
+            var subject = ApplyBracketPlaceholders(subjectTemplate, templateFieldValues, encodeForHtml: false);
 
             var (plainTextBody, htmlBody) = BuildSurveyEmailBodies(
                 selectedContent.Template,
+                templateFieldValues,
                 emailHeaderImageUrl,
                 recipientName,
                 surveyUrl,
@@ -91,15 +94,18 @@ namespace TINWeb.Services
                 .FirstOrDefaultAsync();
 
             var selectedContent = await GetEmailContentAsync(emailContentId);
+            var templateFieldValues = await BuildTemplateFieldValuesAsync(clientId, companyName);
 
-            var subject = string.IsNullOrWhiteSpace(selectedContent.Subject)
+            var subjectTemplate = string.IsNullOrWhiteSpace(selectedContent.Subject)
                 ? $"Reminder: Complete Your {currentSurveyYear} TIN Survey"
                 : selectedContent.Subject.Trim();
+            var subject = ApplyBracketPlaceholders(subjectTemplate, templateFieldValues, encodeForHtml: false);
 
             var emailHeaderImageUrl = BuildEmailHeaderImageUrl(configuredEmailOptions?.EmailHeaderImageId);
 
             var (plainTextBody, htmlBody) = BuildSurveyEmailBodies(
                 selectedContent.Template,
+                templateFieldValues,
                 emailHeaderImageUrl,
                 recipientName,
                 surveyUrl,
@@ -129,10 +135,12 @@ namespace TINWeb.Services
                 .FirstOrDefaultAsync();
 
             var selectedContent = await GetEmailContentAsync(emailContentId);
+            var templateFieldValues = await BuildTemplateFieldValuesAsync(clientId, companyName);
             var emailHeaderImageUrl = BuildEmailHeaderImageUrl(configuredEmailOptions?.EmailHeaderImageId);
 
             var (plainTextBody, htmlBody) = BuildSurveyEmailBodies(
                 selectedContent.Template,
+                templateFieldValues,
                 emailHeaderImageUrl,
                 recipientName,
                 surveyUrl,
@@ -142,7 +150,7 @@ namespace TINWeb.Services
 
             return new SurveyEmailPreviewResult
             {
-                Subject = selectedContent.Subject?.Trim() ?? string.Empty,
+                Subject = ApplyBracketPlaceholders(selectedContent.Subject?.Trim() ?? string.Empty, templateFieldValues, encodeForHtml: false),
                 PlainTextBody = plainTextBody,
                 HtmlBody = htmlBody
             };
@@ -268,6 +276,7 @@ The survey has not been submitted yet.";
 
         private (string PlainTextBody, string HtmlBody) BuildSurveyEmailBodies(
             string? configuredTemplate,
+            IReadOnlyDictionary<string, string> templateFieldValues,
             string? emailHeaderImageUrl,
             string recipientName,
             string surveyUrl,
@@ -298,8 +307,8 @@ Regards,
 
             if (!string.IsNullOrWhiteSpace(configuredTemplate))
             {
-                var htmlTemplate = ApplySurveyTemplate(configuredTemplate, recipientName, surveyUrl, encodeForHtml: true);
-                var plainTextTemplate = ConvertHtmlToPlainText(ApplySurveyTemplate(configuredTemplate, recipientName, surveyUrl, encodeForHtml: false));
+                var htmlTemplate = ApplySurveyTemplate(configuredTemplate, templateFieldValues, recipientName, surveyUrl, encodeForHtml: true);
+                var plainTextTemplate = ConvertHtmlToPlainText(ApplySurveyTemplate(configuredTemplate, templateFieldValues, recipientName, surveyUrl, encodeForHtml: false));
 
                 var plainTextBody = string.IsNullOrWhiteSpace(plainTextTemplate)
                     ? unsubscribePlainText
@@ -331,6 +340,131 @@ Open your secure survey link
             return (fallbackPlainTextBody, fallbackHtmlBody);
         }
 
+        private async Task<Dictionary<string, string>> BuildTemplateFieldValuesAsync(int clientId, string? fallbackCompanyName)
+        {
+            var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            var companyInfo = await _context.Tin200
+                    .AsNoTracking()
+                    .Where(c => c.Id == clientId)
+                    .Select(c => new
+                    {
+                        c.CompanyName,
+                        c.Website,
+                        c.Phone,
+                        c.AddStreet,
+                        c.AddSuburb,
+                        c.AddCity,
+                        c.AddPostcode
+                    })
+                    .FirstOrDefaultAsync();
+
+            var companyName = (companyInfo?.CompanyName)
+                ?? fallbackCompanyName
+                ?? string.Empty;
+
+            values[NormalizeTemplateKey("CompanyName")] = companyName;
+            values[NormalizeTemplateKey("Company Name")] = companyName;
+
+            var companySurveyInfo = await (
+                from cs in _context.CompanySurvey.AsNoTracking()
+                join s in _context.Survey.AsNoTracking() on cs.SurveyId equals s.Id
+                where cs.CompanyId == clientId
+                orderby s.CurrentSurvey descending, s.FinancialYear descending, cs.Id descending
+                select new
+                {
+                    CompanySurveyId = (int?)cs.Id,
+                    cs.Estimate
+                }
+            ).FirstOrDefaultAsync();
+
+            var isEstimated = companySurveyInfo?.Estimate == true;
+            values["Estimated"] = isEstimated ? "Estimated" : "Not Estimated";
+
+            if (companySurveyInfo?.CompanySurveyId.HasValue == true)
+            {
+                var answers = await (
+                    from a in _context.Answer.AsNoTracking()
+                    join q in _context.Question.AsNoTracking() on a.QuestionId equals q.Id
+                    where a.CompanySurveyId == companySurveyInfo.CompanySurveyId.Value && q.Title != null
+                    orderby a.Id descending
+                    select new
+                    {
+                        QuestionTitle = q.Title!,
+                        a.AnswerText,
+                        a.AnswerCurrency,
+                        a.AnswerNumber
+                    }
+                ).ToListAsync();
+
+                foreach (var answer in answers)
+                {
+                    var normalizedQuestionTitle = NormalizeTemplateKey(answer.QuestionTitle);
+                    if (values.ContainsKey(normalizedQuestionTitle))
+                    {
+                        continue;
+                    }
+
+                    var resolvedValue = ResolveAnswerValue(answer.AnswerText, answer.AnswerCurrency, answer.AnswerNumber);
+                    if (string.IsNullOrWhiteSpace(resolvedValue))
+                    {
+                        continue;
+                    }
+
+                    values[normalizedQuestionTitle] = resolvedValue;
+                }
+            }
+
+            var webAddress = companyInfo?.Website?.Trim();
+            var companyPhone = companyInfo?.Phone?.Trim();
+            var physicalAddress = BuildPhysicalAddress(
+                companyInfo?.AddStreet,
+                companyInfo?.AddSuburb,
+                companyInfo?.AddCity,
+                companyInfo?.AddPostcode);
+
+            values[NormalizeTemplateKey("Web Address")] = string.IsNullOrWhiteSpace(webAddress) ? "TBC" : webAddress;
+            values[NormalizeTemplateKey("WebAddress")] = string.IsNullOrWhiteSpace(webAddress) ? "TBC" : webAddress;
+            values[NormalizeTemplateKey("Company Phone")] = string.IsNullOrWhiteSpace(companyPhone) ? "TBC" : companyPhone;
+            values[NormalizeTemplateKey("CompanyPhone")] = string.IsNullOrWhiteSpace(companyPhone) ? "TBC" : companyPhone;
+            values[NormalizeTemplateKey("Physical Address")] = string.IsNullOrWhiteSpace(physicalAddress) ? "TBC" : physicalAddress;
+            values[NormalizeTemplateKey("PhysicalAddress")] = string.IsNullOrWhiteSpace(physicalAddress) ? "TBC" : physicalAddress;
+
+            return values;
+        }
+
+        private static string ResolveAnswerValue(string? answerText, decimal? answerCurrency, double? answerNumber)
+        {
+            if (!string.IsNullOrWhiteSpace(answerText))
+            {
+                return answerText.Trim();
+            }
+
+            if (answerCurrency.HasValue)
+            {
+                return answerCurrency.Value.ToString("N2");
+            }
+
+            if (answerNumber.HasValue)
+            {
+                return answerNumber.Value.ToString("0.##");
+            }
+
+            return string.Empty;
+        }
+
+        private static string BuildPhysicalAddress(string? street, string? suburb, string? city, string? postcode)
+        {
+            var parts = new[] { street, suburb, city, postcode }
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value!.Trim())
+                .ToList();
+
+            return parts.Count == 0
+                ? string.Empty
+                : string.Join(", ", parts);
+        }
+
         private string? BuildEmailHeaderImageUrl(int? emailHeaderImageId)
         {
             if (!emailHeaderImageId.HasValue)
@@ -360,7 +494,7 @@ Open your secure survey link
 ";
         }
 
-        private static string ApplySurveyTemplate(string template, string recipientName, string surveyUrl, bool encodeForHtml)
+        private static string ApplySurveyTemplate(string template, IReadOnlyDictionary<string, string> templateFieldValues, string recipientName, string surveyUrl, bool encodeForHtml)
         {
             if (string.IsNullOrWhiteSpace(template))
             {
@@ -379,6 +513,9 @@ Open your secure survey link
                 .Replace("(Company Name)", companyReplacement, StringComparison.OrdinalIgnoreCase)
                 .Replace("(Name)", companyReplacement, StringComparison.OrdinalIgnoreCase)
                 .Replace("(Survey link)", surveyLinkReplacement, StringComparison.OrdinalIgnoreCase);
+
+            result = ApplyBracketPlaceholders(result, templateFieldValues, encodeForHtml);
+            result = ApplyParenthesisPlaceholders(result, templateFieldValues, encodeForHtml);
 
             if (encodeForHtml)
             {
@@ -412,6 +549,64 @@ Open your secure survey link
             }
 
             return result;
+        }
+
+        private static string ApplyBracketPlaceholders(string content, IReadOnlyDictionary<string, string> values, bool encodeForHtml)
+        {
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                return string.Empty;
+            }
+
+            return Regex.Replace(
+                content,
+                @"\[(?<name>[^\[\]]+)\]",
+                match =>
+                {
+                    var key = NormalizeTemplateKey(match.Groups["name"].Value);
+                    if (string.IsNullOrWhiteSpace(key) || !values.TryGetValue(key, out var value))
+                    {
+                        return match.Value;
+                    }
+
+                    return encodeForHtml ? WebUtility.HtmlEncode(value) : value;
+                },
+                RegexOptions.None,
+                TimeSpan.FromMilliseconds(500));
+        }
+
+        private static string ApplyParenthesisPlaceholders(string content, IReadOnlyDictionary<string, string> values, bool encodeForHtml)
+        {
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                return string.Empty;
+            }
+
+            return Regex.Replace(
+                content,
+                @"\((?<name>[^\(\)\r\n]{1,200})\)",
+                match =>
+                {
+                    var key = NormalizeTemplateKey(match.Groups["name"].Value);
+                    if (string.IsNullOrWhiteSpace(key) || !values.TryGetValue(key, out var value))
+                    {
+                        return match.Value;
+                    }
+
+                    return encodeForHtml ? WebUtility.HtmlEncode(value) : value;
+                },
+                RegexOptions.None,
+                TimeSpan.FromMilliseconds(500));
+        }
+
+        private static string NormalizeTemplateKey(string? raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                return string.Empty;
+            }
+
+            return Regex.Replace(raw.Trim(), @"\s+", " ");
         }
 
         private static string ConvertHtmlToPlainText(string html)

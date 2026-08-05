@@ -26,7 +26,7 @@
         <div class="mb-3">
             <label asp-for="Record.Template" class="form-label">Email Template</label>
             <textarea asp-for="Record.Template" id="emailContentTemplateEditor" class="form-control" rows="14"></textarea>
-            <div class="form-text">Rich text/HTML is supported. Use (Company Name) or (Name) for company name, and include a link with id="surveylink" for the survey URL.</div>
+            <div class="form-text">Rich text/HTML is supported. Use [CompanyName] or (CompanyName) for company name. Other [Field] or (Field) values map by exact Question Title. [Web Address]/(Web address), [Company Phone]/(Company phone), and [Physical Address]/(Physical address) map from Company.Website, Company.Phone, and Company address fields. Legacy tokens (Company Name), (Name), and (Survey link) are still supported.</div>
         </div>
 
         <div class="form-check mb-3">

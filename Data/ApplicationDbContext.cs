@@ -86,6 +86,36 @@ namespace TINWeb.Data
                     .HasColumnType("varchar(255)")
                     .HasMaxLength(255);
 
+                entity.Property(e => e.AddStreet)
+                    .HasColumnName("Add_Street")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255);
+
+                entity.Property(e => e.AddSuburb)
+                    .HasColumnName("Add_Suburb")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255);
+
+                entity.Property(e => e.AddCity)
+                    .HasColumnName("Add_City")
+                    .HasColumnType("varchar(50)")
+                    .HasMaxLength(50);
+
+                entity.Property(e => e.AddPostcode)
+                    .HasColumnName("Add_Postcode")
+                    .HasColumnType("varchar(50)")
+                    .HasMaxLength(50);
+
+                entity.Property(e => e.Phone)
+                    .HasColumnName("Phone")
+                    .HasColumnType("varchar(50)")
+                    .HasMaxLength(50);
+
+                entity.Property(e => e.Website)
+                    .HasColumnName("Website")
+                    .HasColumnType("varchar(255)")
+                    .HasMaxLength(255);
+
                 entity.Property(e => e.ExternalIdImportColumnName)
                     .HasColumnName("ExternalId_ImportColumnName")
                     .HasColumnType("varchar(255)")
