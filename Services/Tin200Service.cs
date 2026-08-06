@@ -454,22 +454,17 @@ VALUES (@externalId, @companyName, @tinStatus);";
             }
         }
 
-        public async Task<CompanyGlobalImportPreviewResult> PreviewGlobalImportFromExcelAsync(Stream excelStream, int importYear)
+        public async Task<CompanyGlobalImportPreviewResult> PreviewGlobalImportFromExcelAsync(Stream excelStream, int importYear, CompanyGlobalImportMapping? mapping = null)
         {
-            var plan = await BuildCompanyGlobalImportPlanAsync(excelStream);
+            var plan = await BuildCompanyGlobalImportPlanAsync(excelStream, mapping);
             var previewErrors = new List<string>(plan.Errors);
             var estimatedCompanySurveyCreatedCount = await EstimateCompanySurveyRowsForImportAsync(plan, importYear, previewErrors);
-            var matchedHeaders = new[]
-            {
-                plan.MatchedExternalIdHeader,
-                plan.MatchedCompanyNameHeader,
-                plan.MatchedCompanyDescriptionHeader
-            }
-            .Where(x => !string.IsNullOrWhiteSpace(x))
-            .Select(x => x!.Trim())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+            var matchedHeaders = plan.MatchedHeaderByField.Values
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .ToList();
 
             var unmatchedHeaders = plan.AvailableHeaders
                 .Except(matchedHeaders, StringComparer.OrdinalIgnoreCase)
@@ -498,17 +493,17 @@ VALUES (@externalId, @companyName, @tinStatus);";
                         ExistingExternalId = x.ExistingExternalId,
                         ExistingCompanyName = x.ExistingCompanyName,
                         ExistingCompanyDescription = x.ExistingCompanyDescription,
-                        ImportedExternalId = x.ImportedExternalId,
-                        ImportedCompanyName = x.ImportedCompanyName,
-                        ImportedCompanyDescription = x.ImportedCompanyDescription
+                        ImportedExternalId = x.ImportedValues.ExternalId,
+                        ImportedCompanyName = x.ImportedValues.CompanyName,
+                        ImportedCompanyDescription = x.ImportedValues.CompanyDescription
                     })
                     .ToList()
             };
         }
 
-        public async Task<CompanyGlobalImportResult> ImportGlobalFromExcelAsync(Stream excelStream, int importYear, int? importTinStatus = null)
+        public async Task<CompanyGlobalImportResult> ImportGlobalFromExcelAsync(Stream excelStream, int importYear, int? importTinStatus = null, CompanyGlobalImportMapping? mapping = null)
         {
-            var plan = await BuildCompanyGlobalImportPlanAsync(excelStream);
+            var plan = await BuildCompanyGlobalImportPlanAsync(excelStream, mapping);
             var finalImportTinStatus = importTinStatus.HasValue && TinStatusHelper.IsValidSelection(importTinStatus)
                 ? importTinStatus
                 : (int)TinStatus.Tin200;
@@ -529,12 +524,54 @@ VALUES (@externalId, @companyName, @tinStatus);";
 
             await using var transaction = await _context.Database.BeginTransactionAsync();
 
+            var updateOperations = plan.Operations
+                .Where(x => x.Action == CompanyImportAction.Update && x.ExistingCompanyId.HasValue)
+                .ToList();
+
+            if (updateOperations.Any())
+            {
+                var updateIds = updateOperations
+                    .Select(x => x.ExistingCompanyId!.Value)
+                    .Distinct()
+                    .ToList();
+
+                var companiesToUpdate = await _context.Tin200
+                    .Where(x => updateIds.Contains(x.Id))
+                    .ToDictionaryAsync(x => x.Id);
+
+                foreach (var operation in updateOperations)
+                {
+                    if (!operation.ExistingCompanyId.HasValue || !companiesToUpdate.TryGetValue(operation.ExistingCompanyId.Value, out var existingCompany))
+                    {
+                        continue;
+                    }
+
+                    ApplyImportedValues(existingCompany, operation.ImportedValues);
+                }
+            }
+
             foreach (var operation in plan.Operations.Where(x => x.Action == CompanyImportAction.Add))
             {
-                await _context.Database.ExecuteSqlInterpolatedAsync($@"
-INSERT INTO [Company] ([ExternalID], [CompanyName], [CompanyDescription], [ExternalId_ImportColumnName], [CompanyName_ImportColumnName], [CompanyDescription_ImportColumnName], [FinancialYear], [LastTIN200Year], [TINStatus])
-VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operation.ImportedCompanyDescription}, {plan.MatchedExternalIdHeader}, {plan.MatchedCompanyNameHeader}, {plan.MatchedCompanyDescriptionHeader}, {importYear}, {importYear}, {finalImportTinStatus})");
+                var imported = operation.ImportedValues;
+                if (!imported.TinStatus.HasValue)
+                {
+                    imported.TinStatus = finalImportTinStatus;
+                }
+
+                if (!imported.FinancialYear.HasValue)
+                {
+                    imported.FinancialYear = importYear;
+                }
+
+                if (!imported.LastTIN200Year.HasValue)
+                {
+                    imported.LastTIN200Year = importYear;
+                }
+
+                _context.Tin200.Add(imported);
             }
+
+            await _context.SaveChangesAsync();
 
             result.CompanySurveyCreatedCount = await EnsureCompanySurveyRowsForImportAsync(plan, importYear, result.Errors);
 
@@ -693,10 +730,7 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                         continue;
                     }
 
-                    company.ContactFirstName = operation.ImportedContactFirstName;
-                    company.ContactLastName = operation.ImportedContactLastName;
-                    company.ContactEmail = operation.ImportedContactEmail;
-                    company.TinStatus = operation.ImportedTinStatus;
+                    ApplyImportedValues(company, operation.ImportedValues);
                     touchedCompanyIds.Add(company.Id);
                 }
             }
@@ -710,19 +744,24 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
 
                 foreach (var operation in operationsToInsert)
                 {
-                    var generatedExternalId = ResolveNextExternalId(null, allExternalIds);
-                    allExternalIds.Add(generatedExternalId);
-
-                    var insertedCompany = new Tin200
+                    var importedValues = operation.ImportedValues;
+                    if (string.IsNullOrWhiteSpace(importedValues.ExternalId))
                     {
-                        CompanyName = operation.CompanyName,
-                        ContactFirstName = operation.ImportedContactFirstName,
-                        ContactLastName = operation.ImportedContactLastName,
-                        ContactEmail = operation.ImportedContactEmail,
-                        ExternalId = ClampToMaxLength(generatedExternalId, 50),
-                        CompanyNameImportColumnName = plan.MatchedCompanyNameHeader,
-                        TinStatus = operation.ImportedTinStatus
-                    };
+                        var generatedExternalId = ResolveNextExternalId(null, allExternalIds);
+                        allExternalIds.Add(generatedExternalId);
+                        importedValues.ExternalId = ClampToMaxLength(generatedExternalId, 50);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(importedValues.ExternalId)
+                        && !allExternalIds.Contains(importedValues.ExternalId!, StringComparer.OrdinalIgnoreCase))
+                    {
+                        allExternalIds.Add(importedValues.ExternalId!);
+                    }
+
+                    importedValues.CompanyNameImportColumnName = plan.MatchedCompanyNameHeader;
+
+                    var insertedCompany = new Tin200();
+                    ApplyImportedValues(insertedCompany, importedValues);
 
                     _context.Tin200.Add(insertedCompany);
                     insertedCompanies.Add(insertedCompany);
@@ -890,14 +929,14 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                 .ToList();
 
             var unresolvedExternalIds = unresolvedOperations
-                .Select(o => o.ImportedExternalId)
+                .Select(o => o.ImportedValues.ExternalId)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Select(x => x!.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             var unresolvedNames = unresolvedOperations
-                .Select(o => o.ImportedCompanyName)
+                .Select(o => o.ImportedValues.CompanyName)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Select(x => x!.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -931,8 +970,8 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
 
                 var resolvedCompanyId = 0;
                 var resolved = false;
-                var importedExternalId = operation.ImportedExternalId?.Trim();
-                var importedCompanyName = operation.ImportedCompanyName?.Trim();
+                var importedExternalId = operation.ImportedValues.ExternalId?.Trim();
+                var importedCompanyName = operation.ImportedValues.CompanyName?.Trim();
 
                 if (!string.IsNullOrWhiteSpace(importedExternalId)
                     && companyIdByExternalId.TryGetValue(importedExternalId, out resolvedCompanyId))
@@ -1387,7 +1426,306 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                 .ToArray());
         }
 
-        private async Task<CompanyGlobalImportPlan> BuildCompanyGlobalImportPlanAsync(Stream excelStream)
+        private static void ApplyImportedValues(Tin200 target, Tin200 source)
+        {
+            target.CeoFirstName = source.CeoFirstName;
+            target.CeoLastName = source.CeoLastName;
+            target.ContactFirstName = source.ContactFirstName;
+            target.ContactLastName = source.ContactLastName;
+            target.ContactEmail = source.ContactEmail;
+            target.Email = source.Email;
+            target.ExternalId = source.ExternalId;
+            target.CompanyName = source.CompanyName;
+            target.CompanyDescription = source.CompanyDescription;
+            target.AddStreet = source.AddStreet;
+            target.AddSuburb = source.AddSuburb;
+            target.AddCity = source.AddCity;
+            target.AddPostcode = source.AddPostcode;
+            target.Phone = source.Phone;
+            target.Website = source.Website;
+            target.ExternalIdImportColumnName = source.ExternalIdImportColumnName;
+            target.CompanyNameImportColumnName = source.CompanyNameImportColumnName;
+            target.CompanyDescriptionImportColumnName = source.CompanyDescriptionImportColumnName;
+            target.Fye2025 = source.Fye2025;
+            target.Fye2024 = source.Fye2024;
+            target.Fye2023 = source.Fye2023;
+            target.FinancialYear = source.FinancialYear;
+            target.LastTIN200Year = source.LastTIN200Year;
+            target.TinStatus = source.TinStatus;
+        }
+
+        private static Tin200 CloneTin200(Tin200 source)
+        {
+            var clone = new Tin200();
+            ApplyImportedValues(clone, source);
+            clone.Id = source.Id;
+            return clone;
+        }
+
+        private static bool AreTin200ValuesEquivalent(Tin200 left, Tin200 right)
+        {
+            return string.Equals(NullIfWhiteSpace(left.CeoFirstName), NullIfWhiteSpace(right.CeoFirstName), StringComparison.OrdinalIgnoreCase)
+                && string.Equals(NullIfWhiteSpace(left.CeoLastName), NullIfWhiteSpace(right.CeoLastName), StringComparison.OrdinalIgnoreCase)
+                && string.Equals(NullIfWhiteSpace(left.ContactFirstName), NullIfWhiteSpace(right.ContactFirstName), StringComparison.OrdinalIgnoreCase)
+                && string.Equals(NullIfWhiteSpace(left.ContactLastName), NullIfWhiteSpace(right.ContactLastName), StringComparison.OrdinalIgnoreCase)
+                && string.Equals(NullIfWhiteSpace(left.ContactEmail), NullIfWhiteSpace(right.ContactEmail), StringComparison.OrdinalIgnoreCase)
+                && string.Equals(NullIfWhiteSpace(left.Email), NullIfWhiteSpace(right.Email), StringComparison.OrdinalIgnoreCase)
+                && string.Equals(NullIfWhiteSpace(left.ExternalId), NullIfWhiteSpace(right.ExternalId), StringComparison.OrdinalIgnoreCase)
+                && string.Equals(NullIfWhiteSpace(left.CompanyName), NullIfWhiteSpace(right.CompanyName), StringComparison.OrdinalIgnoreCase)
+                && string.Equals(NullIfWhiteSpace(left.CompanyDescription), NullIfWhiteSpace(right.CompanyDescription), StringComparison.OrdinalIgnoreCase)
+                && string.Equals(NullIfWhiteSpace(left.AddStreet), NullIfWhiteSpace(right.AddStreet), StringComparison.OrdinalIgnoreCase)
+                && string.Equals(NullIfWhiteSpace(left.AddSuburb), NullIfWhiteSpace(right.AddSuburb), StringComparison.OrdinalIgnoreCase)
+                && string.Equals(NullIfWhiteSpace(left.AddCity), NullIfWhiteSpace(right.AddCity), StringComparison.OrdinalIgnoreCase)
+                && string.Equals(NullIfWhiteSpace(left.AddPostcode), NullIfWhiteSpace(right.AddPostcode), StringComparison.OrdinalIgnoreCase)
+                && string.Equals(NullIfWhiteSpace(left.Phone), NullIfWhiteSpace(right.Phone), StringComparison.OrdinalIgnoreCase)
+                && string.Equals(NullIfWhiteSpace(left.Website), NullIfWhiteSpace(right.Website), StringComparison.OrdinalIgnoreCase)
+                && left.Fye2025 == right.Fye2025
+                && left.Fye2024 == right.Fye2024
+                && left.Fye2023 == right.Fye2023
+                && left.FinancialYear == right.FinancialYear
+                && left.LastTIN200Year == right.LastTIN200Year
+                && left.TinStatus == right.TinStatus;
+        }
+
+        private static decimal? ParseImportedDecimal(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            var cleaned = value
+                .Replace("$", string.Empty)
+                .Replace(",", string.Empty)
+                .Trim();
+
+            if (decimal.TryParse(cleaned, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed))
+            {
+                return Math.Round(parsed, 0, MidpointRounding.AwayFromZero);
+            }
+
+            if (decimal.TryParse(cleaned, NumberStyles.Any, CultureInfo.CurrentCulture, out parsed))
+            {
+                return Math.Round(parsed, 0, MidpointRounding.AwayFromZero);
+            }
+
+            return null;
+        }
+
+        private static int? ParseImportedInt(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            var cleaned = value.Trim();
+
+            if (int.TryParse(cleaned, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
+            {
+                return parsed;
+            }
+
+            if (int.TryParse(cleaned, NumberStyles.Integer, CultureInfo.CurrentCulture, out parsed))
+            {
+                return parsed;
+            }
+
+            if (decimal.TryParse(cleaned.Replace(",", string.Empty), NumberStyles.Any, CultureInfo.InvariantCulture, out var asDecimal))
+            {
+                return (int)Math.Round(asDecimal, 0, MidpointRounding.AwayFromZero);
+            }
+
+            return null;
+        }
+
+        private static int? ParseImportedTinStatus(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            var parsedInt = ParseImportedInt(value);
+            if (TinStatusHelper.IsValidSelection(parsedInt))
+            {
+                return parsedInt;
+            }
+
+            var normalized = NormalizeHeader(value);
+            if (normalized is "TIN200") return (int)TinStatus.Tin200;
+            if (normalized is "TIN200POTENTIAL") return (int)TinStatus.Tin200Potential;
+            if (normalized is "TIN1000") return (int)TinStatus.Tin1000;
+            if (normalized is "TINTEST") return (int)TinStatus.TinTest;
+
+            TinStatusHelper.TryParseLegacyTin200(value, out var legacyStatus);
+            return legacyStatus;
+        }
+
+        private static string? ParseImportedString(string? value, int maxLength)
+        {
+            var normalized = NullIfWhiteSpace(value);
+            if (normalized == null)
+            {
+                return null;
+            }
+
+            return ClampToMaxLength(normalized, maxLength);
+        }
+
+        private static List<GlobalImportFieldSpec> GetGlobalImportFieldSpecs(CompanyGlobalImportMapping? mapping)
+        {
+            var allowFallbackAliases = !HasAnyGlobalImportHeaderMapped(mapping);
+
+            return new List<GlobalImportFieldSpec>
+            {
+                new("CeoFirstName", "CEO First Name", BuildHeaderAliases(new[] { mapping?.CeoFirstNameHeader }, allowFallbackAliases, "CEO First Name", "CEOFirstName"), (company, raw) => company.CeoFirstName = ParseImportedString(raw, 255)),
+                new("CeoLastName", "CEO Last Name", BuildHeaderAliases(new[] { mapping?.CeoLastNameHeader }, allowFallbackAliases, "CEO Last Name", "CEOLastName"), (company, raw) => company.CeoLastName = ParseImportedString(raw, 255)),
+                new("ContactFirstName", "Contact First Name", BuildHeaderAliases(new[] { mapping?.ContactFirstNameHeader }, allowFallbackAliases, "Contact Person - First Name", "Contact First Name", "ContactFirstName"), (company, raw) => company.ContactFirstName = ParseImportedString(raw, 255)),
+                new("ContactLastName", "Contact Last Name", BuildHeaderAliases(new[] { mapping?.ContactLastNameHeader }, allowFallbackAliases, "Contact Person - Last Name", "Contact Last Name", "ContactLastName"), (company, raw) => company.ContactLastName = ParseImportedString(raw, 255)),
+                new("ContactEmail", "Contact Email", BuildHeaderAliases(new[] { mapping?.ContactEmailHeader }, allowFallbackAliases, "Contact Email", "ContactEmail"), (company, raw) => company.ContactEmail = ParseImportedString(raw, 255)),
+                new("Email", "Email", BuildHeaderAliases(new[] { mapping?.EmailHeader }, allowFallbackAliases, "Email"), (company, raw) => company.Email = ParseImportedString(raw, 255)),
+                new("ExternalId", "External ID", BuildHeaderAliases(new[] { mapping?.ExternalIdHeader }, allowFallbackAliases, "ID", "External ID", "ExternalID"), (company, raw) => company.ExternalId = ParseImportedString(raw, 50)),
+                new("CompanyName", "Company Name", BuildHeaderAliases(new[] { mapping?.CompanyNameHeader }, allowFallbackAliases, "Name", "Company Name", "CompanyName"), (company, raw) => company.CompanyName = ParseImportedString(raw, 255)),
+                new("CompanyDescription", "Company Description", BuildHeaderAliases(new[] { mapping?.CompanyDescriptionHeader }, allowFallbackAliases, "Description", "Company Description", "CompanyDescription"), (company, raw) => company.CompanyDescription = ParseImportedString(raw, 255)),
+                new("AddStreet", "Street", BuildHeaderAliases(new[] { mapping?.StreetHeader }, allowFallbackAliases, "Street", "Address Street"), (company, raw) => company.AddStreet = ParseImportedString(raw, 255)),
+                new("AddSuburb", "Suburb", BuildHeaderAliases(new[] { mapping?.SuburbHeader }, allowFallbackAliases, "Suburb", "Address Suburb"), (company, raw) => company.AddSuburb = ParseImportedString(raw, 255)),
+                new("AddCity", "City", BuildHeaderAliases(new[] { mapping?.CityHeader }, allowFallbackAliases, "City", "Address City"), (company, raw) => company.AddCity = ParseImportedString(raw, 50)),
+                new("AddPostcode", "Postcode", BuildHeaderAliases(new[] { mapping?.PostcodeHeader }, allowFallbackAliases, "Postcode", "Zip", "ZIP"), (company, raw) => company.AddPostcode = ParseImportedString(raw, 50)),
+                new("Phone", "Phone", BuildHeaderAliases(new[] { mapping?.PhoneHeader }, allowFallbackAliases, "Phone", "Telephone"), (company, raw) => company.Phone = ParseImportedString(raw, 50)),
+                new("Website", "Website", BuildHeaderAliases(new[] { mapping?.WebsiteHeader }, allowFallbackAliases, "Website", "Web Site", "URL"), (company, raw) => company.Website = ParseImportedString(raw, 255)),
+                new("Fye2025", "FYE Last Financial Year", BuildHeaderAliases(new[] { mapping?.Fye2025Header }, allowFallbackAliases, "FYE Last Financial Year", "FYE2025"), (company, raw) => company.Fye2025 = ParseImportedDecimal(raw)),
+                new("Fye2024", "FYE Year-1", BuildHeaderAliases(new[] { mapping?.Fye2024Header }, allowFallbackAliases, "FYE Year-1", "FYE2024"), (company, raw) => company.Fye2024 = ParseImportedDecimal(raw)),
+                new("Fye2023", "FYE Year-2", BuildHeaderAliases(new[] { mapping?.Fye2023Header }, allowFallbackAliases, "FYE Year-2", "FYE2023"), (company, raw) => company.Fye2023 = ParseImportedDecimal(raw)),
+                new("FinancialYear", "Financial Year", BuildHeaderAliases(new[] { mapping?.FinancialYearHeader }, allowFallbackAliases, "Financial Year", "FinancialYear"), (company, raw) => company.FinancialYear = ParseImportedInt(raw)),
+                new("LastTIN200Year", "Last TIN200 Year", BuildHeaderAliases(new[] { mapping?.LastTin200YearHeader }, allowFallbackAliases, "Last TIN200 Year", "LastTIN200Year"), (company, raw) => company.LastTIN200Year = ParseImportedInt(raw)),
+                new("TinStatus", "TIN Status", BuildHeaderAliases(new[] { mapping?.TinStatusHeader }, allowFallbackAliases, "TIN Status", "TINStatus", "TIN200"), (company, raw) => company.TinStatus = ParseImportedTinStatus(raw))
+            };
+        }
+
+        private static List<GenericImportFieldSpec> GetGenericImportFieldSpecs(CompanyContactImportMapping? mapping)
+        {
+            var allowFallbackAliases = !HasAnyGenericImportHeaderMapped(mapping);
+
+            return new List<GenericImportFieldSpec>
+            {
+                new("CeoFirstName", "CEO First Name", BuildHeaderAliases(new[] { mapping?.CeoFirstNameHeader }, allowFallbackAliases, "CEO First Name", "CEOFirstName"), (company, raw) => company.CeoFirstName = ParseImportedString(raw, 255)),
+                new("CeoLastName", "CEO Last Name", BuildHeaderAliases(new[] { mapping?.CeoLastNameHeader }, allowFallbackAliases, "CEO Last Name", "CEOLastName"), (company, raw) => company.CeoLastName = ParseImportedString(raw, 255)),
+                new("ContactFirstName", "Contact First Name", BuildHeaderAliases(new[] { mapping?.ContactFirstNameHeader }, allowFallbackAliases, "Contact Person - First Name", "Contact First Name", "ContactFirstName"), (company, raw) => company.ContactFirstName = ParseImportedString(raw, 255)),
+                new("ContactLastName", "Contact Last Name", BuildHeaderAliases(new[] { mapping?.ContactLastNameHeader }, allowFallbackAliases, "Contact Person - Last Name", "Contact Last Name", "ContactLastName"), (company, raw) => company.ContactLastName = ParseImportedString(raw, 255)),
+                new("ContactEmail", "Contact Email", BuildHeaderAliases(new[] { mapping?.ContactEmailHeader }, allowFallbackAliases, "Contact Email", "ContactEmail"), (company, raw) => company.ContactEmail = ParseImportedString(raw, 255)),
+                new("Email", "Email", BuildHeaderAliases(new[] { mapping?.EmailHeader }, allowFallbackAliases, "Email"), (company, raw) => company.Email = ParseImportedString(raw, 255)),
+                new("ExternalId", "External ID", BuildHeaderAliases(new[] { mapping?.ExternalIdHeader }, allowFallbackAliases, "ID", "External ID", "ExternalID"), (company, raw) => company.ExternalId = ParseImportedString(raw, 50)),
+                new("CompanyName", "Company Name", BuildHeaderAliases(new[] { mapping?.CompanyNameHeader }, allowFallbackAliases, "Name", "Company Name", "CompanyName"), (company, raw) => company.CompanyName = ParseImportedString(raw, 255)),
+                new("CompanyDescription", "Company Description", BuildHeaderAliases(new[] { mapping?.CompanyDescriptionHeader }, allowFallbackAliases, "Description", "Company Description", "CompanyDescription"), (company, raw) => company.CompanyDescription = ParseImportedString(raw, 255)),
+                new("AddStreet", "Street", BuildHeaderAliases(new[] { mapping?.StreetHeader }, allowFallbackAliases, "Street", "Address Street"), (company, raw) => company.AddStreet = ParseImportedString(raw, 255)),
+                new("AddSuburb", "Suburb", BuildHeaderAliases(new[] { mapping?.SuburbHeader }, allowFallbackAliases, "Suburb", "Address Suburb"), (company, raw) => company.AddSuburb = ParseImportedString(raw, 255)),
+                new("AddCity", "City", BuildHeaderAliases(new[] { mapping?.CityHeader }, allowFallbackAliases, "City", "Address City"), (company, raw) => company.AddCity = ParseImportedString(raw, 50)),
+                new("AddPostcode", "Postcode", BuildHeaderAliases(new[] { mapping?.PostcodeHeader }, allowFallbackAliases, "Postcode", "Zip", "ZIP"), (company, raw) => company.AddPostcode = ParseImportedString(raw, 50)),
+                new("Phone", "Phone", BuildHeaderAliases(new[] { mapping?.PhoneHeader }, allowFallbackAliases, "Phone", "Telephone"), (company, raw) => company.Phone = ParseImportedString(raw, 50)),
+                new("Website", "Website", BuildHeaderAliases(new[] { mapping?.WebsiteHeader }, allowFallbackAliases, "Website", "Web Site", "URL"), (company, raw) => company.Website = ParseImportedString(raw, 255)),
+                new("Fye2025", "FYE Last Financial Year", BuildHeaderAliases(new[] { mapping?.Fye2025Header }, allowFallbackAliases, "FYE Last Financial Year", "FYE2025"), (company, raw) => company.Fye2025 = ParseImportedDecimal(raw)),
+                new("Fye2024", "FYE Year-1", BuildHeaderAliases(new[] { mapping?.Fye2024Header }, allowFallbackAliases, "FYE Year-1", "FYE2024"), (company, raw) => company.Fye2024 = ParseImportedDecimal(raw)),
+                new("Fye2023", "FYE Year-2", BuildHeaderAliases(new[] { mapping?.Fye2023Header }, allowFallbackAliases, "FYE Year-2", "FYE2023"), (company, raw) => company.Fye2023 = ParseImportedDecimal(raw)),
+                new("FinancialYear", "Financial Year", BuildHeaderAliases(new[] { mapping?.FinancialYearHeader }, allowFallbackAliases, "Financial Year", "FinancialYear"), (company, raw) => company.FinancialYear = ParseImportedInt(raw)),
+                new("LastTIN200Year", "Last TIN200 Year", BuildHeaderAliases(new[] { mapping?.LastTin200YearHeader }, allowFallbackAliases, "Last TIN200 Year", "LastTIN200Year"), (company, raw) => company.LastTIN200Year = ParseImportedInt(raw)),
+                new("TinStatus", "TIN Status", BuildHeaderAliases(new[] { mapping?.TinStatusHeader }, allowFallbackAliases, "TIN Status", "TINStatus", "TIN200"), (company, raw) => company.TinStatus = ParseImportedTinStatus(raw))
+            };
+        }
+
+        private static bool HasAnyGlobalImportHeaderMapped(CompanyGlobalImportMapping? mapping)
+        {
+            if (mapping == null)
+            {
+                return false;
+            }
+
+            return !string.IsNullOrWhiteSpace(mapping.CeoFirstNameHeader)
+                || !string.IsNullOrWhiteSpace(mapping.CeoLastNameHeader)
+                || !string.IsNullOrWhiteSpace(mapping.ContactFirstNameHeader)
+                || !string.IsNullOrWhiteSpace(mapping.ContactLastNameHeader)
+                || !string.IsNullOrWhiteSpace(mapping.ContactEmailHeader)
+                || !string.IsNullOrWhiteSpace(mapping.EmailHeader)
+                || !string.IsNullOrWhiteSpace(mapping.ExternalIdHeader)
+                || !string.IsNullOrWhiteSpace(mapping.CompanyNameHeader)
+                || !string.IsNullOrWhiteSpace(mapping.CompanyDescriptionHeader)
+                || !string.IsNullOrWhiteSpace(mapping.StreetHeader)
+                || !string.IsNullOrWhiteSpace(mapping.SuburbHeader)
+                || !string.IsNullOrWhiteSpace(mapping.CityHeader)
+                || !string.IsNullOrWhiteSpace(mapping.PostcodeHeader)
+                || !string.IsNullOrWhiteSpace(mapping.PhoneHeader)
+                || !string.IsNullOrWhiteSpace(mapping.WebsiteHeader)
+                || !string.IsNullOrWhiteSpace(mapping.Fye2025Header)
+                || !string.IsNullOrWhiteSpace(mapping.Fye2024Header)
+                || !string.IsNullOrWhiteSpace(mapping.Fye2023Header)
+                || !string.IsNullOrWhiteSpace(mapping.FinancialYearHeader)
+                || !string.IsNullOrWhiteSpace(mapping.LastTin200YearHeader)
+                || !string.IsNullOrWhiteSpace(mapping.TinStatusHeader);
+        }
+
+        private static bool HasAnyGenericImportHeaderMapped(CompanyContactImportMapping? mapping)
+        {
+            if (mapping == null)
+            {
+                return false;
+            }
+
+            return !string.IsNullOrWhiteSpace(mapping.CompanyNameHeader)
+                || !string.IsNullOrWhiteSpace(mapping.ExternalIdHeader)
+                || !string.IsNullOrWhiteSpace(mapping.ContactFirstNameHeader)
+                || !string.IsNullOrWhiteSpace(mapping.ContactLastNameHeader)
+                || !string.IsNullOrWhiteSpace(mapping.ContactEmailHeader)
+                || !string.IsNullOrWhiteSpace(mapping.CeoFirstNameHeader)
+                || !string.IsNullOrWhiteSpace(mapping.CeoLastNameHeader)
+                || !string.IsNullOrWhiteSpace(mapping.EmailHeader)
+                || !string.IsNullOrWhiteSpace(mapping.CompanyDescriptionHeader)
+                || !string.IsNullOrWhiteSpace(mapping.StreetHeader)
+                || !string.IsNullOrWhiteSpace(mapping.SuburbHeader)
+                || !string.IsNullOrWhiteSpace(mapping.CityHeader)
+                || !string.IsNullOrWhiteSpace(mapping.PostcodeHeader)
+                || !string.IsNullOrWhiteSpace(mapping.PhoneHeader)
+                || !string.IsNullOrWhiteSpace(mapping.WebsiteHeader)
+                || !string.IsNullOrWhiteSpace(mapping.Fye2025Header)
+                || !string.IsNullOrWhiteSpace(mapping.Fye2024Header)
+                || !string.IsNullOrWhiteSpace(mapping.Fye2023Header)
+                || !string.IsNullOrWhiteSpace(mapping.FinancialYearHeader)
+                || !string.IsNullOrWhiteSpace(mapping.LastTin200YearHeader)
+                || !string.IsNullOrWhiteSpace(mapping.TinStatusHeader);
+        }
+
+        private sealed class GlobalImportFieldSpec
+        {
+            public GlobalImportFieldSpec(string fieldName, string label, List<string> aliases, Action<Tin200, string?> applyRawValue)
+            {
+                FieldName = fieldName;
+                Label = label;
+                Aliases = aliases;
+                ApplyRawValue = applyRawValue;
+            }
+
+            public string FieldName { get; }
+            public string Label { get; }
+            public List<string> Aliases { get; }
+            public Action<Tin200, string?> ApplyRawValue { get; }
+        }
+
+        private sealed class GenericImportFieldSpec
+        {
+            public GenericImportFieldSpec(string fieldName, string label, List<string> aliases, Action<Tin200, string?> applyRawValue)
+            {
+                FieldName = fieldName;
+                Label = label;
+                Aliases = aliases;
+                ApplyRawValue = applyRawValue;
+            }
+
+            public string FieldName { get; }
+            public string Label { get; }
+            public List<string> Aliases { get; }
+            public Action<Tin200, string?> ApplyRawValue { get; }
+        }
+
+        private async Task<CompanyGlobalImportPlan> BuildCompanyGlobalImportPlanAsync(Stream excelStream, CompanyGlobalImportMapping? mapping = null)
         {
             var plan = new CompanyGlobalImportPlan();
 
@@ -1489,39 +1827,38 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                 return false;
             }
 
-            var externalIdAliases = new List<string> { "ID", "External ID", "ExternalID" };
-            var companyNameAliases = new List<string> { "Name", "Company Name", "CompanyName" };
-            var companyDescriptionAliases = new List<string> { "Description", "Company Description", "CompanyDescription" };
+            var resolvedMappings = new List<(GlobalImportFieldSpec Spec, int Column, string Header)>();
+            foreach (var spec in GetGlobalImportFieldSpecs(mapping))
+            {
+                if (!TryGetColumn(spec.Aliases, out var column, out var matchedHeader))
+                {
+                    continue;
+                }
 
-            if (!TryGetColumn(externalIdAliases, out var externalIdColumn, out var matchedExternalIdHeader))
-            {
-                plan.Errors.Add($"Could not find an External ID column. Tried: {string.Join(", ", externalIdAliases)}");
-            }
-            else
-            {
-                plan.MatchedExternalIdHeader = matchedExternalIdHeader;
-                plan.MatchedFields.Add($"External ID -> {matchedExternalIdHeader}");
-            }
-
-            if (!TryGetColumn(companyNameAliases, out var companyNameColumn, out var matchedCompanyNameHeader))
-            {
-                plan.Errors.Add($"Could not find a Company Name column. Tried: {string.Join(", ", companyNameAliases)}");
-            }
-            else
-            {
-                plan.MatchedCompanyNameHeader = matchedCompanyNameHeader;
-                plan.MatchedFields.Add($"Company Name -> {matchedCompanyNameHeader}");
+                resolvedMappings.Add((spec, column, matchedHeader));
+                plan.MatchedHeaderByField[spec.FieldName] = matchedHeader;
+                plan.MatchedFields.Add($"{spec.Label} -> {matchedHeader}");
             }
 
-            var hasDescriptionColumn = TryGetColumn(companyDescriptionAliases, out var companyDescriptionColumn, out var matchedCompanyDescriptionHeader);
-            if (hasDescriptionColumn)
+            if (plan.MatchedHeaderByField.TryGetValue("ExternalId", out var matchedExternalHeader))
             {
-                plan.MatchedCompanyDescriptionHeader = matchedCompanyDescriptionHeader;
-                plan.MatchedFields.Add($"Company Description -> {matchedCompanyDescriptionHeader}");
+                plan.MatchedExternalIdHeader = matchedExternalHeader;
             }
 
-            if (string.IsNullOrWhiteSpace(plan.MatchedExternalIdHeader) || string.IsNullOrWhiteSpace(plan.MatchedCompanyNameHeader))
+            if (plan.MatchedHeaderByField.TryGetValue("CompanyName", out var matchedCompanyHeader))
             {
+                plan.MatchedCompanyNameHeader = matchedCompanyHeader;
+            }
+
+            if (plan.MatchedHeaderByField.TryGetValue("CompanyDescription", out var matchedDescriptionHeader))
+            {
+                plan.MatchedCompanyDescriptionHeader = matchedDescriptionHeader;
+            }
+
+            if (string.IsNullOrWhiteSpace(plan.MatchedExternalIdHeader) && string.IsNullOrWhiteSpace(plan.MatchedCompanyNameHeader))
+            {
+                plan.Errors.Add("Could not find an External ID or Company Name column. Map at least one of these fields to identify rows.");
+
                 if (looksLikeAnswersGlobalFile)
                 {
                     plan.Errors.Add(
@@ -1536,22 +1873,11 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             {
                 plan.Errors.Add(
                     $"Detected {matchedQuestionAltHeaderCount} column header(s) that match Question.ImportColumnNameAlt. "
-                    + "Companies -> Import Global File only imports company master fields (ID, Name, optional Description); answer-style columns are ignored here. "
-                    + "Use Answers -> Import Global File to import survey answer columns.");
+                    + "If this file is intended for Companies import, verify the field mappings before applying.");
             }
 
             var existingCompanies = await _context.Tin200
                 .AsNoTracking()
-                .Select(t => new
-                {
-                    t.Id,
-                    t.ExternalId,
-                    t.CompanyName,
-                    t.CompanyDescription,
-                    t.ExternalIdImportColumnName,
-                    t.CompanyNameImportColumnName,
-                    t.CompanyDescriptionImportColumnName
-                })
                 .ToListAsync();
 
             var companyByExternalId = existingCompanies
@@ -1571,16 +1897,26 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             for (var rowNumber = firstDataRowNumber; rowNumber <= lastRowNumber; rowNumber++)
             {
                 var row = worksheet.Row(rowNumber);
-                var importedExternalId = externalIdColumn > 0 ? row.Cell(externalIdColumn).GetString().Trim() : string.Empty;
-                var importedCompanyName = companyNameColumn > 0 ? row.Cell(companyNameColumn).GetString().Trim() : string.Empty;
-                var importedCompanyDescription = hasDescriptionColumn ? row.Cell(companyDescriptionColumn).GetString().Trim() : string.Empty;
+                var rawValuesByField = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+                var hasAnyMappedValue = false;
 
-                if (string.IsNullOrWhiteSpace(importedExternalId)
-                    && string.IsNullOrWhiteSpace(importedCompanyName)
-                    && string.IsNullOrWhiteSpace(importedCompanyDescription))
+                foreach (var resolved in resolvedMappings)
+                {
+                    var rawValue = row.Cell(resolved.Column).GetString().Trim();
+                    rawValuesByField[resolved.Spec.FieldName] = rawValue;
+                    if (!string.IsNullOrWhiteSpace(rawValue))
+                    {
+                        hasAnyMappedValue = true;
+                    }
+                }
+
+                if (!hasAnyMappedValue)
                 {
                     continue;
                 }
+
+                var importedExternalId = NullIfWhiteSpace(rawValuesByField.TryGetValue("ExternalId", out var extRaw) ? extRaw : null);
+                var importedCompanyName = NullIfWhiteSpace(rawValuesByField.TryGetValue("CompanyName", out var nameRaw) ? nameRaw : null);
 
                 if (string.IsNullOrWhiteSpace(importedExternalId) && string.IsNullOrWhiteSpace(importedCompanyName))
                 {
@@ -1604,15 +1940,29 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                         ? matchedByName
                         : null);
 
-                var finalImportedDescription = hasDescriptionColumn
-                    ? NullIfWhiteSpace(importedCompanyDescription)
-                    : existing?.CompanyDescription;
+                var importedValues = existing != null
+                    ? CloneTin200(existing)
+                    : new Tin200();
+
+                foreach (var resolved in resolvedMappings)
+                {
+                    var rawValue = rawValuesByField.TryGetValue(resolved.Spec.FieldName, out var value)
+                        ? value
+                        : null;
+
+                    resolved.Spec.ApplyRawValue(importedValues, rawValue);
+                }
+
+                importedValues.ExternalIdImportColumnName = plan.MatchedExternalIdHeader;
+                importedValues.CompanyNameImportColumnName = plan.MatchedCompanyNameHeader;
+                importedValues.CompanyDescriptionImportColumnName = plan.MatchedCompanyDescriptionHeader;
 
                 var action = CompanyImportAction.Add;
                 if (existing != null)
                 {
-                    // Existing company rows are treated as unchanged by design for global import.
-                    action = CompanyImportAction.Unchanged;
+                    action = AreTin200ValuesEquivalent(existing, importedValues)
+                        ? CompanyImportAction.Unchanged
+                        : CompanyImportAction.Update;
                 }
 
                 plan.Operations.Add(new CompanyImportOperation
@@ -1623,9 +1973,7 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                     ExistingExternalId = existing?.ExternalId,
                     ExistingCompanyName = existing?.CompanyName,
                     ExistingCompanyDescription = existing?.CompanyDescription,
-                    ImportedExternalId = NullIfWhiteSpace(importedExternalId),
-                    ImportedCompanyName = NullIfWhiteSpace(importedCompanyName),
-                    ImportedCompanyDescription = finalImportedDescription
+                    ImportedValues = importedValues
                 });
             }
 
@@ -1711,94 +2059,99 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                 return false;
             }
 
-            var companyNameAliases = BuildAliases(mapping?.CompanyNameHeader, "Company Name");
-            var contactFirstNameAliases = BuildAliases(mapping?.ContactFirstNameHeader, "Contact Person - First Name");
-            var contactLastNameAliases = BuildAliases(mapping?.ContactLastNameHeader, "Contact Person - Last Name");
-            var contactEmailAliases = BuildAliases(mapping?.ContactEmailHeader, "Contact Email");
-
-            if (!TryGetColumn(companyNameAliases, out var companyNameColumn, out var matchedCompanyNameHeader))
+            var specs = GetGenericImportFieldSpecs(mapping);
+            var resolvedMappings = new List<(GenericImportFieldSpec Spec, int Column, string Header)>();
+            foreach (var spec in specs)
             {
-                plan.Errors.Add("Could not find the Company Name column. Expected header: Company Name");
-                return plan;
+                if (!TryGetColumn(spec.Aliases, out var column, out var matchedHeader))
+                {
+                    continue;
+                }
+
+                resolvedMappings.Add((spec, column, matchedHeader));
+                plan.MatchedFields.Add($"{spec.Label} -> {matchedHeader}");
+
+                if (string.Equals(spec.FieldName, "CompanyName", StringComparison.OrdinalIgnoreCase))
+                {
+                    plan.MatchedCompanyNameHeader = matchedHeader;
+                }
+                else if (string.Equals(spec.FieldName, "ContactFirstName", StringComparison.OrdinalIgnoreCase))
+                {
+                    plan.MatchedContactFirstNameHeader = matchedHeader;
+                }
+                else if (string.Equals(spec.FieldName, "ContactLastName", StringComparison.OrdinalIgnoreCase))
+                {
+                    plan.MatchedContactLastNameHeader = matchedHeader;
+                }
+                else if (string.Equals(spec.FieldName, "ContactEmail", StringComparison.OrdinalIgnoreCase))
+                {
+                    plan.MatchedContactEmailHeader = matchedHeader;
+                }
             }
 
-            plan.MatchedCompanyNameHeader = matchedCompanyNameHeader;
-            plan.MatchedFields.Add($"Company Name -> {matchedCompanyNameHeader}");
-
-            var hasContactFirstNameColumn = TryGetColumn(contactFirstNameAliases, out var contactFirstNameColumn, out var matchedContactFirstNameHeader);
-            if (hasContactFirstNameColumn)
+            var hasExternalIdMapping = resolvedMappings.Any(x => string.Equals(x.Spec.FieldName, "ExternalId", StringComparison.OrdinalIgnoreCase));
+            var hasCompanyNameMapping = resolvedMappings.Any(x => string.Equals(x.Spec.FieldName, "CompanyName", StringComparison.OrdinalIgnoreCase));
+            if (!hasExternalIdMapping && !hasCompanyNameMapping)
             {
-                plan.MatchedContactFirstNameHeader = matchedContactFirstNameHeader;
-                plan.MatchedFields.Add($"Contact First Name -> {matchedContactFirstNameHeader}");
-            }
-
-            var hasContactLastNameColumn = TryGetColumn(contactLastNameAliases, out var contactLastNameColumn, out var matchedContactLastNameHeader);
-            if (hasContactLastNameColumn)
-            {
-                plan.MatchedContactLastNameHeader = matchedContactLastNameHeader;
-                plan.MatchedFields.Add($"Contact Last Name -> {matchedContactLastNameHeader}");
-            }
-
-            var hasContactEmailColumn = TryGetColumn(contactEmailAliases, out var contactEmailColumn, out var matchedContactEmailHeader);
-            if (hasContactEmailColumn)
-            {
-                plan.MatchedContactEmailHeader = matchedContactEmailHeader;
-                plan.MatchedFields.Add($"Contact Email -> {matchedContactEmailHeader}");
-            }
-
-            if (!hasContactFirstNameColumn && !hasContactLastNameColumn && !hasContactEmailColumn)
-            {
-                plan.Errors.Add("Could not find any contact columns. Expected headers: Contact Person - First Name, Contact Person - Last Name, Contact Email.");
+                plan.Errors.Add("Could not find an External ID or Company Name column. Map at least one to identify rows.");
                 return plan;
             }
 
             var existingCompanies = await _context.Tin200
                 .AsNoTracking()
-                .Select(t => new
-                {
-                    t.Id,
-                    t.CompanyName,
-                    t.ContactFirstName,
-                    t.ContactLastName,
-                    t.ContactEmail,
-                    t.TinStatus
-                })
                 .ToListAsync();
+
+            var companyByExternalId = existingCompanies
+                .Where(x => !string.IsNullOrWhiteSpace(x.ExternalId))
+                .GroupBy(x => x.ExternalId!.Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.Id).First(), StringComparer.OrdinalIgnoreCase);
 
             var companyByName = existingCompanies
                 .Where(x => !string.IsNullOrWhiteSpace(x.CompanyName))
                 .GroupBy(x => x.CompanyName!.Trim(), StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.Id).First(), StringComparer.OrdinalIgnoreCase);
 
-            var seenCompanyNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var seenImportKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var firstDataRowNumber = headerRowNumber + 1;
             var lastRowNumber = worksheet.LastRowUsed()?.RowNumber() ?? headerRowNumber;
 
             for (var rowNumber = firstDataRowNumber; rowNumber <= lastRowNumber; rowNumber++)
             {
                 var row = worksheet.Row(rowNumber);
-                var importedCompanyName = row.Cell(companyNameColumn).GetString().Trim();
-                var importedContactFirstName = hasContactFirstNameColumn ? row.Cell(contactFirstNameColumn).GetString().Trim() : string.Empty;
-                var importedContactLastName = hasContactLastNameColumn ? row.Cell(contactLastNameColumn).GetString().Trim() : string.Empty;
-                var importedContactEmail = hasContactEmailColumn ? row.Cell(contactEmailColumn).GetString().Trim() : string.Empty;
+                var rawValuesByField = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+                var hasAnyMappedValue = false;
 
-                if (string.IsNullOrWhiteSpace(importedCompanyName)
-                    && string.IsNullOrWhiteSpace(importedContactFirstName)
-                    && string.IsNullOrWhiteSpace(importedContactLastName)
-                    && string.IsNullOrWhiteSpace(importedContactEmail))
+                foreach (var resolved in resolvedMappings)
+                {
+                    var rawValue = row.Cell(resolved.Column).GetString().Trim();
+                    rawValuesByField[resolved.Spec.FieldName] = rawValue;
+                    if (!string.IsNullOrWhiteSpace(rawValue))
+                    {
+                        hasAnyMappedValue = true;
+                    }
+                }
+
+                if (!hasAnyMappedValue)
                 {
                     continue;
                 }
 
-                if (string.IsNullOrWhiteSpace(importedCompanyName))
+                var importedExternalId = NullIfWhiteSpace(rawValuesByField.TryGetValue("ExternalId", out var extRaw) ? extRaw : null);
+                var importedCompanyName = NullIfWhiteSpace(rawValuesByField.TryGetValue("CompanyName", out var nameRaw) ? nameRaw : null);
+
+                if (string.IsNullOrWhiteSpace(importedExternalId) && string.IsNullOrWhiteSpace(importedCompanyName))
                 {
-                    plan.Errors.Add($"Row {rowNumber}: skipped because Company Name is blank.");
+                    plan.Errors.Add($"Row {rowNumber}: skipped because both External ID and Company Name are blank.");
                     continue;
                 }
 
-                if (!seenCompanyNames.Add(importedCompanyName))
+                var importKey = !string.IsNullOrWhiteSpace(importedExternalId)
+                    ? $"id:{importedExternalId}"
+                    : $"name:{importedCompanyName}";
+
+                if (!seenImportKeys.Add(importKey))
                 {
-                    plan.Errors.Add($"Row {rowNumber}: duplicate company name '{importedCompanyName}' skipped.");
+                    plan.Errors.Add($"Row {rowNumber}: duplicate import key '{importKey}' skipped.");
                     continue;
                 }
 
@@ -1809,32 +2162,40 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                     continue;
                 }
 
-                var existing = companyByName.TryGetValue(importedCompanyName, out var matchedCompany)
-                    ? matchedCompany
-                    : null;
+                var existing = !string.IsNullOrWhiteSpace(importedExternalId) && companyByExternalId.TryGetValue(importedExternalId, out var matchedByExternalId)
+                    ? matchedByExternalId
+                    : (!string.IsNullOrWhiteSpace(importedCompanyName) && companyByName.TryGetValue(importedCompanyName, out var matchedCompany)
+                        ? matchedCompany
+                        : null);
 
-                var finalContactFirstName = hasContactFirstNameColumn
-                    ? NullIfWhiteSpace(importedContactFirstName)
-                    : NullIfWhiteSpace(existing?.ContactFirstName);
-                var finalContactLastName = hasContactLastNameColumn
-                    ? NullIfWhiteSpace(importedContactLastName)
-                    : NullIfWhiteSpace(existing?.ContactLastName);
-                var finalContactEmail = hasContactEmailColumn
-                    ? NullIfWhiteSpace(importedContactEmail)
-                    : NullIfWhiteSpace(existing?.ContactEmail);
-                var finalTinStatus = mapping?.ApplyTinStatus == true
-                    ? mapping.TinStatusToApply
-                    : existing?.TinStatus;
+                var importedValues = existing != null
+                    ? CloneTin200(existing)
+                    : new Tin200();
+
+                foreach (var resolved in resolvedMappings)
+                {
+                    var rawValue = rawValuesByField.TryGetValue(resolved.Spec.FieldName, out var value)
+                        ? value
+                        : null;
+                    resolved.Spec.ApplyRawValue(importedValues, rawValue);
+                }
+
+                if (mapping?.ApplyTinStatus == true)
+                {
+                    importedValues.TinStatus = mapping.TinStatusToApply;
+                }
+
+                importedValues.CompanyNameImportColumnName = plan.MatchedCompanyNameHeader;
+
+                var finalContactFirstName = importedValues.ContactFirstName;
+                var finalContactLastName = importedValues.ContactLastName;
+                var finalContactEmail = importedValues.ContactEmail;
+                var finalTinStatus = importedValues.TinStatus;
 
                 var action = CompanyContactImportAction.Add;
                 if (existing != null)
                 {
-                    var unchanged = string.Equals(NullIfWhiteSpace(existing.ContactFirstName), finalContactFirstName, StringComparison.OrdinalIgnoreCase)
-                        && string.Equals(NullIfWhiteSpace(existing.ContactLastName), finalContactLastName, StringComparison.OrdinalIgnoreCase)
-                        && string.Equals(NullIfWhiteSpace(existing.ContactEmail), finalContactEmail, StringComparison.OrdinalIgnoreCase)
-                        && existing.TinStatus == finalTinStatus;
-
-                    action = unchanged
+                    action = AreTin200ValuesEquivalent(existing, importedValues)
                         ? CompanyContactImportAction.Unchanged
                         : CompanyContactImportAction.Update;
                 }
@@ -1844,7 +2205,8 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                     RowNumber = rowNumber,
                     Action = action,
                     CompanyId = existing?.Id,
-                    CompanyName = importedCompanyName,
+                    CompanyName = importedValues.CompanyName,
+                    ImportedValues = importedValues,
                     CurrentContactFirstName = NullIfWhiteSpace(existing?.ContactFirstName),
                     ImportedContactFirstName = finalContactFirstName,
                     CurrentContactLastName = NullIfWhiteSpace(existing?.ContactLastName),
@@ -1875,13 +2237,23 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
                 .ToList();
         }
 
-        private static List<string> BuildHeaderAliases(IEnumerable<string?> configuredValues, params string[] fallbackAliases)
+        private static List<string> BuildHeaderAliases(IEnumerable<string?> configuredValues, bool includeFallbackAliasesWhenNoConfiguredValues = true, params string[] fallbackAliases)
         {
             var aliases = configuredValues
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Select(x => x!.Trim())
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
+
+            if (aliases.Any())
+            {
+                return aliases;
+            }
+
+            if (!includeFallbackAliasesWhenNoConfiguredValues)
+            {
+                return aliases;
+            }
 
             foreach (var fallbackAlias in fallbackAliases)
             {
@@ -2023,12 +2395,54 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
         public class CompanyContactImportMapping
         {
             public string? CompanyNameHeader { get; set; }
+            public string? ExternalIdHeader { get; set; }
             public string? ContactFirstNameHeader { get; set; }
             public string? ContactLastNameHeader { get; set; }
             public string? ContactEmailHeader { get; set; }
+            public string? CeoFirstNameHeader { get; set; }
+            public string? CeoLastNameHeader { get; set; }
+            public string? EmailHeader { get; set; }
+            public string? CompanyDescriptionHeader { get; set; }
+            public string? StreetHeader { get; set; }
+            public string? SuburbHeader { get; set; }
+            public string? CityHeader { get; set; }
+            public string? PostcodeHeader { get; set; }
+            public string? PhoneHeader { get; set; }
+            public string? WebsiteHeader { get; set; }
+            public string? Fye2025Header { get; set; }
+            public string? Fye2024Header { get; set; }
+            public string? Fye2023Header { get; set; }
+            public string? FinancialYearHeader { get; set; }
+            public string? LastTin200YearHeader { get; set; }
+            public string? TinStatusHeader { get; set; }
             public bool ApplyTinStatus { get; set; }
             public int? TinStatusToApply { get; set; }
             public HashSet<int>? SelectedRowNumbers { get; set; }
+        }
+
+        public class CompanyGlobalImportMapping
+        {
+            public string? CeoFirstNameHeader { get; set; }
+            public string? CeoLastNameHeader { get; set; }
+            public string? ContactFirstNameHeader { get; set; }
+            public string? ContactLastNameHeader { get; set; }
+            public string? ContactEmailHeader { get; set; }
+            public string? EmailHeader { get; set; }
+            public string? ExternalIdHeader { get; set; }
+            public string? CompanyNameHeader { get; set; }
+            public string? CompanyDescriptionHeader { get; set; }
+            public string? StreetHeader { get; set; }
+            public string? SuburbHeader { get; set; }
+            public string? CityHeader { get; set; }
+            public string? PostcodeHeader { get; set; }
+            public string? PhoneHeader { get; set; }
+            public string? WebsiteHeader { get; set; }
+            public string? Fye2025Header { get; set; }
+            public string? Fye2024Header { get; set; }
+            public string? Fye2023Header { get; set; }
+            public string? FinancialYearHeader { get; set; }
+            public string? LastTin200YearHeader { get; set; }
+            public string? TinStatusHeader { get; set; }
         }
 
         private sealed class CompanyGlobalImportPlan
@@ -2039,6 +2453,7 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             public string? MatchedExternalIdHeader { get; set; }
             public string? MatchedCompanyNameHeader { get; set; }
             public string? MatchedCompanyDescriptionHeader { get; set; }
+            public Dictionary<string, string> MatchedHeaderByField { get; set; } = new(StringComparer.OrdinalIgnoreCase);
             public List<CompanyImportOperation> Operations { get; set; } = new();
         }
 
@@ -2050,9 +2465,7 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             public string? ExistingExternalId { get; set; }
             public string? ExistingCompanyName { get; set; }
             public string? ExistingCompanyDescription { get; set; }
-            public string? ImportedExternalId { get; set; }
-            public string? ImportedCompanyName { get; set; }
-            public string? ImportedCompanyDescription { get; set; }
+            public Tin200 ImportedValues { get; set; } = new();
         }
 
         private sealed class CompanyContactImportPlan
@@ -2073,6 +2486,7 @@ VALUES ({operation.ImportedExternalId}, {operation.ImportedCompanyName}, {operat
             public CompanyContactImportAction Action { get; set; }
             public int? CompanyId { get; set; }
             public string? CompanyName { get; set; }
+            public Tin200 ImportedValues { get; set; } = new();
             public string? CurrentContactFirstName { get; set; }
             public string? ImportedContactFirstName { get; set; }
             public string? CurrentContactLastName { get; set; }

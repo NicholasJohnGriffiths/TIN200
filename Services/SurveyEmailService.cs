@@ -405,7 +405,7 @@ Open your secure survey link
                         continue;
                     }
 
-                    var resolvedValue = ResolveAnswerValue(answer.AnswerText, answer.AnswerCurrency, answer.AnswerNumber);
+                    var resolvedValue = ResolveAnswerValue(answer.QuestionTitle, answer.AnswerText, answer.AnswerCurrency, answer.AnswerNumber);
                     if (string.IsNullOrWhiteSpace(resolvedValue))
                     {
                         continue;
@@ -433,24 +433,43 @@ Open your secure survey link
             return values;
         }
 
-        private static string ResolveAnswerValue(string? answerText, decimal? answerCurrency, double? answerNumber)
+        private static string ResolveAnswerValue(string? questionTitle, string? answerText, decimal? answerCurrency, double? answerNumber)
         {
             if (!string.IsNullOrWhiteSpace(answerText))
             {
                 return answerText.Trim();
             }
 
+            var normalizedQuestionTitle = NormalizeTemplateKey(questionTitle);
+            var useWholeNumberFormat = ShouldFormatAsWholeNumber(normalizedQuestionTitle);
+
             if (answerCurrency.HasValue)
             {
-                return answerCurrency.Value.ToString("N2");
+                return useWholeNumberFormat
+                    ? Math.Round(answerCurrency.Value, 0, MidpointRounding.AwayFromZero).ToString("N0")
+                    : answerCurrency.Value.ToString("N2");
             }
 
             if (answerNumber.HasValue)
             {
-                return answerNumber.Value.ToString("0.##");
+                return useWholeNumberFormat
+                    ? Math.Round((decimal)answerNumber.Value, 0, MidpointRounding.AwayFromZero).ToString("N0")
+                    : answerNumber.Value.ToString("0.##");
             }
 
             return string.Empty;
+        }
+
+        private static bool ShouldFormatAsWholeNumber(string? normalizedQuestionTitle)
+        {
+            if (string.IsNullOrWhiteSpace(normalizedQuestionTitle))
+            {
+                return false;
+            }
+
+            return normalizedQuestionTitle.Contains("revenue", StringComparison.OrdinalIgnoreCase)
+                || normalizedQuestionTitle.Contains("employment", StringComparison.OrdinalIgnoreCase)
+                || normalizedQuestionTitle.Contains("staffemployed", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string BuildPhysicalAddress(string? street, string? suburb, string? city, string? postcode)

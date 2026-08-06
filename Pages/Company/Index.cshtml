@@ -213,7 +213,7 @@
                         No company rows will be added or updated, but applying this import is still expected to create @Model.GlobalImportPreview.EstimatedCompanySurveyCreatedCount CompanySurvey record(s) for the selected import year.
                     </div>
                 }
-                <p class="mb-3 text-muted">Matching used: Excel <strong>External ID</strong> to Company <strong>ExternalId</strong>, then fallback Excel <strong>Company Name</strong> to Company <strong>CompanyName</strong> when the External ID does not match an existing company.</p>
+                <p class="mb-3 text-muted">Matching used: mapped <strong>External ID</strong> to Company <strong>ExternalId</strong>, then mapped <strong>Company Name</strong> to Company <strong>CompanyName</strong> when External ID does not match. All mapped fields are applied to existing and new records.</p>
 
                 <p class="mb-1"><strong>Matched columns:</strong></p>
                 @if (Model.GlobalImportPreview.MatchedHeaders.Any())
@@ -449,6 +449,193 @@
                                 </div>
 
                                 <div class="col-md-3">
+                                    <label asp-for="GlobalMapExternalIdHeader" class="form-label">External ID</label>
+                                    <select asp-for="GlobalMapExternalIdHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.ContactImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label asp-for="GlobalMapCeoFirstNameHeader" class="form-label">CEO First Name</label>
+                                    <select asp-for="GlobalMapCeoFirstNameHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.ContactImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label asp-for="GlobalMapCeoLastNameHeader" class="form-label">CEO Last Name</label>
+                                    <select asp-for="GlobalMapCeoLastNameHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.ContactImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label asp-for="GlobalMapEmailHeader" class="form-label">Email</label>
+                                    <select asp-for="GlobalMapEmailHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.ContactImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label asp-for="GlobalMapCompanyDescriptionHeader" class="form-label">Company Description</label>
+                                    <select asp-for="GlobalMapCompanyDescriptionHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.ContactImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label asp-for="GlobalMapStreetHeader" class="form-label">Street</label>
+                                    <select asp-for="GlobalMapStreetHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.ContactImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label asp-for="GlobalMapSuburbHeader" class="form-label">Suburb</label>
+                                    <select asp-for="GlobalMapSuburbHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.ContactImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label asp-for="GlobalMapCityHeader" class="form-label">City</label>
+                                    <select asp-for="GlobalMapCityHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.ContactImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label asp-for="GlobalMapPostcodeHeader" class="form-label">Postcode</label>
+                                    <select asp-for="GlobalMapPostcodeHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.ContactImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label asp-for="GlobalMapPhoneHeader" class="form-label">Phone</label>
+                                    <select asp-for="GlobalMapPhoneHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.ContactImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label asp-for="GlobalMapWebsiteHeader" class="form-label">Website</label>
+                                    <select asp-for="GlobalMapWebsiteHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.ContactImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label asp-for="GlobalMapFye2025Header" class="form-label">FYE Last Financial Year</label>
+                                    <select asp-for="GlobalMapFye2025Header" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.ContactImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label asp-for="GlobalMapFye2024Header" class="form-label">FYE Year-1</label>
+                                    <select asp-for="GlobalMapFye2024Header" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.ContactImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label asp-for="GlobalMapFye2023Header" class="form-label">FYE Year-2</label>
+                                    <select asp-for="GlobalMapFye2023Header" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.ContactImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label asp-for="GlobalMapFinancialYearHeader" class="form-label">Financial Year</label>
+                                    <select asp-for="GlobalMapFinancialYearHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.ContactImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label asp-for="GlobalMapLastTin200YearHeader" class="form-label">Last TIN200 Year</label>
+                                    <select asp-for="GlobalMapLastTin200YearHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.ContactImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
+                                    <label asp-for="GlobalMapTinStatusHeader" class="form-label">TIN Status (from file)</label>
+                                    <select asp-for="GlobalMapTinStatusHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.ContactImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-3">
                                     <label asp-for="ContactImportTinStatus" class="form-label">TIN Status</label>
                                     <select asp-for="ContactImportTinStatus" class="form-select form-select-sm">
                                         <option value="">Blank</option>
@@ -470,7 +657,7 @@
                     </div>
 
                     <div class="tab-pane fade @(activeImportTab == "global" ? "show active" : null)" id="company-import-global-pane" role="tabpanel" aria-labelledby="company-import-global-tab" tabindex="0">
-                        <form method="post" asp-page-handler="PreviewGlobalImport" enctype="multipart/form-data" class="d-inline-flex align-items-center gap-2 flex-wrap" id="globalImportForm">
+                        <form method="post" asp-page-handler="LoadGlobalImportHeaders" enctype="multipart/form-data" class="d-inline-flex align-items-center gap-2 flex-wrap" id="globalImportLoadForm">
                             <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
                             <input type="hidden" name="tinStatus" value="@Model.SelectedTinStatus" />
                             <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
@@ -478,10 +665,270 @@
                             <input type="hidden" name="showMissingCompanySurveyOnly" value="@Model.ShowMissingCompanySurveyOnly.ToString().ToLowerInvariant()" />
                             <input type="hidden" name="showImportTool" value="import" />
                             <input type="hidden" name="showImportTab" value="global" />
-                            <input type="number" name="importYear" value="@Model.SelectedImportYear" class="form-control form-control-sm" style="max-width: 120px;" placeholder="Import Year" min="1900" max="9999" />
+                            <input type="number" name="importYear" value="@Model.SelectedImportYear" class="form-control form-control-sm" style="max-width: 140px;" placeholder="Import Year" min="1900" max="9999" required />
                             <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="max-width: 320px;" />
-                            <button type="submit" class="btn btn-dark btn-sm">Preview Global Import</button>
+                            <button type="submit" class="btn btn-dark btn-sm">Load Headers</button>
                         </form>
+
+                        @if (Model.GlobalImportHeaders.Any())
+                        {
+                            <hr class="my-3" />
+                            <p class="small text-muted mb-3">Map Excel headers to Company fields. Any mapped field will be imported on preview/apply, including updates to existing companies.</p>
+
+                            <form method="post" asp-page-handler="PreviewGlobalImport" class="row g-2 align-items-end" id="globalImportForm">
+                                <input type="hidden" name="lastTin200Year" value="@Model.SelectedLastTin200Year" />
+                                <input type="hidden" name="tinStatus" value="@Model.SelectedTinStatus" />
+                                <input type="hidden" name="companySearch" value="@Model.CompanySearch" />
+                                <input type="hidden" name="showTestCompanies" value="@Model.ShowTestCompanies.ToString().ToLowerInvariant()" />
+                                <input type="hidden" name="showMissingCompanySurveyOnly" value="@Model.ShowMissingCompanySurveyOnly.ToString().ToLowerInvariant()" />
+                                <input type="hidden" name="showImportTool" value="import" />
+                                <input type="hidden" name="showImportTab" value="global" />
+                                <input type="hidden" asp-for="GlobalImportMappingToken" />
+
+                                <div class="col-md-2">
+                                    <label class="form-label">Import Year</label>
+                                    <input type="number" name="importYear" value="@Model.SelectedImportYear" class="form-control form-control-sm" min="1900" max="9999" required />
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label asp-for="GlobalMapExternalIdHeader" class="form-label">External ID</label>
+                                    <select asp-for="GlobalMapExternalIdHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.GlobalImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label asp-for="GlobalMapCompanyNameHeader" class="form-label">Company Name</label>
+                                    <select asp-for="GlobalMapCompanyNameHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.GlobalImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label asp-for="GlobalMapCompanyDescriptionHeader" class="form-label">Description</label>
+                                    <select asp-for="GlobalMapCompanyDescriptionHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.GlobalImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label asp-for="GlobalMapCeoFirstNameHeader" class="form-label">CEO First</label>
+                                    <select asp-for="GlobalMapCeoFirstNameHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.GlobalImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label asp-for="GlobalMapCeoLastNameHeader" class="form-label">CEO Last</label>
+                                    <select asp-for="GlobalMapCeoLastNameHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.GlobalImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label asp-for="GlobalMapContactFirstNameHeader" class="form-label">Contact First</label>
+                                    <select asp-for="GlobalMapContactFirstNameHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.GlobalImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label asp-for="GlobalMapContactLastNameHeader" class="form-label">Contact Last</label>
+                                    <select asp-for="GlobalMapContactLastNameHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.GlobalImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label asp-for="GlobalMapContactEmailHeader" class="form-label">Contact Email</label>
+                                    <select asp-for="GlobalMapContactEmailHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.GlobalImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label asp-for="GlobalMapEmailHeader" class="form-label">Email</label>
+                                    <select asp-for="GlobalMapEmailHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.GlobalImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label asp-for="GlobalMapStreetHeader" class="form-label">Street</label>
+                                    <select asp-for="GlobalMapStreetHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.GlobalImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label asp-for="GlobalMapSuburbHeader" class="form-label">Suburb</label>
+                                    <select asp-for="GlobalMapSuburbHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.GlobalImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label asp-for="GlobalMapCityHeader" class="form-label">City</label>
+                                    <select asp-for="GlobalMapCityHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.GlobalImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label asp-for="GlobalMapPostcodeHeader" class="form-label">Postcode</label>
+                                    <select asp-for="GlobalMapPostcodeHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.GlobalImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label asp-for="GlobalMapPhoneHeader" class="form-label">Phone</label>
+                                    <select asp-for="GlobalMapPhoneHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.GlobalImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label asp-for="GlobalMapWebsiteHeader" class="form-label">Website</label>
+                                    <select asp-for="GlobalMapWebsiteHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.GlobalImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label asp-for="GlobalMapFye2025Header" class="form-label">FYE Last FY</label>
+                                    <select asp-for="GlobalMapFye2025Header" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.GlobalImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label asp-for="GlobalMapFye2024Header" class="form-label">FYE Year-1</label>
+                                    <select asp-for="GlobalMapFye2024Header" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.GlobalImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label asp-for="GlobalMapFye2023Header" class="form-label">FYE Year-2</label>
+                                    <select asp-for="GlobalMapFye2023Header" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.GlobalImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label asp-for="GlobalMapFinancialYearHeader" class="form-label">Financial Year</label>
+                                    <select asp-for="GlobalMapFinancialYearHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.GlobalImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label asp-for="GlobalMapLastTin200YearHeader" class="form-label">Last TIN200 Year</label>
+                                    <select asp-for="GlobalMapLastTin200YearHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.GlobalImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-md-2">
+                                    <label asp-for="GlobalMapTinStatusHeader" class="form-label">TIN Status</label>
+                                    <select asp-for="GlobalMapTinStatusHeader" class="form-select form-select-sm">
+                                        <option value="">(not mapped)</option>
+                                        @foreach (var h in Model.GlobalImportHeaders)
+                                        {
+                                            <option value="@h">@h</option>
+                                        }
+                                    </select>
+                                </div>
+
+                                <div class="col-12 d-flex gap-2 flex-wrap mt-2">
+                                    <button type="submit" class="btn btn-dark btn-sm">Preview Global Import</button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="saveGlobalMappingBtn">Save Mapping File</button>
+                                    <input type="file" id="globalMappingFile" accept="application/json,.json" class="form-control form-control-sm" style="max-width: 240px;" />
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" id="loadGlobalMappingBtn">Load Mapping File</button>
+                                </div>
+                            </form>
+                        }
                     </div>
                     </div>
             </div>
@@ -756,10 +1203,17 @@
             });
         }
 
+        var globalImportLoadForm = document.getElementById('globalImportLoadForm');
+        if (globalImportLoadForm) {
+            globalImportLoadForm.addEventListener('submit', function () {
+                startProgress('Reading file and building import preview...');
+            });
+        }
+
         var globalImportForm = document.getElementById('globalImportForm');
         if (globalImportForm) {
             globalImportForm.addEventListener('submit', function () {
-                startProgress('Reading file and building import preview...');
+                startProgress('Building mapped global import preview...');
             });
         }
 
@@ -842,24 +1296,54 @@
         var saveContactMappingBtn = document.getElementById('saveContactMappingBtn');
         var loadContactMappingBtn = document.getElementById('loadContactMappingBtn');
         var contactMappingFile = document.getElementById('contactMappingFile');
-        var companyField = document.getElementById('ContactMapCompanyNameHeader');
-        var firstField = document.getElementById('ContactMapFirstNameHeader');
-        var lastField = document.getElementById('ContactMapLastNameHeader');
-        var emailField = document.getElementById('ContactMapEmailHeader');
         var tinStatusField = document.getElementById('ContactImportTinStatus');
 
-        if (saveContactMappingBtn && companyField && firstField && lastField && emailField && tinStatusField) {
+        var genericMappingFieldByKey = {
+            companyNameHeader: 'ContactMapCompanyNameHeader',
+            externalIdHeader: 'GlobalMapExternalIdHeader',
+            contactFirstNameHeader: 'ContactMapFirstNameHeader',
+            contactLastNameHeader: 'ContactMapLastNameHeader',
+            contactEmailHeader: 'ContactMapEmailHeader',
+            ceoFirstNameHeader: 'GlobalMapCeoFirstNameHeader',
+            ceoLastNameHeader: 'GlobalMapCeoLastNameHeader',
+            emailHeader: 'GlobalMapEmailHeader',
+            companyDescriptionHeader: 'GlobalMapCompanyDescriptionHeader',
+            streetHeader: 'GlobalMapStreetHeader',
+            suburbHeader: 'GlobalMapSuburbHeader',
+            cityHeader: 'GlobalMapCityHeader',
+            postcodeHeader: 'GlobalMapPostcodeHeader',
+            phoneHeader: 'GlobalMapPhoneHeader',
+            websiteHeader: 'GlobalMapWebsiteHeader',
+            fye2025Header: 'GlobalMapFye2025Header',
+            fye2024Header: 'GlobalMapFye2024Header',
+            fye2023Header: 'GlobalMapFye2023Header',
+            financialYearHeader: 'GlobalMapFinancialYearHeader',
+            lastTin200YearHeader: 'GlobalMapLastTin200YearHeader',
+            tinStatusHeader: 'GlobalMapTinStatusHeader'
+        };
+
+        function setMappingFieldValue(fieldId, value) {
+            var field = document.getElementById(fieldId);
+            if (!field) {
+                return;
+            }
+
+            field.value = value || '';
+        }
+
+        if (saveContactMappingBtn && tinStatusField) {
             saveContactMappingBtn.addEventListener('click', function () {
                 var payload = {
                     mappingType: 'company-contact-import',
-                    version: 1,
-                    companyNameHeader: companyField.value || '',
-                    contactFirstNameHeader: firstField.value || '',
-                    contactLastNameHeader: lastField.value || '',
-                    contactEmailHeader: emailField.value || '',
+                    version: 2,
                     applyTinStatus: true,
                     tinStatus: tinStatusField.value === '' ? null : Number(tinStatusField.value)
                 };
+
+                Object.keys(genericMappingFieldByKey).forEach(function (key) {
+                    var field = document.getElementById(genericMappingFieldByKey[key]);
+                    payload[key] = field ? (field.value || '') : '';
+                });
 
                 var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
                 var url = URL.createObjectURL(blob);
@@ -873,7 +1357,7 @@
             });
         }
 
-        if (loadContactMappingBtn && contactMappingFile && companyField && firstField && lastField && emailField && tinStatusField) {
+        if (loadContactMappingBtn && contactMappingFile && tinStatusField) {
             loadContactMappingBtn.addEventListener('click', function () {
                 var file = contactMappingFile.files && contactMappingFile.files.length ? contactMappingFile.files[0] : null;
                 if (!file) {
@@ -885,11 +1369,112 @@
                 reader.onload = function () {
                     try {
                         var data = JSON.parse(reader.result);
-                        companyField.value = data.companyNameHeader || '';
-                        firstField.value = data.contactFirstNameHeader || '';
-                        lastField.value = data.contactLastNameHeader || '';
-                        emailField.value = data.contactEmailHeader || '';
+
+                        Object.keys(genericMappingFieldByKey).forEach(function (key) {
+                            if (Object.prototype.hasOwnProperty.call(data, key)) {
+                                setMappingFieldValue(genericMappingFieldByKey[key], data[key]);
+                            }
+                        });
+
+                        // Backward compatibility for older mapping files.
+                        if (!Object.prototype.hasOwnProperty.call(data, 'externalIdHeader')) {
+                            setMappingFieldValue('GlobalMapExternalIdHeader', data.externalIDHeader || data.idHeader || '');
+                        }
+
                         tinStatusField.value = data.tinStatus === null || data.tinStatus === undefined ? '' : String(data.tinStatus);
+                    } catch (error) {
+                        alert('Invalid mapping file. Please choose a valid JSON mapping file.');
+                    }
+                };
+                reader.readAsText(file);
+            });
+        }
+
+        var saveGlobalMappingBtn = document.getElementById('saveGlobalMappingBtn');
+        var loadGlobalMappingBtn = document.getElementById('loadGlobalMappingBtn');
+        var globalMappingFile = document.getElementById('globalMappingFile');
+
+        var globalMappingFieldIds = [
+            'GlobalMapCeoFirstNameHeader',
+            'GlobalMapCeoLastNameHeader',
+            'GlobalMapContactFirstNameHeader',
+            'GlobalMapContactLastNameHeader',
+            'GlobalMapContactEmailHeader',
+            'GlobalMapEmailHeader',
+            'GlobalMapExternalIdHeader',
+            'GlobalMapCompanyNameHeader',
+            'GlobalMapCompanyDescriptionHeader',
+            'GlobalMapStreetHeader',
+            'GlobalMapSuburbHeader',
+            'GlobalMapCityHeader',
+            'GlobalMapPostcodeHeader',
+            'GlobalMapPhoneHeader',
+            'GlobalMapWebsiteHeader',
+            'GlobalMapFye2025Header',
+            'GlobalMapFye2024Header',
+            'GlobalMapFye2023Header',
+            'GlobalMapFinancialYearHeader',
+            'GlobalMapLastTin200YearHeader',
+            'GlobalMapTinStatusHeader'
+        ];
+
+        function getGlobalMappingFields() {
+            return globalMappingFieldIds
+                .map(function (id) { return document.getElementById(id); })
+                .filter(function (field) { return !!field; });
+        }
+
+        if (saveGlobalMappingBtn) {
+            saveGlobalMappingBtn.addEventListener('click', function () {
+                var fields = getGlobalMappingFields();
+                if (!fields.length) {
+                    alert('Global mapping fields are not available yet.');
+                    return;
+                }
+
+                var payload = {
+                    mappingType: 'company-global-import',
+                    version: 1
+                };
+
+                fields.forEach(function (field) {
+                    payload[field.id.charAt(0).toLowerCase() + field.id.slice(1)] = field.value || '';
+                });
+
+                var blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = 'company-global-import-mapping.json';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        if (loadGlobalMappingBtn && globalMappingFile) {
+            loadGlobalMappingBtn.addEventListener('click', function () {
+                var fields = getGlobalMappingFields();
+                if (!fields.length) {
+                    alert('Global mapping fields are not available yet.');
+                    return;
+                }
+
+                var file = globalMappingFile.files && globalMappingFile.files.length ? globalMappingFile.files[0] : null;
+                if (!file) {
+                    alert('Select a mapping JSON file first.');
+                    return;
+                }
+
+                var reader = new FileReader();
+                reader.onload = function () {
+                    try {
+                        var data = JSON.parse(reader.result);
+                        fields.forEach(function (field) {
+                            var key = field.id.charAt(0).toLowerCase() + field.id.slice(1);
+                            field.value = data[key] || '';
+                        });
                     } catch (error) {
                         alert('Invalid mapping file. Please choose a valid JSON mapping file.');
                     }
