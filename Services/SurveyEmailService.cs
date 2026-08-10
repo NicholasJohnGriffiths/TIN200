@@ -366,7 +366,7 @@ Open your secure survey link
             values[NormalizeTemplateKey("CompanyName")] = companyName;
             values[NormalizeTemplateKey("Company Name")] = companyName;
 
-            var companySurveyInfo = await (
+            var companySurveyHistory = await (
                 from cs in _context.CompanySurvey.AsNoTracking()
                 join s in _context.Survey.AsNoTracking() on cs.SurveyId equals s.Id
                 where cs.CompanyId == clientId
@@ -374,12 +374,23 @@ Open your secure survey link
                 select new
                 {
                     CompanySurveyId = (int?)cs.Id,
+                    s.FinancialYear,
                     cs.Estimate
                 }
-            ).FirstOrDefaultAsync();
+            ).ToListAsync();
+
+            var companySurveyInfo = companySurveyHistory.FirstOrDefault();
+            var previousYearSurveyInfo = companySurveyInfo == null
+                ? null
+                : companySurveyHistory
+                    .FirstOrDefault(x => x.FinancialYear < companySurveyInfo.FinancialYear);
 
             var isEstimated = companySurveyInfo?.Estimate == true;
+            var isEstimatedYearMinus1 = previousYearSurveyInfo?.Estimate == true;
             values["Estimated"] = isEstimated ? "Estimated" : "Not Estimated";
+            values[NormalizeTemplateKey("Estimated Year-1")] = previousYearSurveyInfo == null
+                ? string.Empty
+                : (isEstimatedYearMinus1 ? "Estimated" : "Not Estimated");
 
             if (companySurveyInfo?.CompanySurveyId.HasValue == true)
             {
