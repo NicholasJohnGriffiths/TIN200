@@ -110,6 +110,17 @@
                     <form id="bulkSendForm" method="post" asp-page-handler="Bulk">
                         <input type="hidden" asp-for="SelectedTinStatus" />
                         <input type="hidden" asp-for="SelectedEmailContentId" />
+                        <div class="row g-3 mb-3">
+                            <div class="col-12 col-md-6 col-lg-4">
+                                <label asp-for="SelectedFromEmail" class="form-label mb-1">From Email Address</label>
+                                <select asp-for="SelectedFromEmail" class="form-select">
+                                    <option value="donotreply@tin100.com">donotreply@tin100.com</option>
+                                    <option value="survey@tinetwork.com">survey@tinetwork.com</option>
+                                </select>
+                                <div class="form-text">Default sender is donotreply@tin100.com.</div>
+                            </div>
+                        </div>
+
                         <div class="form-check mb-3">
                             <input asp-for="SendToAllClients" class="form-check-input" />
                             <label asp-for="SendToAllClients" class="form-check-label">Send to all clients with a contact email address</label>

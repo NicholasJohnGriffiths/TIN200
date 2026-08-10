@@ -12,6 +12,9 @@ namespace TINWeb.Pages.Company
 {
     public class SendSurveyModel : PageModel
     {
+        public const string DefaultFromEmail = "donotreply@tin100.com";
+        public const string SurveyFromEmail = "survey@tinetwork.com";
+
         private readonly CompanyService _companyService;
         private readonly ISurveyEmailService _surveyEmailService;
         private readonly ISurveyLinkTokenService _surveyLinkTokenService;
@@ -79,6 +82,9 @@ namespace TINWeb.Pages.Company
         [BindProperty(SupportsGet = true)]
         public int? SelectedEmailContentId { get; set; }
 
+        [BindProperty(SupportsGet = true)]
+        public string SelectedFromEmail { get; set; } = DefaultFromEmail;
+
         public List<SurveyClientRow> AvailableClients { get; set; } = new();
         public List<SelectListItem> EmailContentOptions { get; set; } = new();
         public SurveyEmailPreviewResult? EmailPreview { get; set; }
@@ -109,6 +115,7 @@ namespace TINWeb.Pages.Company
         public async Task<IActionResult> OnGetAsync(int? id)
         {
             SelectedTinStatus = NormalizeTinStatusFilter(SelectedTinStatus);
+            SelectedFromEmail = NormalizeSelectedFromEmail(SelectedFromEmail);
             await LoadAvailableClientsAsync();
             await LoadEmailContentOptionsAsync();
             SelectDefaultEmailContentIfMissing();
@@ -147,6 +154,7 @@ namespace TINWeb.Pages.Company
         public async Task<IActionResult> OnPostBulkAsync()
         {
             var isAjaxRequest = IsAjaxRequest();
+            SelectedFromEmail = NormalizeSelectedFromEmail(SelectedFromEmail);
             await LoadAvailableClientsAsync();
             await LoadEmailContentOptionsAsync();
             SelectDefaultEmailContentIfMissing();
@@ -284,11 +292,11 @@ namespace TINWeb.Pages.Company
                             totalSentCount = 0,
                             totalFailedCount = 0,
                             totalSkippedCount,
-                            redirectUrl = Url.Page(pageName: null, pageHandler: null, values: new { SelectedTinStatus, SelectedEmailContentId }, protocol: null)
+                            redirectUrl = Url.Page(pageName: null, pageHandler: null, values: new { SelectedTinStatus, SelectedEmailContentId, SelectedFromEmail }, protocol: null)
                         });
                     }
 
-                    return RedirectToPage(new { SelectedTinStatus, SelectedEmailContentId });
+                    return RedirectToPage(new { SelectedTinStatus, SelectedEmailContentId, SelectedFromEmail });
                 }
             }
 
@@ -301,7 +309,13 @@ namespace TINWeb.Pages.Company
 
                 try
                 {
-                    await _surveyEmailService.SendSurveyLinkAsync(recipientEmail, surveyUrl, clientRow.CompanyName, clientRow.Id, SelectedEmailContentId!.Value);
+                    await _surveyEmailService.SendSurveyLinkAsync(
+                        recipientEmail,
+                        surveyUrl,
+                        clientRow.CompanyName,
+                        clientRow.Id,
+                        SelectedEmailContentId!.Value,
+                        SelectedFromEmail);
                     sentCount++;
 
                     if (currentSurveyId.HasValue)
@@ -361,11 +375,11 @@ namespace TINWeb.Pages.Company
                                 totalSentCount = aggregateSentCount + sentCount,
                                 totalFailedCount = aggregateFailedCount + failedCount,
                                 totalSkippedCount,
-                                redirectUrl = Url.Page(pageName: null, pageHandler: null, values: new { SelectedTinStatus, SelectedEmailContentId }, protocol: null)
+                                redirectUrl = Url.Page(pageName: null, pageHandler: null, values: new { SelectedTinStatus, SelectedEmailContentId, SelectedFromEmail }, protocol: null)
                             });
                         }
 
-                        return RedirectToPage(new { SelectedTinStatus, SelectedEmailContentId });
+                        return RedirectToPage(new { SelectedTinStatus, SelectedEmailContentId, SelectedFromEmail });
                     }
                 }
             }
@@ -411,7 +425,7 @@ namespace TINWeb.Pages.Company
                     totalSentCount,
                     totalFailedCount,
                     totalSkippedCount,
-                    redirectUrl = Url.Page(pageName: null, pageHandler: null, values: new { SelectedTinStatus, SelectedEmailContentId }, protocol: null)
+                    redirectUrl = Url.Page(pageName: null, pageHandler: null, values: new { SelectedTinStatus, SelectedEmailContentId, SelectedFromEmail }, protocol: null)
                 });
             }
 
@@ -438,7 +452,7 @@ namespace TINWeb.Pages.Company
 
             BulkSendSucceeded = true;
 
-            return RedirectToPage(new { SelectedTinStatus, SelectedEmailContentId });
+            return RedirectToPage(new { SelectedTinStatus, SelectedEmailContentId, SelectedFromEmail });
         }
 
         private async Task DelayUntilStartAsync(DateTime sendStartTimeLocal, CancellationToken cancellationToken)
@@ -609,6 +623,13 @@ namespace TINWeb.Pages.Company
                 (int)TinStatus.TinTest => (int)TinStatus.TinTest,
                 _ => (int)TinStatus.Tin200
             };
+        }
+
+        private static string NormalizeSelectedFromEmail(string? selectedFromEmail)
+        {
+            return string.Equals(selectedFromEmail?.Trim(), SurveyFromEmail, StringComparison.OrdinalIgnoreCase)
+                ? SurveyFromEmail
+                : DefaultFromEmail;
         }
 
         private async Task<Dictionary<int, SurveyEmailStatus>> GetSurveyEmailStatusByCompanyIdForCurrentSurveyAsync()

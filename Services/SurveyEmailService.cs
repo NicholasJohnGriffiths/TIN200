@@ -25,7 +25,7 @@ namespace TINWeb.Services
             _surveyLinkSettings = surveyLinkOptions.Value;
         }
 
-        public async Task SendSurveyLinkAsync(string recipientEmail, string surveyUrl, string? companyName, int clientId, int emailContentId)
+        public async Task SendSurveyLinkAsync(string recipientEmail, string surveyUrl, string? companyName, int clientId, int emailContentId, string? senderEmail = null, string? replyToEmail = null)
         {
             EnsureEmailConfigured();
 
@@ -65,10 +65,10 @@ namespace TINWeb.Services
                 supportEmail,
                 senderDisplayName);
 
-            await SendEmailAsync(new[] { recipientEmail }, subject, plainTextBody, htmlBody);
+            await SendEmailAsync(new[] { recipientEmail }, subject, plainTextBody, htmlBody, senderEmail, replyToEmail);
         }
 
-        public async Task SendSurveyReminderLinkAsync(string recipientEmail, string surveyUrl, string? companyName, int clientId, int emailContentId)
+        public async Task SendSurveyReminderLinkAsync(string recipientEmail, string surveyUrl, string? companyName, int clientId, int emailContentId, string? senderEmail = null, string? replyToEmail = null)
         {
             EnsureEmailConfigured();
 
@@ -113,7 +113,7 @@ namespace TINWeb.Services
                 supportEmail,
                 senderDisplayName);
 
-            await SendEmailAsync(new[] { recipientEmail }, subject, plainTextBody, htmlBody);
+            await SendEmailAsync(new[] { recipientEmail }, subject, plainTextBody, htmlBody, senderEmail, replyToEmail);
         }
 
         public async Task<SurveyEmailPreviewResult> BuildSurveyEmailPreviewAsync(int emailContentId, string surveyUrl, string? companyName, int clientId)
@@ -666,7 +666,7 @@ Open your secure survey link
             }
         }
 
-        private async Task SendEmailAsync(IEnumerable<string> recipientEmails, string subject, string plainTextBody, string htmlBody)
+        private async Task SendEmailAsync(IEnumerable<string> recipientEmails, string subject, string plainTextBody, string htmlBody, string? senderEmailOverride = null, string? replyToEmailOverride = null)
         {
             var recipients = ParseRecipientEmails(recipientEmails).ToList();
             if (recipients.Count == 0)
@@ -675,15 +675,22 @@ Open your secure survey link
             }
 
             var emailClient = new EmailClient(_emailSettings.ConnectionString);
+            var senderEmail = ResolveSenderEmailAddress(senderEmailOverride);
+            var replyToAddress = ResolveReplyToAddress(replyToEmailOverride, senderEmail);
 
             var emailMessage = new EmailMessage(
-                senderAddress: BuildSenderAddress(_emailSettings.FromEmail, _emailSettings.FromName),
+                senderAddress: BuildSenderAddress(senderEmail, _emailSettings.FromName),
                 content: new Azure.Communication.Email.EmailContent(subject)
                 {
                     PlainText = plainTextBody,
                     Html = htmlBody
                 },
                 recipients: new EmailRecipients(recipients.Select(email => new EmailAddress(email)).ToList()));
+
+            if (!string.IsNullOrWhiteSpace(replyToAddress))
+            {
+                emailMessage.ReplyTo.Add(new EmailAddress(replyToAddress));
+            }
 
             try
             {
@@ -724,6 +731,28 @@ Open your secure survey link
             // also match the sender identity configured in Azure for the mailbox.
             // return "tin@tin100.com"; // Temporary override previously used.
             return fromEmail.Trim();
+        }
+
+        private string ResolveSenderEmailAddress(string? senderEmailOverride)
+        {
+            if (!string.IsNullOrWhiteSpace(senderEmailOverride))
+            {
+                return senderEmailOverride.Trim();
+            }
+
+            return _emailSettings.FromEmail.Trim();
+        }
+
+        private static string ResolveReplyToAddress(string? replyToEmailOverride, string senderEmail)
+        {
+            if (!string.IsNullOrWhiteSpace(replyToEmailOverride))
+            {
+                return replyToEmailOverride.Trim();
+            }
+
+            return string.IsNullOrWhiteSpace(senderEmail)
+                ? string.Empty
+                : senderEmail.Trim();
         }
 
         private static IEnumerable<string> ParseRecipientEmails(IEnumerable<string> recipientEmails)
