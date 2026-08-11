@@ -1,8 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
+using ClosedXML.Excel;
+using System.Globalization;
 using System.Text.RegularExpressions;
-using TINWeb.Pages.CompanySurvey;
 using TINWeb.Data;
 using TINWeb.Models;
 
@@ -15,10 +16,21 @@ namespace TINWeb.Pages.CompanySurvey
         public List<ColumnDefinition> Columns { get; } = BuildColumns();
         public List<PrePublishDataRow> Records { get; set; } = new();
         public List<(int Value, string Label)> TinStatusOptions { get; } = TinStatusHelper.DropdownOptions.ToList();
-        public string SelectedEmailContentName { get; set; } = string.Empty;
+        public RevenueAdjustPreviewResult? PreviewResult { get; set; }
+        public PopulateOwnershipFormedPreviewResult? PopulatePreviewResult { get; set; }
+        public EstimatedImportPreviewResult? EstimatedImportPreview { get; set; }
 
         [BindProperty(SupportsGet = true)]
         public int SelectedTinStatus { get; set; } = (int)TinStatus.Tin200;
+
+        [BindProperty]
+        public int RevenueDecimalPlacesAdjustment { get; set; }
+
+        [BindProperty]
+        public List<int> SelectedCompanyIds { get; set; } = new();
+
+        [TempData]
+        public string? StatusMessage { get; set; }
 
         public PrePublishDataCheckModel(ApplicationDbContext context)
         {
@@ -29,38 +41,1018 @@ namespace TINWeb.Pages.CompanySurvey
         {
             SelectedTinStatus = NormalizeTinStatusFilter(SelectedTinStatus);
 
-            var emailContentOptions = await _context.EmailContent
-                .AsNoTracking()
-                .Where(x => x.Active)
-                .OrderBy(x => x.Name)
-                .ThenBy(x => x.Id)
-                .Select(x => new EmailContentOption
-                {
-                    Id = x.Id,
-                    Name = x.Name,
-                    Subject = x.Subject,
-                    Template = x.Template
-                })
-                .ToListAsync();
-
-            var selectedEmailContent = ResolveSelectedEmailContent(emailContentOptions);
-            SelectedEmailContentName = selectedEmailContent?.Name ?? string.Empty;
-
             await LoadRowsAsync();
         }
 
-        private static EmailContentOption? ResolveSelectedEmailContent(List<EmailContentOption> emailContentOptions)
+        public async Task<IActionResult> OnPostPreviewAdjustRevenueAsync()
         {
-            if (emailContentOptions.Count == 0)
+            SelectedTinStatus = NormalizeTinStatusFilter(SelectedTinStatus);
+            await LoadRowsAsync();
+
+            var selectedCompanyIds = ResolveSelectedCompanyIds(SelectedCompanyIds, Records);
+            SelectedCompanyIds = selectedCompanyIds;
+
+            if (selectedCompanyIds.Count == 0)
+            {
+                ModelState.AddModelError(string.Empty, "Select at least one company row first.");
+                return Page();
+            }
+
+            if (RevenueDecimalPlacesAdjustment == 0)
+            {
+                ModelState.AddModelError(nameof(RevenueDecimalPlacesAdjustment), "Enter a non-zero decimal place adjustment.");
+                return Page();
+            }
+
+            PreviewResult = await BuildRevenueAdjustPreviewAsync(selectedCompanyIds, RevenueDecimalPlacesAdjustment, applyUpdates: false);
+            return Page();
+        }
+
+        public async Task<IActionResult> OnPostApplyAdjustRevenueAsync()
+        {
+            SelectedTinStatus = NormalizeTinStatusFilter(SelectedTinStatus);
+            await LoadRowsAsync();
+
+            var selectedCompanyIds = ResolveSelectedCompanyIds(SelectedCompanyIds, Records);
+
+            if (selectedCompanyIds.Count == 0)
+            {
+                StatusMessage = "Error: Select at least one company row first.";
+                return RedirectToPage(new { selectedTinStatus = SelectedTinStatus });
+            }
+
+            if (RevenueDecimalPlacesAdjustment == 0)
+            {
+                StatusMessage = "Error: Enter a non-zero decimal place adjustment.";
+                return RedirectToPage(new { selectedTinStatus = SelectedTinStatus });
+            }
+
+            var result = await BuildRevenueAdjustPreviewAsync(selectedCompanyIds, RevenueDecimalPlacesAdjustment, applyUpdates: true);
+
+            StatusMessage = $"Revenue update applied. Selected companies: {result.SelectedCompanyCount}. Revenue answers updated: {result.ChangedCount}. Decimal place adjustment: {RevenueDecimalPlacesAdjustment}.";
+            return RedirectToPage(new { selectedTinStatus = SelectedTinStatus });
+        }
+
+        public async Task<IActionResult> OnPostPreviewPopulateOwnershipFormedAsync()
+        {
+            SelectedTinStatus = NormalizeTinStatusFilter(SelectedTinStatus);
+            await LoadRowsAsync();
+
+            var selectedCompanyIds = ResolveSelectedCompanyIds(SelectedCompanyIds, Records);
+            SelectedCompanyIds = selectedCompanyIds;
+
+            if (selectedCompanyIds.Count == 0)
+            {
+                ModelState.AddModelError(string.Empty, "Select at least one company row first.");
+                return Page();
+            }
+
+            PopulatePreviewResult = await BuildPopulateOwnershipFormedPreviewAsync(selectedCompanyIds, applyUpdates: false);
+            return Page();
+        }
+
+        public async Task<IActionResult> OnPostApplyPopulateOwnershipFormedAsync()
+        {
+            SelectedTinStatus = NormalizeTinStatusFilter(SelectedTinStatus);
+            await LoadRowsAsync();
+
+            var selectedCompanyIds = ResolveSelectedCompanyIds(SelectedCompanyIds, Records);
+
+            if (selectedCompanyIds.Count == 0)
+            {
+                StatusMessage = "Error: Select at least one company row first.";
+                return RedirectToPage(new { selectedTinStatus = SelectedTinStatus });
+            }
+
+            var result = await BuildPopulateOwnershipFormedPreviewAsync(selectedCompanyIds, applyUpdates: true);
+            StatusMessage = $"Populate Missing Data From Prev Year applied. Selected companies: {result.SelectedCompanyCount}. Answers populated: {result.ChangedCount}.";
+            return RedirectToPage(new { selectedTinStatus = SelectedTinStatus });
+        }
+
+        public async Task<IActionResult> OnPostPreviewEstimatedImportAsync(IFormFile? importFile)
+        {
+            SelectedTinStatus = NormalizeTinStatusFilter(SelectedTinStatus);
+            await LoadRowsAsync();
+
+            var selectedCompanyIds = ResolveSelectedCompanyIds(SelectedCompanyIds, Records);
+            SelectedCompanyIds = selectedCompanyIds;
+
+            if (selectedCompanyIds.Count == 0)
+            {
+                ModelState.AddModelError(string.Empty, "Select at least one company row first.");
+                return Page();
+            }
+
+            if (importFile == null || importFile.Length == 0)
+            {
+                ModelState.AddModelError(string.Empty, "Select an Excel file (.xlsx) to preview.");
+                return Page();
+            }
+
+            if (!importFile.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                ModelState.AddModelError(string.Empty, "Only .xlsx Excel files are supported.");
+                return Page();
+            }
+
+            await using var stream = importFile.OpenReadStream();
+            EstimatedImportPreview = await BuildEstimatedImportPreviewAsync(selectedCompanyIds, stream, applyUpdates: false);
+            return Page();
+        }
+
+        public async Task<IActionResult> OnPostApplyEstimatedImportAsync(IFormFile? importFile)
+        {
+            SelectedTinStatus = NormalizeTinStatusFilter(SelectedTinStatus);
+            await LoadRowsAsync();
+
+            var selectedCompanyIds = ResolveSelectedCompanyIds(SelectedCompanyIds, Records);
+
+            if (selectedCompanyIds.Count == 0)
+            {
+                StatusMessage = "Error: Select at least one company row first.";
+                return RedirectToPage(new { selectedTinStatus = SelectedTinStatus });
+            }
+
+            if (importFile == null || importFile.Length == 0)
+            {
+                StatusMessage = "Error: Select an Excel file (.xlsx) to import.";
+                return RedirectToPage(new { selectedTinStatus = SelectedTinStatus });
+            }
+
+            if (!importFile.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                StatusMessage = "Error: Only .xlsx Excel files are supported.";
+                return RedirectToPage(new { selectedTinStatus = SelectedTinStatus });
+            }
+
+            await using var stream = importFile.OpenReadStream();
+            var result = await BuildEstimatedImportPreviewAsync(selectedCompanyIds, stream, applyUpdates: true);
+            StatusMessage = $"Estimated import applied. Selected companies: {result.SelectedCompanyCount}. Fields updated: {result.ChangedCount}. Rows without match: {result.UnmatchedCompanyCount}.";
+            return RedirectToPage(new { selectedTinStatus = SelectedTinStatus });
+        }
+
+        private static List<int> ResolveSelectedCompanyIds(IEnumerable<int>? selectedCompanyIds, IEnumerable<PrePublishDataRow> records)
+        {
+            var validIds = records.Select(x => x.CompanyId).ToHashSet();
+
+            return (selectedCompanyIds ?? Enumerable.Empty<int>())
+                .Where(id => validIds.Contains(id))
+                .Distinct()
+                .ToList();
+        }
+
+        private async Task<RevenueAdjustPreviewResult> BuildRevenueAdjustPreviewAsync(IReadOnlyCollection<int> selectedCompanyIds, int decimalPlacesAdjustment, bool applyUpdates)
+        {
+            var result = new RevenueAdjustPreviewResult
+            {
+                SelectedCompanyCount = selectedCompanyIds.Count,
+                DecimalPlacesAdjustment = decimalPlacesAdjustment
+            };
+
+            var latestCompanySurveyIds = await (
+                from companySurvey in _context.CompanySurvey
+                join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
+                where selectedCompanyIds.Contains(companySurvey.CompanyId)
+                select new
+                {
+                    companySurvey.CompanyId,
+                    companySurvey.Id,
+                    survey.CurrentSurvey,
+                    survey.FinancialYear
+                })
+                .ToListAsync();
+
+            var targetCompanySurveyIds = latestCompanySurveyIds
+                .GroupBy(x => x.CompanyId)
+                .Select(g => g
+                    .OrderByDescending(x => x.CurrentSurvey)
+                    .ThenByDescending(x => x.FinancialYear)
+                    .ThenByDescending(x => x.Id)
+                    .Select(x => x.Id)
+                    .First())
+                .ToHashSet();
+
+            if (targetCompanySurveyIds.Count == 0)
+            {
+                return result;
+            }
+
+            var candidates = await (
+                from answer in _context.Answer
+                join question in _context.Question on answer.QuestionId equals question.Id
+                join companySurvey in _context.CompanySurvey on answer.CompanySurveyId equals companySurvey.Id
+                join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
+                join company in _context.Tin200 on companySurvey.CompanyId equals company.Id
+                where targetCompanySurveyIds.Contains(companySurvey.Id)
+                select new
+                {
+                    Answer = answer,
+                    QuestionTitle = question.Title,
+                    QuestionText = question.QuestionText,
+                    question.ImportColumnName,
+                    question.ImportColumnNameAlt,
+                    CompanyName = company.CompanyName,
+                    SurveyYear = survey.FinancialYear
+                })
+                .ToListAsync();
+
+            var previewRows = new List<RevenueAdjustPreviewRow>();
+
+            foreach (var candidate in candidates)
+            {
+                if (!IsRevenueQuestion(candidate.QuestionTitle, candidate.QuestionText, candidate.ImportColumnName, candidate.ImportColumnNameAlt))
+                {
+                    continue;
+                }
+
+                var hasCurrency = candidate.Answer.AnswerCurrency.HasValue;
+                var hasNumber = candidate.Answer.AnswerNumber.HasValue;
+                if (!hasCurrency && !hasNumber)
+                {
+                    continue;
+                }
+
+                var oldCurrency = candidate.Answer.AnswerCurrency;
+                var oldNumber = candidate.Answer.AnswerNumber;
+                var newCurrency = hasCurrency
+                    ? ShiftDecimalPlaces(candidate.Answer.AnswerCurrency!.Value, decimalPlacesAdjustment)
+                    : (decimal?)null;
+                var newNumber = hasNumber
+                    ? ShiftDecimalPlaces(candidate.Answer.AnswerNumber!.Value, decimalPlacesAdjustment)
+                    : (double?)null;
+
+                var isChanged = (oldCurrency != newCurrency) || (oldNumber != newNumber);
+                if (!isChanged)
+                {
+                    continue;
+                }
+
+                result.TotalRevenueAnswersFound++;
+                result.ChangedCount++;
+
+                if (previewRows.Count < 200)
+                {
+                    var fieldType = hasCurrency ? "Currency" : "Number";
+                    var oldDisplay = hasCurrency
+                        ? oldCurrency?.ToString("N2", CultureInfo.InvariantCulture) ?? string.Empty
+                        : oldNumber?.ToString("N2", CultureInfo.InvariantCulture) ?? string.Empty;
+                    var newDisplay = hasCurrency
+                        ? newCurrency?.ToString("N2", CultureInfo.InvariantCulture) ?? string.Empty
+                        : newNumber?.ToString("N2", CultureInfo.InvariantCulture) ?? string.Empty;
+
+                    previewRows.Add(new RevenueAdjustPreviewRow
+                    {
+                        CompanyName = string.IsNullOrWhiteSpace(candidate.CompanyName) ? "(No company name)" : candidate.CompanyName.Trim(),
+                        SurveyYear = candidate.SurveyYear,
+                        QuestionTitle = candidate.QuestionTitle ?? candidate.ImportColumnName ?? candidate.ImportColumnNameAlt ?? "Revenue Question",
+                        FieldType = fieldType,
+                        OldValue = oldDisplay,
+                        NewValue = newDisplay
+                    });
+                }
+
+                if (applyUpdates)
+                {
+                    candidate.Answer.AnswerCurrency = newCurrency;
+                    candidate.Answer.AnswerNumber = newNumber;
+                }
+            }
+
+            result.PreviewRows = previewRows;
+
+            if (applyUpdates && result.ChangedCount > 0)
+            {
+                await _context.SaveChangesAsync();
+            }
+
+            return result;
+        }
+
+        private async Task<PopulateOwnershipFormedPreviewResult> BuildPopulateOwnershipFormedPreviewAsync(IReadOnlyCollection<int> selectedCompanyIds, bool applyUpdates)
+        {
+            var result = new PopulateOwnershipFormedPreviewResult
+            {
+                SelectedCompanyCount = selectedCompanyIds.Count
+            };
+
+            var companySurveyRows = await (
+                from companySurvey in _context.CompanySurvey
+                join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
+                join company in _context.Tin200 on companySurvey.CompanyId equals company.Id
+                where selectedCompanyIds.Contains(companySurvey.CompanyId)
+                select new
+                {
+                    companySurvey.CompanyId,
+                    companySurvey.Id,
+                    survey.CurrentSurvey,
+                    survey.FinancialYear,
+                    CompanyName = company.CompanyName
+                })
+                .ToListAsync();
+
+            var latestByCompany = companySurveyRows
+                .GroupBy(x => x.CompanyId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.OrderByDescending(x => x.CurrentSurvey)
+                        .ThenByDescending(x => x.FinancialYear)
+                        .ThenByDescending(x => x.Id)
+                        .ToList());
+
+            var companyPairs = latestByCompany
+                .Select(x => new
+                {
+                    CompanyId = x.Key,
+                    Latest = x.Value.ElementAtOrDefault(0),
+                    Previous = x.Value.ElementAtOrDefault(1)
+                })
+                .Where(x => x.Latest != null && x.Previous != null)
+                .ToList();
+
+            if (companyPairs.Count == 0)
+            {
+                return result;
+            }
+
+            var targetQuestionRows = await _context.Question
+                .AsNoTracking()
+                .Select(q => new
+                {
+                    q.Id,
+                    q.Title,
+                    q.QuestionText,
+                    q.ImportColumnName,
+                    q.ImportColumnNameAlt
+                })
+                .ToListAsync();
+
+            var targetQuestionIds = targetQuestionRows
+                .Where(q => IsOwnershipFormedDescriptionQuestion(q.Title, q.QuestionText, q.ImportColumnName, q.ImportColumnNameAlt))
+                .Select(q => q.Id)
+                .ToHashSet();
+
+            if (targetQuestionIds.Count == 0)
+            {
+                return result;
+            }
+
+            var latestSurveyIds = companyPairs.Select(x => x.Latest!.Id).ToHashSet();
+            var previousSurveyIds = companyPairs.Select(x => x.Previous!.Id).ToHashSet();
+            var allSurveyIds = latestSurveyIds.Concat(previousSurveyIds).Distinct().ToList();
+
+            var answerRows = await _context.Answer
+                .Where(a => allSurveyIds.Contains(a.CompanySurveyId) && targetQuestionIds.Contains(a.QuestionId))
+                .ToListAsync();
+
+            var answersBySurvey = answerRows
+                .GroupBy(a => a.CompanySurveyId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.GroupBy(a => a.QuestionId).ToDictionary(ga => ga.Key, ga => ga.OrderByDescending(x => x.Id).First()));
+
+            var questionLabelById = targetQuestionRows
+                .Where(q => targetQuestionIds.Contains(q.Id))
+                .ToDictionary(
+                    q => q.Id,
+                    q => string.IsNullOrWhiteSpace(q.Title)
+                        ? (q.ImportColumnName ?? q.ImportColumnNameAlt ?? $"Question {q.Id}")
+                        : q.Title!.Trim());
+
+            var previewRows = new List<PopulateOwnershipFormedPreviewRow>();
+
+            foreach (var pair in companyPairs)
+            {
+                var latestSurveyId = pair.Latest!.Id;
+                var previousSurveyId = pair.Previous!.Id;
+
+                answersBySurvey.TryGetValue(latestSurveyId, out var latestAnswers);
+                latestAnswers ??= new Dictionary<int, Answer>();
+                answersBySurvey.TryGetValue(previousSurveyId, out var previousAnswers);
+                previousAnswers ??= new Dictionary<int, Answer>();
+
+                foreach (var questionId in targetQuestionIds)
+                {
+                    previousAnswers.TryGetValue(questionId, out var sourceAnswer);
+                    if (!HasAnswerValue(sourceAnswer))
+                    {
+                        continue;
+                    }
+
+                    latestAnswers.TryGetValue(questionId, out var targetAnswer);
+                    if (HasAnswerValue(targetAnswer))
+                    {
+                        continue;
+                    }
+
+                    result.ChangedCount++;
+
+                    if (previewRows.Count < 200)
+                    {
+                        previewRows.Add(new PopulateOwnershipFormedPreviewRow
+                        {
+                            CompanyName = string.IsNullOrWhiteSpace(pair.Latest.CompanyName) ? "(No company name)" : pair.Latest.CompanyName.Trim(),
+                            LatestSurveyYear = pair.Latest.FinancialYear,
+                            PreviousSurveyYear = pair.Previous.FinancialYear,
+                            QuestionTitle = questionLabelById.TryGetValue(questionId, out var questionLabel) ? questionLabel : $"Question {questionId}",
+                            NewValue = FormatAnswerValue(sourceAnswer)
+                        });
+                    }
+
+                    if (applyUpdates)
+                    {
+                        if (targetAnswer == null)
+                        {
+                            var created = new Answer
+                            {
+                                CompanySurveyId = latestSurveyId,
+                                QuestionId = questionId,
+                                AnswerText = sourceAnswer!.AnswerText,
+                                AnswerCurrency = sourceAnswer.AnswerCurrency,
+                                AnswerNumber = sourceAnswer.AnswerNumber
+                            };
+
+                            _context.Answer.Add(created);
+                            latestAnswers[questionId] = created;
+                        }
+                        else
+                        {
+                            targetAnswer.AnswerText = sourceAnswer!.AnswerText;
+                            targetAnswer.AnswerCurrency = sourceAnswer.AnswerCurrency;
+                            targetAnswer.AnswerNumber = sourceAnswer.AnswerNumber;
+                        }
+                    }
+                }
+            }
+
+            result.PreviewRows = previewRows;
+
+            if (applyUpdates && result.ChangedCount > 0)
+            {
+                await _context.SaveChangesAsync();
+            }
+
+            return result;
+        }
+
+        private static bool IsRevenueQuestion(params string?[] values)
+        {
+            foreach (var value in values)
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    continue;
+                }
+
+                var normalized = CanonicalizeKey(value);
+                if (string.IsNullOrWhiteSpace(normalized))
+                {
+                    continue;
+                }
+
+                if (normalized.Contains("revenue", StringComparison.OrdinalIgnoreCase)
+                    || normalized.StartsWith("fye", StringComparison.OrdinalIgnoreCase)
+                    || normalized.Contains("fyelastfinancialyear", StringComparison.OrdinalIgnoreCase)
+                    || normalized.Contains("fyeyear1", StringComparison.OrdinalIgnoreCase)
+                    || normalized.Contains("fyeyear2", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsOwnershipFormedDescriptionQuestion(params string?[] values)
+        {
+            foreach (var value in values)
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                {
+                    continue;
+                }
+
+                var key = CanonicalizeKey(value);
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    continue;
+                }
+
+                if (key.Contains("ownership", StringComparison.OrdinalIgnoreCase)
+                    || key.Contains("formationyear", StringComparison.OrdinalIgnoreCase)
+                    || key.Contains("yearofformation", StringComparison.OrdinalIgnoreCase)
+                    || key.Contains("formed", StringComparison.OrdinalIgnoreCase)
+                    || key.Contains("founded", StringComparison.OrdinalIgnoreCase)
+                    || key.Contains("companydescription", StringComparison.OrdinalIgnoreCase)
+                    || key.Contains("physicaladdress", StringComparison.OrdinalIgnoreCase)
+                    || key.Contains("primarysector", StringComparison.OrdinalIgnoreCase)
+                    || key.Contains("secondarysector", StringComparison.OrdinalIgnoreCase)
+                    || key.Contains("businessdecision", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasAnswerValue(Answer? answer)
+        {
+            if (answer == null)
+            {
+                return false;
+            }
+
+            return !string.IsNullOrWhiteSpace(answer.AnswerText)
+                || answer.AnswerCurrency.HasValue
+                || answer.AnswerNumber.HasValue;
+        }
+
+        private static string FormatAnswerValue(Answer? answer)
+        {
+            if (answer == null)
+            {
+                return string.Empty;
+            }
+
+            if (!string.IsNullOrWhiteSpace(answer.AnswerText))
+            {
+                return answer.AnswerText.Trim();
+            }
+
+            if (answer.AnswerCurrency.HasValue)
+            {
+                return answer.AnswerCurrency.Value.ToString("N2", CultureInfo.InvariantCulture);
+            }
+
+            if (answer.AnswerNumber.HasValue)
+            {
+                return answer.AnswerNumber.Value.ToString("N2", CultureInfo.InvariantCulture);
+            }
+
+            return string.Empty;
+        }
+
+        private static decimal ShiftDecimalPlaces(decimal value, int places)
+        {
+            if (places == 0)
+            {
+                return value;
+            }
+
+            var factor = Pow10Decimal(Math.Abs(places));
+            return places > 0 ? value * factor : value / factor;
+        }
+
+        private static double ShiftDecimalPlaces(double value, int places)
+        {
+            if (places == 0)
+            {
+                return value;
+            }
+
+            var factor = Math.Pow(10d, Math.Abs(places));
+            return places > 0 ? value * factor : value / factor;
+        }
+
+        private static decimal Pow10Decimal(int exponent)
+        {
+            var factor = 1m;
+            for (var i = 0; i < exponent; i++)
+            {
+                factor *= 10m;
+            }
+
+            return factor;
+        }
+
+        private async Task<EstimatedImportPreviewResult> BuildEstimatedImportPreviewAsync(IReadOnlyCollection<int> selectedCompanyIds, Stream excelStream, bool applyUpdates)
+        {
+            var result = new EstimatedImportPreviewResult
+            {
+                SelectedCompanyCount = selectedCompanyIds.Count
+            };
+
+            var importedRows = ParseEstimatedImportRows(excelStream, result.Warnings);
+            result.RowsRead = importedRows.Count;
+            if (importedRows.Count == 0)
+            {
+                return result;
+            }
+
+            var selectedCompanies = await _context.Tin200
+                .Where(x => selectedCompanyIds.Contains(x.Id))
+                .Select(x => new { x.Id, x.CompanyName })
+                .ToListAsync();
+
+            var companyLookup = selectedCompanies
+                .Where(x => !string.IsNullOrWhiteSpace(x.CompanyName))
+                .GroupBy(x => NormalizeCompanyName(x.CompanyName!))
+                .ToDictionary(g => g.Key, g => g.Select(x => x.Id).Distinct().ToList(), StringComparer.OrdinalIgnoreCase);
+
+            var matchedCompanyIds = new HashSet<int>();
+            var companyMatches = new List<(EstimatedImportRow Row, int CompanyId)>();
+
+            foreach (var row in importedRows)
+            {
+                var normalizedName = NormalizeCompanyName(row.CompanyName);
+                if (string.IsNullOrWhiteSpace(normalizedName)
+                    || !companyLookup.TryGetValue(normalizedName, out var companyIds)
+                    || companyIds.Count == 0)
+                {
+                    result.UnmatchedCompanyCount++;
+                    continue;
+                }
+
+                if (companyIds.Count > 1)
+                {
+                    result.Warnings.Add($"Skipped '{row.CompanyName}': multiple selected companies share this name.");
+                    continue;
+                }
+
+                var companyId = companyIds[0];
+                matchedCompanyIds.Add(companyId);
+                companyMatches.Add((row, companyId));
+            }
+
+            result.MatchedCompanyCount = matchedCompanyIds.Count;
+            if (companyMatches.Count == 0)
+            {
+                return result;
+            }
+
+            var latestSurveyRows = await (
+                from cs in _context.CompanySurvey
+                join s in _context.Survey on cs.SurveyId equals s.Id
+                where matchedCompanyIds.Contains(cs.CompanyId)
+                select new
+                {
+                    cs.CompanyId,
+                    CompanySurveyId = cs.Id,
+                    s.CurrentSurvey,
+                    s.FinancialYear
+                })
+                .ToListAsync();
+
+            var latestSurveyByCompany = latestSurveyRows
+                .GroupBy(x => x.CompanyId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g
+                        .OrderByDescending(x => x.CurrentSurvey)
+                        .ThenByDescending(x => x.FinancialYear)
+                        .ThenByDescending(x => x.CompanySurveyId)
+                        .First());
+
+            var questionRows = await _context.Question
+                .AsNoTracking()
+                .Select(q => new
+                {
+                    q.Id,
+                    q.Title,
+                    q.QuestionText,
+                    q.ImportColumnName,
+                    q.ImportColumnNameAlt
+                })
+                .ToListAsync();
+
+            var revenueQuestionId = questionRows
+                .Where(q => IsRevenueLastFinancialYearQuestion(q.Title, q.QuestionText, q.ImportColumnName, q.ImportColumnNameAlt))
+                .Select(q => q.Id)
+                .FirstOrDefault();
+
+            var employmentQuestionId = questionRows
+                .Where(q => IsEmploymentLastFinancialYearQuestion(q.Title, q.QuestionText, q.ImportColumnName, q.ImportColumnNameAlt))
+                .Select(q => q.Id)
+                .FirstOrDefault();
+
+            if (revenueQuestionId <= 0)
+            {
+                result.Warnings.Add("Could not find question mapping for Total Revenue Last Financial Year.");
+            }
+
+            if (employmentQuestionId <= 0)
+            {
+                result.Warnings.Add("Could not find question mapping for Total Employment Last Financial Year.");
+            }
+
+            var targetSurveyIds = latestSurveyByCompany.Values
+                .Select(x => x.CompanySurveyId)
+                .Distinct()
+                .ToList();
+
+            if (targetSurveyIds.Count == 0)
+            {
+                result.Warnings.Add("No latest surveys found for matched selected companies.");
+                return result;
+            }
+
+            var trackedAnswers = await _context.Answer
+                .Where(a => targetSurveyIds.Contains(a.CompanySurveyId)
+                    && ((revenueQuestionId > 0 && a.QuestionId == revenueQuestionId)
+                        || (employmentQuestionId > 0 && a.QuestionId == employmentQuestionId)))
+                .ToListAsync();
+
+            var answerLookup = trackedAnswers
+                .GroupBy(a => (a.CompanySurveyId, a.QuestionId))
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.Id).First());
+
+            var companyNameById = selectedCompanies.ToDictionary(
+                x => x.Id,
+                x => string.IsNullOrWhiteSpace(x.CompanyName) ? "(No company name)" : x.CompanyName!.Trim());
+
+            foreach (var match in companyMatches)
+            {
+                if (!latestSurveyByCompany.TryGetValue(match.CompanyId, out var latestSurvey))
+                {
+                    result.Warnings.Add($"Skipped '{match.Row.CompanyName}': no latest survey record found.");
+                    continue;
+                }
+
+                if (match.Row.RevenueEstimated && match.Row.RevenueValue.HasValue && revenueQuestionId > 0)
+                {
+                    ProcessEstimatedField(
+                        result,
+                        answerLookup,
+                        latestSurvey.CompanySurveyId,
+                        latestSurvey.FinancialYear,
+                        revenueQuestionId,
+                        companyNameById.GetValueOrDefault(match.CompanyId, match.Row.CompanyName),
+                        "Total Revenue Last Financial Year",
+                        match.Row.RevenueValue.Value,
+                        isRevenue: true,
+                        applyUpdates: applyUpdates);
+                }
+
+                if (match.Row.EmployeesEstimated && match.Row.EmployeesValue.HasValue && employmentQuestionId > 0)
+                {
+                    ProcessEstimatedField(
+                        result,
+                        answerLookup,
+                        latestSurvey.CompanySurveyId,
+                        latestSurvey.FinancialYear,
+                        employmentQuestionId,
+                        companyNameById.GetValueOrDefault(match.CompanyId, match.Row.CompanyName),
+                        "Total Employment Last Financial Year",
+                        match.Row.EmployeesValue.Value,
+                        isRevenue: false,
+                        applyUpdates: applyUpdates);
+                }
+            }
+
+            if (applyUpdates && result.ChangedCount > 0)
+            {
+                await _context.SaveChangesAsync();
+            }
+
+            return result;
+        }
+
+        private void ProcessEstimatedField(
+            EstimatedImportPreviewResult result,
+            Dictionary<(int CompanySurveyId, int QuestionId), Answer> answerLookup,
+            int companySurveyId,
+            int latestSurveyYear,
+            int questionId,
+            string companyName,
+            string fieldName,
+            decimal importedValue,
+            bool isRevenue,
+            bool applyUpdates)
+        {
+            answerLookup.TryGetValue((companySurveyId, questionId), out var targetAnswer);
+            if (HasAnswerValue(targetAnswer))
+            {
+                return;
+            }
+
+            var oldValue = FormatAnswerValue(targetAnswer);
+            var newValue = importedValue.ToString("N2", CultureInfo.InvariantCulture);
+            result.ChangedCount++;
+
+            if (result.PreviewRows.Count < 200)
+            {
+                result.PreviewRows.Add(new EstimatedImportPreviewRow
+                {
+                    CompanyName = companyName,
+                    LatestSurveyYear = latestSurveyYear,
+                    FieldName = fieldName,
+                    OldValue = oldValue,
+                    NewValue = newValue
+                });
+            }
+
+            if (!applyUpdates)
+            {
+                return;
+            }
+
+            if (targetAnswer == null)
+            {
+                targetAnswer = new Answer
+                {
+                    CompanySurveyId = companySurveyId,
+                    QuestionId = questionId
+                };
+
+                _context.Answer.Add(targetAnswer);
+                answerLookup[(companySurveyId, questionId)] = targetAnswer;
+            }
+
+            targetAnswer.AnswerText = null;
+            if (isRevenue)
+            {
+                targetAnswer.AnswerCurrency = importedValue;
+                targetAnswer.AnswerNumber = null;
+            }
+            else
+            {
+                targetAnswer.AnswerCurrency = null;
+                targetAnswer.AnswerNumber = (double)importedValue;
+            }
+        }
+
+        private static List<EstimatedImportRow> ParseEstimatedImportRows(Stream excelStream, ICollection<string> warnings)
+        {
+            using var workbook = new XLWorkbook(excelStream);
+            var worksheet = workbook.Worksheets.FirstOrDefault();
+            if (worksheet == null)
+            {
+                warnings.Add("The workbook does not contain any worksheets.");
+                return new List<EstimatedImportRow>();
+            }
+
+            var usedRange = worksheet.RangeUsed();
+            if (usedRange == null)
+            {
+                warnings.Add("The worksheet is empty.");
+                return new List<EstimatedImportRow>();
+            }
+
+            var headerRowNumber = usedRange.FirstRow().RowNumber();
+            var lastRowNumber = usedRange.LastRow().RowNumber();
+            var headerCells = worksheet.Row(headerRowNumber).CellsUsed();
+
+            var headerMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var cell in headerCells)
+            {
+                var headerText = NormalizeTemplateKey(cell.GetString());
+                if (string.IsNullOrWhiteSpace(headerText))
+                {
+                    continue;
+                }
+
+                var canonical = CanonicalizeKey(headerText);
+                if (string.IsNullOrWhiteSpace(canonical) || headerMap.ContainsKey(canonical))
+                {
+                    continue;
+                }
+
+                headerMap[canonical] = cell.Address.ColumnNumber;
+            }
+
+            var companyNameCol = FindHeaderColumn(headerMap, "companyname");
+            var revenueCol = FindHeaderColumn(headerMap, "revenue000", "revenue");
+            var revenueEstimatedCol = FindHeaderColumn(headerMap, "revenueestimated");
+            var employeesCol = FindHeaderColumn(headerMap, "employees", "employee");
+            var employeesEstimatedCol = FindHeaderColumn(headerMap, "employeesestimated", "employeeestimated");
+
+            if (companyNameCol <= 0 || revenueCol <= 0 || revenueEstimatedCol <= 0 || employeesCol <= 0 || employeesEstimatedCol <= 0)
+            {
+                warnings.Add("Missing required headers. Expected: Company Name, Revenue ($000), Revenue Estimated, Employees, Employees Estimated.");
+                return new List<EstimatedImportRow>();
+            }
+
+            var rows = new List<EstimatedImportRow>();
+
+            for (var rowNumber = headerRowNumber + 1; rowNumber <= lastRowNumber; rowNumber++)
+            {
+                var row = worksheet.Row(rowNumber);
+                var companyName = NormalizeTemplateKey(row.Cell(companyNameCol).GetString());
+                if (string.IsNullOrWhiteSpace(companyName))
+                {
+                    continue;
+                }
+
+                var revenueEstimated = IsEstimatedFlag(row.Cell(revenueEstimatedCol).GetString());
+                var employeesEstimated = IsEstimatedFlag(row.Cell(employeesEstimatedCol).GetString());
+                if (!revenueEstimated && !employeesEstimated)
+                {
+                    continue;
+                }
+
+                var revenueRaw = row.Cell(revenueCol).GetString();
+                var employeesRaw = row.Cell(employeesCol).GetString();
+
+                var revenueValue = ParseNullableDecimal(revenueRaw);
+                var employeesValue = ParseNullableDecimal(employeesRaw);
+
+                if (revenueEstimated && !revenueValue.HasValue)
+                {
+                    warnings.Add($"Row {rowNumber} ({companyName}): Revenue Estimated is set but Revenue ($000) is not numeric.");
+                }
+
+                if (employeesEstimated && !employeesValue.HasValue)
+                {
+                    warnings.Add($"Row {rowNumber} ({companyName}): Employees Estimated is set but Employees is not numeric.");
+                }
+
+                rows.Add(new EstimatedImportRow
+                {
+                    CompanyName = companyName,
+                    RevenueEstimated = revenueEstimated,
+                    RevenueValue = revenueValue,
+                    EmployeesEstimated = employeesEstimated,
+                    EmployeesValue = employeesValue
+                });
+            }
+
+            return rows;
+        }
+
+        private static int FindHeaderColumn(IReadOnlyDictionary<string, int> headerMap, params string[] canonicalCandidates)
+        {
+            foreach (var candidate in canonicalCandidates)
+            {
+                if (headerMap.TryGetValue(candidate, out var col))
+                {
+                    return col;
+                }
+            }
+
+            return 0;
+        }
+
+        private static bool IsEstimatedFlag(string? raw)
+        {
+            return string.Equals(NormalizeTemplateKey(raw), "Estimated", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static decimal? ParseNullableDecimal(string? raw)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
             {
                 return null;
             }
 
-            var prePublishMatch = emailContentOptions.FirstOrDefault(x =>
-                x.Name.Contains("pre", StringComparison.OrdinalIgnoreCase)
-                && x.Name.Contains("publish", StringComparison.OrdinalIgnoreCase));
+            var cleaned = raw.Trim()
+                .Replace("$", string.Empty, StringComparison.Ordinal)
+                .Replace(",", string.Empty, StringComparison.Ordinal);
 
-            return prePublishMatch ?? emailContentOptions.First();
+            if (decimal.TryParse(cleaned, NumberStyles.Number | NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var parsed))
+            {
+                return parsed;
+            }
+
+            return null;
+        }
+
+        private static string NormalizeCompanyName(string raw)
+        {
+            return NormalizeTemplateKey(raw).Trim();
+        }
+
+        private static bool IsRevenueLastFinancialYearQuestion(params string?[] values)
+        {
+            foreach (var value in values)
+            {
+                var canonical = CanonicalizeKey(value);
+                if (string.IsNullOrWhiteSpace(canonical))
+                {
+                    continue;
+                }
+
+                if (canonical == "totalrevenuelastfinancialyear"
+                    || canonical == "totalrevenuelastfinancialyear000"
+                    || canonical == "revenuelastfinancialyear"
+                    || canonical == "revenuelastfinancialyear000")
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsEmploymentLastFinancialYearQuestion(params string?[] values)
+        {
+            foreach (var value in values)
+            {
+                var canonical = CanonicalizeKey(value);
+                if (string.IsNullOrWhiteSpace(canonical))
+                {
+                    continue;
+                }
+
+                if (canonical == "totalemploymentlastfinancialyear"
+                    || canonical == "totalemplymentlastfinancialyear"
+                    || canonical == "employmentlastfinancialyear"
+                    || canonical == "staffemployedlastfinancialyear")
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private async Task LoadRowsAsync()
@@ -451,7 +1443,7 @@ namespace TINWeb.Pages.CompanySurvey
                 new("Physical address", "Physical Address", "PhysicalAddress"),
                 new("Primary sector", "Primary sector", "Primary Sector"),
                 new("Secondary sector", "Secondary sector", "Secondary Sector"),
-                new("Best business decision for 2026", "Best business decision for 2026", "Best Business Decision for 2026"),
+                new("Business Decision", "Business Decision", "Business Decision"),
                 new("Key products", "Key products", "Key Products")
             };
         }
@@ -566,12 +1558,69 @@ namespace TINWeb.Pages.CompanySurvey
             }
         }
 
-        public class EmailContentOption
+        public class RevenueAdjustPreviewResult
         {
-            public int Id { get; set; }
-            public string Name { get; set; } = string.Empty;
-            public string? Subject { get; set; }
-            public string? Template { get; set; }
+            public int SelectedCompanyCount { get; set; }
+            public int DecimalPlacesAdjustment { get; set; }
+            public int TotalRevenueAnswersFound { get; set; }
+            public int ChangedCount { get; set; }
+            public List<RevenueAdjustPreviewRow> PreviewRows { get; set; } = new();
         }
+
+        public class RevenueAdjustPreviewRow
+        {
+            public string CompanyName { get; set; } = string.Empty;
+            public int SurveyYear { get; set; }
+            public string QuestionTitle { get; set; } = string.Empty;
+            public string FieldType { get; set; } = string.Empty;
+            public string OldValue { get; set; } = string.Empty;
+            public string NewValue { get; set; } = string.Empty;
+        }
+
+        public class PopulateOwnershipFormedPreviewResult
+        {
+            public int SelectedCompanyCount { get; set; }
+            public int ChangedCount { get; set; }
+            public List<PopulateOwnershipFormedPreviewRow> PreviewRows { get; set; } = new();
+        }
+
+        public class PopulateOwnershipFormedPreviewRow
+        {
+            public string CompanyName { get; set; } = string.Empty;
+            public int LatestSurveyYear { get; set; }
+            public int PreviousSurveyYear { get; set; }
+            public string QuestionTitle { get; set; } = string.Empty;
+            public string NewValue { get; set; } = string.Empty;
+        }
+
+        private sealed class EstimatedImportRow
+        {
+            public string CompanyName { get; set; } = string.Empty;
+            public decimal? RevenueValue { get; set; }
+            public bool RevenueEstimated { get; set; }
+            public decimal? EmployeesValue { get; set; }
+            public bool EmployeesEstimated { get; set; }
+        }
+
+        public class EstimatedImportPreviewResult
+        {
+            public int SelectedCompanyCount { get; set; }
+            public int RowsRead { get; set; }
+            public int MatchedCompanyCount { get; set; }
+            public int UnmatchedCompanyCount { get; set; }
+            public int ChangedCount { get; set; }
+            public List<string> Warnings { get; set; } = new();
+            public List<EstimatedImportPreviewRow> PreviewRows { get; set; } = new();
+        }
+
+        public class EstimatedImportPreviewRow
+        {
+            public string CompanyName { get; set; } = string.Empty;
+            public int LatestSurveyYear { get; set; }
+            public string FieldName { get; set; } = string.Empty;
+            public string OldValue { get; set; } = string.Empty;
+            public string NewValue { get; set; } = string.Empty;
+        }
+
     }
 }

@@ -350,6 +350,8 @@ Open your secure survey link
                     .Select(c => new
                     {
                         c.CompanyName,
+                        c.CeoFirstName,
+                        c.CeoLastName,
                         c.Website,
                         c.Phone,
                         c.AddStreet,
@@ -365,6 +367,20 @@ Open your secure survey link
 
             values[NormalizeTemplateKey("CompanyName")] = companyName;
             values[NormalizeTemplateKey("Company Name")] = companyName;
+
+            var fallbackCeoFirstName = companyInfo?.CeoFirstName?.Trim() ?? string.Empty;
+            var fallbackCeoLastName = companyInfo?.CeoLastName?.Trim() ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(fallbackCeoFirstName))
+            {
+                values[NormalizeTemplateKey("CEO First Name")] = fallbackCeoFirstName;
+                values[NormalizeTemplateKey("CeoFirstName")] = fallbackCeoFirstName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(fallbackCeoLastName))
+            {
+                values[NormalizeTemplateKey("CEO Last Name")] = fallbackCeoLastName;
+                values[NormalizeTemplateKey("CeoLastName")] = fallbackCeoLastName;
+            }
 
             var companySurveyHistory = await (
                 from cs in _context.CompanySurvey.AsNoTracking()

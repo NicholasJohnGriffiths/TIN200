@@ -68,13 +68,18 @@
         min-width: 140px;
         max-width: 140px;
     }
-    </style>
+
+    .revenue-adjust-preview-table th,
+    .revenue-adjust-preview-table td {
+        font-size: 0.8rem;
+    }
+</style>
 
 <div class="container-fluid mt-4">
     <div class="row mb-3">
         <div class="col">
             <h1 class="mb-1">Pre Publish Data Check</h1>
-            <p class="text-muted mb-0">Company summary data for prepublication checks using a fixed column layout.</p>
+            <p class="text-muted mb-0">Company summary data sourced directly from Company, CompanySurvey, Answer, and Question database tables.</p>
         </div>
     </div>
 
@@ -96,42 +101,272 @@
         </div>
     </div>
 
-    @if (string.IsNullOrWhiteSpace(Model.SelectedEmailContentName))
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
     {
-        <div class="alert alert-warning">No active email content records were found. Create or activate a prepublication email content record first.</div>
+        <div class="alert alert-success" role="alert">@Model.StatusMessage</div>
     }
-    else
-    {
-        <div class="alert alert-light border mb-3">
-            <strong>Selected Email Content:</strong> @Model.SelectedEmailContentName
-            <span class="mx-2">|</span>
-            <strong>Columns:</strong> @Model.Columns.Count
-            <span class="mx-2">|</span>
-            <strong>Companies:</strong> @Model.Records.Count
-        </div>
 
-        <div class="table-responsive">
-            <table class="table table-sm table-striped table-hover align-middle company-table prepublish-table">
-                <thead class="table-dark">
+    <div asp-validation-summary="ModelOnly" class="text-danger mb-2"></div>
+
+    <form id="adjustRevenueForm" method="post" class="card mb-3 requires-selection-form">
+        <div class="card-body py-2 d-flex flex-wrap align-items-end gap-2">
+            <input type="hidden" asp-for="SelectedTinStatus" />
+            <div>
+                <label asp-for="RevenueDecimalPlacesAdjustment" class="form-label mb-1">Adjust Revenue (Decimal Places)</label>
+                <input asp-for="RevenueDecimalPlacesAdjustment" type="number" step="1" class="form-control form-control-sm" style="max-width: 180px;" />
+                <div class="form-text">Positive multiplies by 10^n. Negative divides by 10^|n|. Revenue fields only.</div>
+            </div>
+            <button type="submit" asp-page-handler="PreviewAdjustRevenue" class="btn btn-outline-primary btn-sm">Adjust Revenue</button>
+            <button type="submit" asp-page-handler="ApplyAdjustRevenue" class="btn btn-primary btn-sm" onclick="return confirm('Apply revenue updates to selected records?');">Apply</button>
+        </div>
+    </form>
+
+    <form id="populateOwnershipFormedForm" method="post" class="card mb-3 requires-selection-form">
+        <div class="card-body py-2 d-flex flex-wrap align-items-end gap-2">
+            <input type="hidden" asp-for="SelectedTinStatus" />
+            <div>
+                <label class="form-label mb-1">Populate Missing Data From Prev Year</label>
+                <div class="form-text">For selected companies, fill blank Company Description, Ownership, Formed, Physical Address, Primary Sector, Secondary Sector, and Best Business Decision answers on the latest survey from the previous survey year.</div>
+            </div>
+            <button type="submit" asp-page-handler="PreviewPopulateOwnershipFormed" class="btn btn-outline-secondary btn-sm">Populate Missing Data From Prev Year</button>
+            <button type="submit" asp-page-handler="ApplyPopulateOwnershipFormed" class="btn btn-secondary btn-sm" onclick="return confirm('Apply Populate Missing Data From Prev Year updates to selected records?');">Apply</button>
+        </div>
+    </form>
+
+    <form id="estimatedImportForm" method="post" enctype="multipart/form-data" class="card mb-3 requires-selection-form">
+        <div class="card-body py-2 d-flex flex-wrap align-items-end gap-2">
+            <input type="hidden" asp-for="SelectedTinStatus" />
+            <div>
+                <label class="form-label mb-1">Import Estimated Revenue/Employees</label>
+                <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="min-width: 320px;" required />
+                <div class="form-text">Expected columns: Company Name, Revenue ($000), Revenue Estimated, Employees, Employees Estimated.</div>
+            </div>
+            <button type="submit" asp-page-handler="PreviewEstimatedImport" class="btn btn-outline-dark btn-sm">Preview Import</button>
+            <button type="submit" asp-page-handler="ApplyEstimatedImport" class="btn btn-dark btn-sm" onclick="return confirm('Apply estimated revenue/employees import to selected records?');">Apply Import</button>
+        </div>
+    </form>
+
+    @if (Model.PreviewResult != null)
+    {
+        <div class="card mb-3">
+            <div class="card-header">Revenue Update Preview</div>
+            <div class="card-body py-2">
+                <div><strong>Selected Companies:</strong> @Model.PreviewResult.SelectedCompanyCount</div>
+                <div><strong>Decimal Adjustment:</strong> @Model.PreviewResult.DecimalPlacesAdjustment</div>
+                <div><strong>Revenue Answers Changed:</strong> @Model.PreviewResult.ChangedCount</div>
+                <div><strong>Preview Rows:</strong> @Model.PreviewResult.PreviewRows.Count (max 200 shown)</div>
+            </div>
+            @if (Model.PreviewResult.PreviewRows.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped mb-0 revenue-adjust-preview-table">
+                        <thead>
+                            <tr>
+                                <th>Company</th>
+                                <th>Survey Year</th>
+                                <th>Question</th>
+                                <th>Type</th>
+                                <th>Old Value</th>
+                                <th>New Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.PreviewResult.PreviewRows)
+                            {
+                                <tr>
+                                    <td>@row.CompanyName</td>
+                                    <td>@row.SurveyYear</td>
+                                    <td>@row.QuestionTitle</td>
+                                    <td>@row.FieldType</td>
+                                    <td>@row.OldValue</td>
+                                    <td>@row.NewValue</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+
+    @if (Model.PopulatePreviewResult != null)
+    {
+        <div class="card mb-3">
+            <div class="card-header">Populate Missing Data From Prev Year Preview</div>
+            <div class="card-body py-2">
+                <div><strong>Selected Companies:</strong> @Model.PopulatePreviewResult.SelectedCompanyCount</div>
+                <div><strong>Answers to Populate:</strong> @Model.PopulatePreviewResult.ChangedCount</div>
+                <div><strong>Preview Rows:</strong> @Model.PopulatePreviewResult.PreviewRows.Count (max 200 shown)</div>
+            </div>
+            @if (Model.PopulatePreviewResult.PreviewRows.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped mb-0 revenue-adjust-preview-table">
+                        <thead>
+                            <tr>
+                                <th>Company</th>
+                                <th>Latest Survey Year</th>
+                                <th>Previous Survey Year</th>
+                                <th>Question</th>
+                                <th>Value to Populate</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.PopulatePreviewResult.PreviewRows)
+                            {
+                                <tr>
+                                    <td>@row.CompanyName</td>
+                                    <td>@row.LatestSurveyYear</td>
+                                    <td>@row.PreviousSurveyYear</td>
+                                    <td>@row.QuestionTitle</td>
+                                    <td>@row.NewValue</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+
+    @if (Model.EstimatedImportPreview != null)
+    {
+        <div class="card mb-3">
+            <div class="card-header">Estimated Import Preview</div>
+            <div class="card-body py-2">
+                <div><strong>Selected Companies:</strong> @Model.EstimatedImportPreview.SelectedCompanyCount</div>
+                <div><strong>Rows Read:</strong> @Model.EstimatedImportPreview.RowsRead</div>
+                <div><strong>Company Matches:</strong> @Model.EstimatedImportPreview.MatchedCompanyCount</div>
+                <div><strong>Rows Without Company Match:</strong> @Model.EstimatedImportPreview.UnmatchedCompanyCount</div>
+                <div><strong>Fields to Update:</strong> @Model.EstimatedImportPreview.ChangedCount</div>
+                @if (Model.EstimatedImportPreview.Warnings.Any())
+                {
+                    <div class="mt-2">
+                        <strong>Warnings:</strong>
+                        <ul class="mb-0 mt-1 small">
+                            @foreach (var warning in Model.EstimatedImportPreview.Warnings.Take(20))
+                            {
+                                <li>@warning</li>
+                            }
+                        </ul>
+                    </div>
+                }
+            </div>
+            @if (Model.EstimatedImportPreview.PreviewRows.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped mb-0 revenue-adjust-preview-table">
+                        <thead>
+                            <tr>
+                                <th>Company</th>
+                                <th>Latest Survey Year</th>
+                                <th>Field</th>
+                                <th>Old Value</th>
+                                <th>New Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.EstimatedImportPreview.PreviewRows)
+                            {
+                                <tr>
+                                    <td>@row.CompanyName</td>
+                                    <td>@row.LatestSurveyYear</td>
+                                    <td>@row.FieldName</td>
+                                    <td>@row.OldValue</td>
+                                    <td>@row.NewValue</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+
+    <div class="alert alert-light border mb-3">
+        <strong>Columns:</strong> @Model.Columns.Count
+        <span class="mx-2">|</span>
+        <strong>Companies:</strong> @Model.Records.Count
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-sm table-striped table-hover align-middle company-table prepublish-table">
+            <thead class="table-dark">
+                <tr>
+                    <th style="min-width:60px;">
+                        <input id="selectAllRows" type="checkbox" class="form-check-input" title="Select all visible rows" />
+                    </th>
+                    @foreach (var column in Model.Columns)
+                    {
+                        <th class="@GetColumnClass(column.Header)">@column.Header</th>
+                    }
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Model.Records)
+                {
                     <tr>
+                        <td>
+                            <input type="checkbox" class="form-check-input record-selector" value="@row.CompanyId" checked="@Model.SelectedCompanyIds.Contains(row.CompanyId)" />
+                        </td>
                         @foreach (var column in Model.Columns)
                         {
-                            <th class="@GetColumnClass(column.Header)">@column.Header</th>
+                            <td class="@GetColumnClass(column.Header)">@row.GetValue(column.Header)</td>
                         }
                     </tr>
-                </thead>
-                <tbody>
-                    @foreach (var row in Model.Records)
-                    {
-                        <tr>
-                            @foreach (var column in Model.Columns)
-                            {
-                                <td class="@GetColumnClass(column.Header)">@row.GetValue(column.Header)</td>
-                            }
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    }
+                }
+            </tbody>
+        </table>
+    </div>
 </div>
+
+<script>
+    (function () {
+        function getRowSelectors() {
+            return Array.from(document.querySelectorAll('.record-selector'));
+        }
+
+        function syncSelectAllState() {
+            var selectAll = document.getElementById('selectAllRows');
+            var selectors = getRowSelectors();
+            if (!selectAll || selectors.length === 0) {
+                return;
+            }
+
+            var selectedCount = selectors.filter(function (x) { return x.checked; }).length;
+            selectAll.checked = selectedCount === selectors.length;
+            selectAll.indeterminate = selectedCount > 0 && selectedCount < selectors.length;
+        }
+
+        var selectAll = document.getElementById('selectAllRows');
+        if (selectAll) {
+            selectAll.addEventListener('change', function () {
+                var checked = selectAll.checked;
+                getRowSelectors().forEach(function (x) { x.checked = checked; });
+                syncSelectAllState();
+            });
+        }
+
+        getRowSelectors().forEach(function (x) {
+            x.addEventListener('change', syncSelectAllState);
+        });
+
+        syncSelectAllState();
+
+        Array.from(document.querySelectorAll('.requires-selection-form')).forEach(function (form) {
+            form.addEventListener('submit', function () {
+                Array.from(form.querySelectorAll('input[name="SelectedCompanyIds"]')).forEach(function (x) { x.remove(); });
+
+                getRowSelectors()
+                    .filter(function (x) { return x.checked; })
+                    .forEach(function (x) {
+                        var hidden = document.createElement('input');
+                        hidden.type = 'hidden';
+                        hidden.name = 'SelectedCompanyIds';
+                        hidden.value = x.value;
+                        form.appendChild(hidden);
+                    });
+            });
+        });
+    })();
+</script>
