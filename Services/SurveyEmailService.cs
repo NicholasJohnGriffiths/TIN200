@@ -11,6 +11,8 @@ namespace TINWeb.Services
 {
     public class SurveyEmailService : ISurveyEmailService
     {
+        private const string PlaceholderPromptText = "Please provide";
+
         private readonly ApplicationDbContext _context;
         private readonly AzureCommunicationEmailSettings _emailSettings;
         private readonly SurveyLinkSettings _surveyLinkSettings;
@@ -440,14 +442,12 @@ Open your secure survey link
 
                     values[normalizedQuestionTitle] = resolvedValue;
                 }
-
-                var businessDecisionKey = NormalizeTemplateKey("Business Decision");
-                if (!values.TryGetValue(businessDecisionKey, out var businessDecisionValue)
-                    || string.IsNullOrWhiteSpace(businessDecisionValue))
-                {
-                    values[businessDecisionKey] = "Please Provide";
-                }
             }
+
+            EnsurePromptFallbackValue(values, "Business Decision");
+            EnsurePromptFallbackValue(values, "Key Products");
+            EnsureDollarPrefix(values, "Total Revenue Last Financial Year");
+            EnsureDollarPrefix(values, "Total Revenue Year-1");
 
             var webAddress = companyInfo?.Website?.Trim();
             var companyPhone = companyInfo?.Phone?.Trim();
@@ -622,7 +622,7 @@ Open your secure survey link
                         return match.Value;
                     }
 
-                    return encodeForHtml ? WebUtility.HtmlEncode(value) : value;
+                    return FormatPlaceholderValue(value, encodeForHtml);
                 },
                 RegexOptions.None,
                 TimeSpan.FromMilliseconds(500));
@@ -646,10 +646,48 @@ Open your secure survey link
                         return match.Value;
                     }
 
-                    return encodeForHtml ? WebUtility.HtmlEncode(value) : value;
+                    return FormatPlaceholderValue(value, encodeForHtml);
                 },
                 RegexOptions.None,
                 TimeSpan.FromMilliseconds(500));
+        }
+
+        private static string FormatPlaceholderValue(string value, bool encodeForHtml)
+        {
+            if (string.Equals(value, PlaceholderPromptText, StringComparison.OrdinalIgnoreCase))
+            {
+                return encodeForHtml ? "<em>Please provide</em>" : PlaceholderPromptText;
+            }
+
+            return encodeForHtml ? WebUtility.HtmlEncode(value) : value;
+        }
+
+        private static void EnsurePromptFallbackValue(IDictionary<string, string> values, string key)
+        {
+            var normalizedKey = NormalizeTemplateKey(key);
+            if (!values.TryGetValue(normalizedKey, out var existingValue)
+                || string.IsNullOrWhiteSpace(existingValue))
+            {
+                values[normalizedKey] = PlaceholderPromptText;
+            }
+        }
+
+        private static void EnsureDollarPrefix(IDictionary<string, string> values, string key)
+        {
+            var normalizedKey = NormalizeTemplateKey(key);
+            if (!values.TryGetValue(normalizedKey, out var existingValue)
+                || string.IsNullOrWhiteSpace(existingValue))
+            {
+                return;
+            }
+
+            var trimmed = existingValue.Trim();
+            if (trimmed.StartsWith("$", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            values[normalizedKey] = $"${trimmed}";
         }
 
         private static string NormalizeTemplateKey(string? raw)
