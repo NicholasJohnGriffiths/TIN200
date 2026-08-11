@@ -1,0 +1,137 @@
+@page
+@model TINWeb.Pages.CompanySurvey.PrePublishDataCheckModel
+@{
+    ViewData["Title"] = "Pre Publish Data Check";
+}
+
+@functions {
+    string GetColumnClass(string header)
+    {
+        return header switch
+        {
+            "Company name" => "col-company-name",
+            "Physical address" => "col-physical-address",
+            "Primary sector" => "col-primary-sector",
+            "Best business decision for 2026" => "col-best-decision",
+            "Key products" => "col-key-products",
+            _ => string.Empty
+        };
+    }
+}
+
+<style>
+    .prepublish-table {
+        table-layout: auto;
+        width: 100%;
+        min-width: 1700px;
+    }
+
+    .prepublish-table th,
+    .prepublish-table td {
+        font-size: 0.7rem;
+        padding: 0.4rem 0.5rem;
+        min-width: 120px;
+        white-space: normal;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+        vertical-align: top;
+    }
+
+    .prepublish-table th:first-child,
+    .prepublish-table td:first-child {
+        min-width: 190px;
+    }
+
+    .prepublish-table th.col-company-name,
+    .prepublish-table td.col-company-name {
+        min-width: 190px;
+    }
+
+    .prepublish-table th.col-physical-address,
+    .prepublish-table td.col-physical-address {
+        min-width: 220px;
+    }
+
+    .prepublish-table th.col-primary-sector,
+    .prepublish-table td.col-primary-sector {
+        min-width: 180px;
+    }
+
+    .prepublish-table th.col-best-decision,
+    .prepublish-table td.col-best-decision {
+        min-width: 220px;
+    }
+
+    .prepublish-table th.col-key-products,
+    .prepublish-table td.col-key-products {
+        width: 140px;
+        min-width: 140px;
+        max-width: 140px;
+    }
+    </style>
+
+<div class="container-fluid mt-4">
+    <div class="row mb-3">
+        <div class="col">
+            <h1 class="mb-1">Pre Publish Data Check</h1>
+            <p class="text-muted mb-0">Company summary data for prepublication checks using a fixed column layout.</p>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-12">
+            <form method="get" class="d-flex flex-wrap align-items-end gap-2">
+                <div>
+                    <label asp-for="SelectedTinStatus" class="form-label mb-1">TIN Status</label>
+                    <select asp-for="SelectedTinStatus" class="form-select" style="min-width: 200px;">
+                        @foreach (var option in Model.TinStatusOptions)
+                        {
+                            <option value="@option.Value">@option.Label</option>
+                        }
+                    </select>
+                </div>
+
+                <button class="btn btn-outline-primary" type="submit">Apply</button>
+            </form>
+        </div>
+    </div>
+
+    @if (string.IsNullOrWhiteSpace(Model.SelectedEmailContentName))
+    {
+        <div class="alert alert-warning">No active email content records were found. Create or activate a prepublication email content record first.</div>
+    }
+    else
+    {
+        <div class="alert alert-light border mb-3">
+            <strong>Selected Email Content:</strong> @Model.SelectedEmailContentName
+            <span class="mx-2">|</span>
+            <strong>Columns:</strong> @Model.Columns.Count
+            <span class="mx-2">|</span>
+            <strong>Companies:</strong> @Model.Records.Count
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-sm table-striped table-hover align-middle company-table prepublish-table">
+                <thead class="table-dark">
+                    <tr>
+                        @foreach (var column in Model.Columns)
+                        {
+                            <th class="@GetColumnClass(column.Header)">@column.Header</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Model.Records)
+                    {
+                        <tr>
+                            @foreach (var column in Model.Columns)
+                            {
+                                <td class="@GetColumnClass(column.Header)">@row.GetValue(column.Header)</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
