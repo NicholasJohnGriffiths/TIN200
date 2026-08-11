@@ -440,6 +440,13 @@ Open your secure survey link
 
                     values[normalizedQuestionTitle] = resolvedValue;
                 }
+
+                var businessDecisionKey = NormalizeTemplateKey("Business Decision");
+                if (!values.TryGetValue(businessDecisionKey, out var businessDecisionValue)
+                    || string.IsNullOrWhiteSpace(businessDecisionValue))
+                {
+                    values[businessDecisionKey] = "Please Provide";
+                }
             }
 
             var webAddress = companyInfo?.Website?.Trim();

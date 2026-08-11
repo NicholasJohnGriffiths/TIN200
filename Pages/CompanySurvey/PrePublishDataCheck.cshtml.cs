@@ -19,6 +19,7 @@ namespace TINWeb.Pages.CompanySurvey
         public RevenueAdjustPreviewResult? PreviewResult { get; set; }
         public PopulateOwnershipFormedPreviewResult? PopulatePreviewResult { get; set; }
         public EstimatedImportPreviewResult? EstimatedImportPreview { get; set; }
+        public CeoKeyProductsImportPreviewResult? CeoKeyProductsImportPreview { get; set; }
 
         [BindProperty(SupportsGet = true)]
         public int SelectedTinStatus { get; set; } = (int)TinStatus.Tin200;
@@ -188,6 +189,68 @@ namespace TINWeb.Pages.CompanySurvey
             await using var stream = importFile.OpenReadStream();
             var result = await BuildEstimatedImportPreviewAsync(selectedCompanyIds, stream, applyUpdates: true);
             StatusMessage = $"Estimated import applied. Selected companies: {result.SelectedCompanyCount}. Fields updated: {result.ChangedCount}. Rows without match: {result.UnmatchedCompanyCount}.";
+            return RedirectToPage(new { selectedTinStatus = SelectedTinStatus });
+        }
+
+        public async Task<IActionResult> OnPostPreviewCeoKeyProductsImportAsync(IFormFile? importFile)
+        {
+            SelectedTinStatus = NormalizeTinStatusFilter(SelectedTinStatus);
+            await LoadRowsAsync();
+
+            var selectedCompanyIds = ResolveSelectedCompanyIds(SelectedCompanyIds, Records);
+            SelectedCompanyIds = selectedCompanyIds;
+
+            if (selectedCompanyIds.Count == 0)
+            {
+                ModelState.AddModelError(string.Empty, "Select at least one company row first.");
+                return Page();
+            }
+
+            if (importFile == null || importFile.Length == 0)
+            {
+                ModelState.AddModelError(string.Empty, "Select an Excel file (.xlsx) to preview.");
+                return Page();
+            }
+
+            if (!importFile.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                ModelState.AddModelError(string.Empty, "Only .xlsx Excel files are supported.");
+                return Page();
+            }
+
+            await using var stream = importFile.OpenReadStream();
+            CeoKeyProductsImportPreview = await BuildCeoKeyProductsImportPreviewAsync(selectedCompanyIds, stream, applyUpdates: false);
+            return Page();
+        }
+
+        public async Task<IActionResult> OnPostApplyCeoKeyProductsImportAsync(IFormFile? importFile)
+        {
+            SelectedTinStatus = NormalizeTinStatusFilter(SelectedTinStatus);
+            await LoadRowsAsync();
+
+            var selectedCompanyIds = ResolveSelectedCompanyIds(SelectedCompanyIds, Records);
+
+            if (selectedCompanyIds.Count == 0)
+            {
+                StatusMessage = "Error: Select at least one company row first.";
+                return RedirectToPage(new { selectedTinStatus = SelectedTinStatus });
+            }
+
+            if (importFile == null || importFile.Length == 0)
+            {
+                StatusMessage = "Error: Select an Excel file (.xlsx) to import.";
+                return RedirectToPage(new { selectedTinStatus = SelectedTinStatus });
+            }
+
+            if (!importFile.FileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                StatusMessage = "Error: Only .xlsx Excel files are supported.";
+                return RedirectToPage(new { selectedTinStatus = SelectedTinStatus });
+            }
+
+            await using var stream = importFile.OpenReadStream();
+            var result = await BuildCeoKeyProductsImportPreviewAsync(selectedCompanyIds, stream, applyUpdates: true);
+            StatusMessage = $"CEO/Key Products import applied. Selected companies: {result.SelectedCompanyCount}. Company fields updated: {result.CompanyFieldChangeCount}. Survey fields updated: {result.SurveyFieldChangeCount}. Rows without match: {result.UnmatchedCompanyCount}.";
             return RedirectToPage(new { selectedTinStatus = SelectedTinStatus });
         }
 
@@ -807,6 +870,399 @@ namespace TINWeb.Pages.CompanySurvey
             return result;
         }
 
+        private async Task<CeoKeyProductsImportPreviewResult> BuildCeoKeyProductsImportPreviewAsync(IReadOnlyCollection<int> selectedCompanyIds, Stream excelStream, bool applyUpdates)
+        {
+            var result = new CeoKeyProductsImportPreviewResult
+            {
+                SelectedCompanyCount = selectedCompanyIds.Count
+            };
+
+            var importedRows = ParseCeoKeyProductsImportRows(excelStream, result.Warnings);
+            result.RowsRead = importedRows.Count;
+            if (importedRows.Count == 0)
+            {
+                return result;
+            }
+
+            var selectedCompanies = await _context.Tin200
+                .Where(x => selectedCompanyIds.Contains(x.Id))
+                .ToListAsync();
+
+            var companyByExternalId = selectedCompanies
+                .Where(x => !string.IsNullOrWhiteSpace(x.ExternalId))
+                .GroupBy(x => NormalizeIdentifier(x.ExternalId!))
+                .Where(g => !string.IsNullOrWhiteSpace(g.Key) && g.Count() == 1)
+                .ToDictionary(g => g.Key, g => g.Single(), StringComparer.OrdinalIgnoreCase);
+
+            var matchedRows = new List<(CeoKeyProductsImportRow Row, Tin200 Company)>();
+            var matchedCompanyIds = new HashSet<int>();
+            var seenCompanyIds = new HashSet<int>();
+
+            foreach (var row in importedRows)
+            {
+                var normalizedExternalId = NormalizeIdentifier(row.ExternalId);
+                if (string.IsNullOrWhiteSpace(normalizedExternalId))
+                {
+                    result.UnmatchedCompanyCount++;
+                    result.Warnings.Add($"Skipped row for '{row.CompanyName}': ID/ExternalID is blank.");
+                    continue;
+                }
+
+                if (!companyByExternalId.TryGetValue(normalizedExternalId, out var company))
+                {
+                    result.UnmatchedCompanyCount++;
+                    result.Warnings.Add($"Skipped '{row.CompanyName}' ({row.ExternalId}): no selected company matches this ExternalID.");
+                    continue;
+                }
+
+                if (!string.Equals(NormalizeCompanyName(company.CompanyName ?? string.Empty), NormalizeCompanyName(row.CompanyName), StringComparison.OrdinalIgnoreCase))
+                {
+                    result.UnmatchedCompanyCount++;
+                    result.Warnings.Add($"Skipped '{row.CompanyName}' ({row.ExternalId}): CompanyName does not match selected company '{company.CompanyName}'.");
+                    continue;
+                }
+
+                if (!seenCompanyIds.Add(company.Id))
+                {
+                    result.Warnings.Add($"Skipped duplicate import row for '{row.CompanyName}' ({row.ExternalId}).");
+                    continue;
+                }
+
+                matchedRows.Add((row, company));
+                matchedCompanyIds.Add(company.Id);
+            }
+
+            result.MatchedCompanyCount = matchedCompanyIds.Count;
+            if (matchedRows.Count == 0)
+            {
+                return result;
+            }
+
+            var latestSurveyRows = await (
+                from cs in _context.CompanySurvey
+                join s in _context.Survey on cs.SurveyId equals s.Id
+                where matchedCompanyIds.Contains(cs.CompanyId)
+                select new
+                {
+                    cs.CompanyId,
+                    CompanySurveyId = cs.Id,
+                    s.CurrentSurvey,
+                    s.FinancialYear
+                })
+                .ToListAsync();
+
+            var latestSurveyByCompany = latestSurveyRows
+                .GroupBy(x => x.CompanyId)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.OrderByDescending(x => x.CurrentSurvey)
+                        .ThenByDescending(x => x.FinancialYear)
+                        .ThenByDescending(x => x.CompanySurveyId)
+                        .First());
+
+            var questionRows = await _context.Question
+                .AsNoTracking()
+                .Select(q => new
+                {
+                    q.Id,
+                    q.Title,
+                    q.QuestionText,
+                    q.ImportColumnName,
+                    q.ImportColumnNameAlt
+                })
+                .ToListAsync();
+
+            var questionKeys = questionRows
+                .Select(q => (q.Id, q.Title, q.QuestionText, q.ImportColumnName, q.ImportColumnNameAlt))
+                .ToList();
+
+            var ceoFirstNameQuestionId = ResolveSingleQuestionId(questionKeys, q => IsCeoFirstNameQuestion(q.Title, q.QuestionText, q.ImportColumnName, q.ImportColumnNameAlt), "CEO First Name", result.Warnings);
+            var ceoLastNameQuestionId = ResolveSingleQuestionId(questionKeys, q => IsCeoLastNameQuestion(q.Title, q.QuestionText, q.ImportColumnName, q.ImportColumnNameAlt), "CEO Last Name", result.Warnings);
+            var keyProductsQuestionId = ResolveSingleQuestionId(questionKeys, q => IsKeyProductsQuestion(q.Title, q.QuestionText, q.ImportColumnName, q.ImportColumnNameAlt), "Key Products", result.Warnings);
+
+            var questionIds = new[] { ceoFirstNameQuestionId, ceoLastNameQuestionId, keyProductsQuestionId }
+                .Where(x => x > 0)
+                .Distinct()
+                .ToList();
+
+            var targetSurveyIds = latestSurveyByCompany.Values
+                .Select(x => x.CompanySurveyId)
+                .Distinct()
+                .ToList();
+
+            var trackedAnswers = questionIds.Count == 0 || targetSurveyIds.Count == 0
+                ? new List<Answer>()
+                : await _context.Answer
+                    .Where(a => targetSurveyIds.Contains(a.CompanySurveyId) && questionIds.Contains(a.QuestionId))
+                    .ToListAsync();
+
+            var answerLookup = trackedAnswers
+                .GroupBy(a => (a.CompanySurveyId, a.QuestionId))
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.Id).First());
+
+            foreach (var match in matchedRows)
+            {
+                var importedCeoFirstName = NormalizeImportedText(match.Row.CeoFirstName);
+                var importedCeoLastName = NormalizeImportedText(match.Row.CeoLastName);
+                var importedKeyProducts = NormalizeImportedText(match.Row.KeyProducts);
+
+                ProcessCompanyTextField(
+                    result,
+                    match.Company,
+                    "CEO First Name",
+                    match.Company.CeoFirstName,
+                    importedCeoFirstName,
+                    value => match.Company.CeoFirstName = string.IsNullOrWhiteSpace(value) ? null : Truncate(value, 255));
+
+                ProcessCompanyTextField(
+                    result,
+                    match.Company,
+                    "CEO Last Name",
+                    match.Company.CeoLastName,
+                    importedCeoLastName,
+                    value => match.Company.CeoLastName = string.IsNullOrWhiteSpace(value) ? null : Truncate(value, 255));
+
+                if (!latestSurveyByCompany.TryGetValue(match.Company.Id, out var latestSurvey))
+                {
+                    if (!string.IsNullOrWhiteSpace(importedCeoFirstName)
+                        || !string.IsNullOrWhiteSpace(importedCeoLastName)
+                        || !string.IsNullOrWhiteSpace(importedKeyProducts))
+                    {
+                        result.Warnings.Add($"Skipped survey update for '{match.Company.CompanyName}': no latest survey record found.");
+                    }
+
+                    continue;
+                }
+
+                ProcessSurveyTextField(result, answerLookup, latestSurvey.CompanySurveyId, latestSurvey.FinancialYear, ceoFirstNameQuestionId, match.Company.CompanyName, match.Company.ExternalId, "CEO First Name", importedCeoFirstName, applyUpdates);
+                ProcessSurveyTextField(result, answerLookup, latestSurvey.CompanySurveyId, latestSurvey.FinancialYear, ceoLastNameQuestionId, match.Company.CompanyName, match.Company.ExternalId, "CEO Last Name", importedCeoLastName, applyUpdates);
+                ProcessSurveyTextField(result, answerLookup, latestSurvey.CompanySurveyId, latestSurvey.FinancialYear, keyProductsQuestionId, match.Company.CompanyName, match.Company.ExternalId, "Key Products", importedKeyProducts, applyUpdates);
+            }
+
+            if (applyUpdates && result.TotalChangedCount > 0)
+            {
+                await _context.SaveChangesAsync();
+            }
+
+            return result;
+        }
+
+        private void ProcessCompanyTextField(
+            CeoKeyProductsImportPreviewResult result,
+            Tin200 company,
+            string fieldName,
+            string? existingValue,
+            string? importedValue,
+            Action<string?> applyValue)
+        {
+            if (string.IsNullOrWhiteSpace(importedValue))
+            {
+                return;
+            }
+
+            var oldValue = NormalizeImportedText(existingValue);
+            if (string.Equals(oldValue, importedValue, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            result.CompanyFieldChangeCount++;
+            if (result.PreviewRows.Count < 200)
+            {
+                result.PreviewRows.Add(new CeoKeyProductsImportPreviewRow
+                {
+                    CompanyName = string.IsNullOrWhiteSpace(company.CompanyName) ? "(No company name)" : company.CompanyName.Trim(),
+                    ExternalId = company.ExternalId?.Trim() ?? string.Empty,
+                    LatestSurveyYear = null,
+                    Target = "Company",
+                    FieldName = fieldName,
+                    OldValue = oldValue,
+                    NewValue = importedValue
+                });
+            }
+
+            applyValue(importedValue);
+        }
+
+        private void ProcessSurveyTextField(
+            CeoKeyProductsImportPreviewResult result,
+            Dictionary<(int CompanySurveyId, int QuestionId), Answer> answerLookup,
+            int companySurveyId,
+            int latestSurveyYear,
+            int questionId,
+            string? companyName,
+            string? externalId,
+            string fieldName,
+            string? importedValue,
+            bool applyUpdates)
+        {
+            if (questionId <= 0 || string.IsNullOrWhiteSpace(importedValue))
+            {
+                return;
+            }
+
+            answerLookup.TryGetValue((companySurveyId, questionId), out var targetAnswer);
+            var oldValue = NormalizeImportedText(FormatAnswerValue(targetAnswer));
+            if (string.Equals(oldValue, importedValue, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            result.SurveyFieldChangeCount++;
+            if (result.PreviewRows.Count < 200)
+            {
+                result.PreviewRows.Add(new CeoKeyProductsImportPreviewRow
+                {
+                    CompanyName = string.IsNullOrWhiteSpace(companyName) ? "(No company name)" : companyName.Trim(),
+                    ExternalId = externalId?.Trim() ?? string.Empty,
+                    LatestSurveyYear = latestSurveyYear,
+                    Target = "Survey",
+                    FieldName = fieldName,
+                    OldValue = oldValue,
+                    NewValue = importedValue
+                });
+            }
+
+            if (!applyUpdates)
+            {
+                return;
+            }
+
+            if (targetAnswer == null)
+            {
+                targetAnswer = new Answer
+                {
+                    CompanySurveyId = companySurveyId,
+                    QuestionId = questionId
+                };
+
+                _context.Answer.Add(targetAnswer);
+                answerLookup[(companySurveyId, questionId)] = targetAnswer;
+            }
+
+            targetAnswer.AnswerText = importedValue;
+            targetAnswer.AnswerCurrency = null;
+            targetAnswer.AnswerNumber = null;
+        }
+
+        private static int ResolveSingleQuestionId(
+            IEnumerable<(int Id, string? Title, string? QuestionText, string? ImportColumnName, string? ImportColumnNameAlt)> questionRows,
+            Func<(int Id, string? Title, string? QuestionText, string? ImportColumnName, string? ImportColumnNameAlt), bool> predicate,
+            string fieldName,
+            ICollection<string> warnings)
+        {
+            var matches = questionRows.Where(predicate).ToList();
+            if (matches.Count == 0)
+            {
+                warnings.Add($"Could not find survey question mapping for {fieldName}.");
+                return 0;
+            }
+
+            if (matches.Count > 1)
+            {
+                warnings.Add($"Multiple survey question mappings found for {fieldName}; using the first match.");
+            }
+
+            return matches[0].Id;
+        }
+
+        private static List<CeoKeyProductsImportRow> ParseCeoKeyProductsImportRows(Stream excelStream, ICollection<string> warnings)
+        {
+            using var workbook = new XLWorkbook(excelStream);
+            var worksheet = workbook.Worksheets.FirstOrDefault();
+            if (worksheet == null)
+            {
+                warnings.Add("The workbook does not contain any worksheets.");
+                return new List<CeoKeyProductsImportRow>();
+            }
+
+            var usedRange = worksheet.RangeUsed();
+            if (usedRange == null)
+            {
+                warnings.Add("The worksheet is empty.");
+                return new List<CeoKeyProductsImportRow>();
+            }
+
+            var headerRowNumber = usedRange.FirstRow().RowNumber();
+            var lastRowNumber = usedRange.LastRow().RowNumber();
+            var headerCells = worksheet.Row(headerRowNumber).CellsUsed();
+
+            var headerMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var cell in headerCells)
+            {
+                var headerText = NormalizeTemplateKey(ReadExcelCellText(cell));
+                if (string.IsNullOrWhiteSpace(headerText))
+                {
+                    continue;
+                }
+
+                var canonical = CanonicalizeKey(headerText);
+                if (string.IsNullOrWhiteSpace(canonical) || headerMap.ContainsKey(canonical))
+                {
+                    continue;
+                }
+
+                headerMap[canonical] = cell.Address.ColumnNumber;
+            }
+
+            var externalIdCol = FindHeaderColumn(headerMap, "id", "externalid");
+            var companyNameCol = FindHeaderColumn(headerMap, "name", "companyname");
+            var ceoFirstNameCol = FindHeaderColumn(headerMap, "ceofirstname");
+            var ceoLastNameCol = FindHeaderColumn(headerMap, "ceolastname");
+            var keyProductsCol = FindHeaderColumn(headerMap, "keyproducts");
+
+            if (externalIdCol <= 0 || companyNameCol <= 0)
+            {
+                warnings.Add("Missing required headers. Expected at least ID/ExternalID and Name/CompanyName.");
+                return new List<CeoKeyProductsImportRow>();
+            }
+
+            if (ceoFirstNameCol <= 0 && ceoLastNameCol <= 0 && keyProductsCol <= 0)
+            {
+                warnings.Add("Missing update headers. Expected at least one of CEO FirstName, CEO Last Name, or Key Products.");
+                return new List<CeoKeyProductsImportRow>();
+            }
+
+            var rows = new List<CeoKeyProductsImportRow>();
+
+            for (var rowNumber = headerRowNumber + 1; rowNumber <= lastRowNumber; rowNumber++)
+            {
+                var row = worksheet.Row(rowNumber);
+                var externalId = NormalizeIdentifier(ReadExcelCellText(row.Cell(externalIdCol)));
+                var companyName = NormalizeImportedText(ReadExcelCellText(row.Cell(companyNameCol)));
+                var ceoFirstName = ceoFirstNameCol > 0 ? NormalizeImportedText(ReadExcelCellText(row.Cell(ceoFirstNameCol))) : string.Empty;
+                var ceoLastName = ceoLastNameCol > 0 ? NormalizeImportedText(ReadExcelCellText(row.Cell(ceoLastNameCol))) : string.Empty;
+                var keyProducts = keyProductsCol > 0 ? NormalizeImportedText(ReadExcelCellText(row.Cell(keyProductsCol))) : string.Empty;
+
+                if (string.Equals(keyProducts, "0", StringComparison.Ordinal))
+                {
+                    warnings.Add($"Row {rowNumber} ({companyName} / {externalId}): Key Products resolved to '0' from the workbook, so it was treated as blank. This usually means that Excel stored a formula/cached value of 0 for that cell in the .xlsx file.");
+                    keyProducts = string.Empty;
+                }
+
+                if (string.IsNullOrWhiteSpace(externalId) && string.IsNullOrWhiteSpace(companyName))
+                {
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(ceoFirstName) && string.IsNullOrWhiteSpace(ceoLastName) && string.IsNullOrWhiteSpace(keyProducts))
+                {
+                    continue;
+                }
+
+                rows.Add(new CeoKeyProductsImportRow
+                {
+                    ExternalId = externalId,
+                    CompanyName = companyName,
+                    CeoFirstName = ceoFirstName,
+                    CeoLastName = ceoLastName,
+                    KeyProducts = keyProducts
+                });
+            }
+
+            return rows;
+        }
+
         private void ProcessEstimatedField(
             EstimatedImportPreviewResult result,
             Dictionary<(int CompanySurveyId, int QuestionId), Answer> answerLookup,
@@ -1047,6 +1503,30 @@ namespace TINWeb.Pages.CompanySurvey
                     || canonical == "totalemplymentlastfinancialyear"
                     || canonical == "employmentlastfinancialyear"
                     || canonical == "staffemployedlastfinancialyear")
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsCeoFirstNameQuestion(params string?[] values)
+        {
+            return values.Any(value => string.Equals(NormalizeTemplateKey(value), "CEO First Name", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static bool IsCeoLastNameQuestion(params string?[] values)
+        {
+            return values.Any(value => string.Equals(NormalizeTemplateKey(value), "CEO Last Name", StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static bool IsKeyProductsQuestion(params string?[] values)
+        {
+            foreach (var value in values)
+            {
+                var canonical = CanonicalizeKey(value);
+                if (canonical == "keyproducts" || canonical == "keyproduct")
                 {
                     return true;
                 }
@@ -1520,6 +2000,41 @@ namespace TINWeb.Pages.CompanySurvey
             return Regex.Replace(normalized, @"[^a-z0-9]", string.Empty);
         }
 
+        private static string NormalizeIdentifier(string? raw)
+        {
+            return NormalizeTemplateKey(raw).Trim();
+        }
+
+        private static string ReadExcelCellText(IXLCell cell)
+        {
+            var formatted = cell.GetFormattedString();
+            if (!string.IsNullOrWhiteSpace(formatted))
+            {
+                return formatted.Trim();
+            }
+
+            var raw = cell.GetString();
+            return string.IsNullOrWhiteSpace(raw)
+                ? string.Empty
+                : raw.Trim();
+        }
+
+        private static string NormalizeImportedText(string? raw)
+        {
+            return NormalizeTemplateKey(raw).Trim();
+        }
+
+        private static string Truncate(string? value, int maxLength)
+        {
+            var normalized = NormalizeImportedText(value);
+            if (normalized.Length <= maxLength)
+            {
+                return normalized;
+            }
+
+            return normalized.Substring(0, maxLength);
+        }
+
         private static int NormalizeTinStatusFilter(int tinStatus)
         {
             return tinStatus switch
@@ -1617,6 +2132,39 @@ namespace TINWeb.Pages.CompanySurvey
         {
             public string CompanyName { get; set; } = string.Empty;
             public int LatestSurveyYear { get; set; }
+            public string FieldName { get; set; } = string.Empty;
+            public string OldValue { get; set; } = string.Empty;
+            public string NewValue { get; set; } = string.Empty;
+        }
+
+        private sealed class CeoKeyProductsImportRow
+        {
+            public string ExternalId { get; set; } = string.Empty;
+            public string CompanyName { get; set; } = string.Empty;
+            public string CeoFirstName { get; set; } = string.Empty;
+            public string CeoLastName { get; set; } = string.Empty;
+            public string KeyProducts { get; set; } = string.Empty;
+        }
+
+        public class CeoKeyProductsImportPreviewResult
+        {
+            public int SelectedCompanyCount { get; set; }
+            public int RowsRead { get; set; }
+            public int MatchedCompanyCount { get; set; }
+            public int UnmatchedCompanyCount { get; set; }
+            public int CompanyFieldChangeCount { get; set; }
+            public int SurveyFieldChangeCount { get; set; }
+            public int TotalChangedCount => CompanyFieldChangeCount + SurveyFieldChangeCount;
+            public List<string> Warnings { get; set; } = new();
+            public List<CeoKeyProductsImportPreviewRow> PreviewRows { get; set; } = new();
+        }
+
+        public class CeoKeyProductsImportPreviewRow
+        {
+            public string CompanyName { get; set; } = string.Empty;
+            public string ExternalId { get; set; } = string.Empty;
+            public int? LatestSurveyYear { get; set; }
+            public string Target { get; set; } = string.Empty;
             public string FieldName { get; set; } = string.Empty;
             public string OldValue { get; set; } = string.Empty;
             public string NewValue { get; set; } = string.Empty;

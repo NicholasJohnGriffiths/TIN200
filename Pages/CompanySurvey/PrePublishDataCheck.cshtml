@@ -73,6 +73,25 @@
     .revenue-adjust-preview-table td {
         font-size: 0.8rem;
     }
+
+    .prepublish-scrollbar-top {
+        overflow-x: auto;
+        overflow-y: hidden;
+        position: sticky;
+        top: 0;
+        z-index: 1020;
+        background: #fff;
+        border: 1px solid #dee2e6;
+        border-bottom: 0;
+    }
+
+    .prepublish-scrollbar-top-inner {
+        height: 1px;
+    }
+
+    .prepublish-table-wrap {
+        overflow-x: auto;
+    }
 </style>
 
 <div class="container-fluid mt-4">
@@ -143,6 +162,19 @@
             </div>
             <button type="submit" asp-page-handler="PreviewEstimatedImport" class="btn btn-outline-dark btn-sm">Preview Import</button>
             <button type="submit" asp-page-handler="ApplyEstimatedImport" class="btn btn-dark btn-sm" onclick="return confirm('Apply estimated revenue/employees import to selected records?');">Apply Import</button>
+        </div>
+    </form>
+
+    <form id="ceoKeyProductsImportForm" method="post" enctype="multipart/form-data" class="card mb-3 requires-selection-form">
+        <div class="card-body py-2 d-flex flex-wrap align-items-end gap-2">
+            <input type="hidden" asp-for="SelectedTinStatus" />
+            <div>
+                <label class="form-label mb-1">Import CEO/Key Products</label>
+                <input type="file" name="importFile" accept=".xlsx" class="form-control form-control-sm" style="min-width: 320px;" required />
+                <div class="form-text">Match on Excel ID to Company ExternalID and Excel Name to CompanyName. Update fields: CEO FirstName, CEO Last Name, Key Products. Survey mappings use Question.Title values CEO First Name and CEO Last Name.</div>
+            </div>
+            <button type="submit" asp-page-handler="PreviewCeoKeyProductsImport" class="btn btn-outline-success btn-sm">Import CEO/Key Products</button>
+            <button type="submit" asp-page-handler="ApplyCeoKeyProductsImport" class="btn btn-success btn-sm" onclick="return confirm('Apply CEO/Key Products import to selected records?');">Apply Import</button>
         </div>
     </form>
 
@@ -283,13 +315,77 @@
         </div>
     }
 
+    @if (Model.CeoKeyProductsImportPreview != null)
+    {
+        <div class="card mb-3">
+            <div class="card-header">CEO/Key Products Import Preview</div>
+            <div class="card-body py-2">
+                <div><strong>Selected Companies:</strong> @Model.CeoKeyProductsImportPreview.SelectedCompanyCount</div>
+                <div><strong>Rows Read:</strong> @Model.CeoKeyProductsImportPreview.RowsRead</div>
+                <div><strong>Company Matches:</strong> @Model.CeoKeyProductsImportPreview.MatchedCompanyCount</div>
+                <div><strong>Rows Without Match:</strong> @Model.CeoKeyProductsImportPreview.UnmatchedCompanyCount</div>
+                <div><strong>Company Fields to Update:</strong> @Model.CeoKeyProductsImportPreview.CompanyFieldChangeCount</div>
+                <div><strong>Survey Fields to Update:</strong> @Model.CeoKeyProductsImportPreview.SurveyFieldChangeCount</div>
+                <div><strong>Total Fields to Update:</strong> @Model.CeoKeyProductsImportPreview.TotalChangedCount</div>
+                @if (Model.CeoKeyProductsImportPreview.Warnings.Any())
+                {
+                    <div class="mt-2">
+                        <strong>Warnings:</strong>
+                        <ul class="mb-0 mt-1 small">
+                            @foreach (var warning in Model.CeoKeyProductsImportPreview.Warnings.Take(20))
+                            {
+                                <li>@warning</li>
+                            }
+                        </ul>
+                    </div>
+                }
+            </div>
+            @if (Model.CeoKeyProductsImportPreview.PreviewRows.Any())
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped mb-0 revenue-adjust-preview-table">
+                        <thead>
+                            <tr>
+                                <th>Company</th>
+                                <th>External ID</th>
+                                <th>Target</th>
+                                <th>Survey Year</th>
+                                <th>Field</th>
+                                <th>Old Value</th>
+                                <th>New Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var row in Model.CeoKeyProductsImportPreview.PreviewRows)
+                            {
+                                <tr>
+                                    <td>@row.CompanyName</td>
+                                    <td>@row.ExternalId</td>
+                                    <td>@row.Target</td>
+                                    <td>@(row.LatestSurveyYear?.ToString() ?? "-")</td>
+                                    <td>@row.FieldName</td>
+                                    <td>@row.OldValue</td>
+                                    <td>@row.NewValue</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+
     <div class="alert alert-light border mb-3">
         <strong>Columns:</strong> @Model.Columns.Count
         <span class="mx-2">|</span>
         <strong>Companies:</strong> @Model.Records.Count
     </div>
 
-    <div class="table-responsive">
+    <div id="prepublishTopScrollbar" class="prepublish-scrollbar-top mb-0" aria-label="Horizontal table scroll">
+        <div id="prepublishTopScrollbarInner" class="prepublish-scrollbar-top-inner"></div>
+    </div>
+
+    <div id="prepublishTableWrap" class="table-responsive prepublish-table-wrap">
         <table class="table table-sm table-striped table-hover align-middle company-table prepublish-table">
             <thead class="table-dark">
                 <tr>
@@ -322,6 +418,36 @@
 
 <script>
     (function () {
+        var topScrollbar = document.getElementById('prepublishTopScrollbar');
+        var topScrollbarInner = document.getElementById('prepublishTopScrollbarInner');
+        var tableWrap = document.getElementById('prepublishTableWrap');
+        var prepublishTable = tableWrap ? tableWrap.querySelector('.prepublish-table') : null;
+
+        function syncHorizontalScrollWidths() {
+            if (!topScrollbar || !topScrollbarInner || !tableWrap || !prepublishTable) {
+                return;
+            }
+
+            topScrollbarInner.style.width = prepublishTable.scrollWidth + 'px';
+            topScrollbar.style.display = prepublishTable.scrollWidth > tableWrap.clientWidth ? 'block' : 'none';
+        }
+
+        function syncTopToBottom() {
+            if (!topScrollbar || !tableWrap) {
+                return;
+            }
+
+            tableWrap.scrollLeft = topScrollbar.scrollLeft;
+        }
+
+        function syncBottomToTop() {
+            if (!topScrollbar || !tableWrap) {
+                return;
+            }
+
+            topScrollbar.scrollLeft = tableWrap.scrollLeft;
+        }
+
         function getRowSelectors() {
             return Array.from(document.querySelectorAll('.record-selector'));
         }
@@ -339,6 +465,14 @@
         }
 
         var selectAll = document.getElementById('selectAllRows');
+        if (topScrollbar && tableWrap) {
+            topScrollbar.addEventListener('scroll', syncTopToBottom, { passive: true });
+            tableWrap.addEventListener('scroll', syncBottomToTop, { passive: true });
+            window.addEventListener('resize', syncHorizontalScrollWidths);
+            syncHorizontalScrollWidths();
+            syncBottomToTop();
+        }
+
         if (selectAll) {
             selectAll.addEventListener('change', function () {
                 var checked = selectAll.checked;
