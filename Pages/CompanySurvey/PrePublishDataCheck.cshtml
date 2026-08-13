@@ -74,23 +74,57 @@
         font-size: 0.8rem;
     }
 
-    .prepublish-scrollbar-top {
-        overflow-x: auto;
-        overflow-y: hidden;
-        position: sticky;
-        top: 0;
-        z-index: 1020;
-        background: #fff;
-        border: 1px solid #dee2e6;
-        border-bottom: 0;
-    }
-
-    .prepublish-scrollbar-top-inner {
-        height: 1px;
-    }
-
     .prepublish-table-wrap {
-        overflow-x: auto;
+        overflow: auto;
+        max-height: 70vh;
+        position: relative;
+        --prepublish-sticky-header-top: 0px;
+        --prepublish-sticky-col-1-left: 0px;
+        --prepublish-sticky-col-2-left: 60px;
+    }
+
+    .prepublish-table thead th {
+        position: sticky;
+        top: var(--prepublish-sticky-header-top);
+        z-index: 1015;
+        background-color: #212529;
+        color: #fff;
+    }
+
+    .prepublish-table th:nth-child(1),
+    .prepublish-table td:nth-child(1) {
+        position: sticky;
+        left: var(--prepublish-sticky-col-1-left);
+    }
+
+    .prepublish-table th:nth-child(2),
+    .prepublish-table td:nth-child(2) {
+        position: sticky;
+        left: var(--prepublish-sticky-col-2-left);
+    }
+
+    .prepublish-table tbody td:nth-child(1),
+    .prepublish-table tbody td:nth-child(2),
+    .prepublish-table tbody th:nth-child(1),
+    .prepublish-table tbody th:nth-child(2) {
+        z-index: 1010;
+        box-shadow: 1px 0 0 #dee2e6;
+    }
+
+    .prepublish-table tbody tr:nth-of-type(odd) td:nth-child(1),
+    .prepublish-table tbody tr:nth-of-type(odd) td:nth-child(2) {
+        background-color: #f8f9fa;
+    }
+
+    .prepublish-table tbody tr:nth-of-type(even) td:nth-child(1),
+    .prepublish-table tbody tr:nth-of-type(even) td:nth-child(2) {
+        background-color: #fff;
+    }
+
+    .prepublish-table thead th:nth-child(1),
+    .prepublish-table thead th:nth-child(2) {
+        z-index: 1025;
+        box-shadow: 1px 0 0 rgba(255, 255, 255, 0.2);
     }
 </style>
 
@@ -381,11 +415,7 @@
         <strong>Companies:</strong> @Model.Records.Count
     </div>
 
-    <div id="prepublishTopScrollbar" class="prepublish-scrollbar-top mb-0" aria-label="Horizontal table scroll">
-        <div id="prepublishTopScrollbarInner" class="prepublish-scrollbar-top-inner"></div>
-    </div>
-
-    <div id="prepublishTableWrap" class="table-responsive prepublish-table-wrap">
+    <div id="prepublishTableWrap" class="prepublish-table-wrap">
         <table class="table table-sm table-striped table-hover align-middle company-table prepublish-table">
             <thead class="table-dark">
                 <tr>
@@ -418,34 +448,31 @@
 
 <script>
     (function () {
-        var topScrollbar = document.getElementById('prepublishTopScrollbar');
-        var topScrollbarInner = document.getElementById('prepublishTopScrollbarInner');
         var tableWrap = document.getElementById('prepublishTableWrap');
         var prepublishTable = tableWrap ? tableWrap.querySelector('.prepublish-table') : null;
 
-        function syncHorizontalScrollWidths() {
-            if (!topScrollbar || !topScrollbarInner || !tableWrap || !prepublishTable) {
+        function syncStickyHeaderOffset() {
+            if (!tableWrap) {
                 return;
             }
 
-            topScrollbarInner.style.width = prepublishTable.scrollWidth + 'px';
-            topScrollbar.style.display = prepublishTable.scrollWidth > tableWrap.clientWidth ? 'block' : 'none';
+            tableWrap.style.setProperty('--prepublish-sticky-header-top', '0px');
         }
 
-        function syncTopToBottom() {
-            if (!topScrollbar || !tableWrap) {
+        function syncStickyColumnOffsets() {
+            if (!tableWrap || !prepublishTable) {
                 return;
             }
 
-            tableWrap.scrollLeft = topScrollbar.scrollLeft;
-        }
-
-        function syncBottomToTop() {
-            if (!topScrollbar || !tableWrap) {
+            var headerCells = prepublishTable.querySelectorAll('thead th');
+            if (!headerCells || headerCells.length < 2) {
                 return;
             }
 
-            topScrollbar.scrollLeft = tableWrap.scrollLeft;
+            var col1Width = headerCells[0].offsetWidth;
+
+            tableWrap.style.setProperty('--prepublish-sticky-col-1-left', '0px');
+            tableWrap.style.setProperty('--prepublish-sticky-col-2-left', col1Width + 'px');
         }
 
         function getRowSelectors() {
@@ -465,12 +492,11 @@
         }
 
         var selectAll = document.getElementById('selectAllRows');
-        if (topScrollbar && tableWrap) {
-            topScrollbar.addEventListener('scroll', syncTopToBottom, { passive: true });
-            tableWrap.addEventListener('scroll', syncBottomToTop, { passive: true });
-            window.addEventListener('resize', syncHorizontalScrollWidths);
-            syncHorizontalScrollWidths();
-            syncBottomToTop();
+        if (tableWrap) {
+            window.addEventListener('resize', syncStickyHeaderOffset);
+            window.addEventListener('resize', syncStickyColumnOffsets);
+            syncStickyHeaderOffset();
+            syncStickyColumnOffsets();
         }
 
         if (selectAll) {

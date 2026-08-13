@@ -1,0 +1,367 @@
+@page
+@model TINWeb.Pages.Answers.CheckRevenueDataModel
+@{
+    ViewData["Title"] = "Check Revenue Data";
+}
+
+<style>
+    .revenue-data-table {
+        table-layout: auto;
+        width: 100%;
+        min-width: 1400px;
+    }
+
+    .revenue-data-table th,
+    .revenue-data-table td {
+        font-size: 0.75rem;
+        padding: 0.4rem 0.5rem;
+        min-width: 120px;
+        white-space: normal;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+        vertical-align: top;
+    }
+
+    .revenue-data-table th:first-child,
+    .revenue-data-table td:first-child {
+        min-width: 200px;
+    }
+
+    .revenue-data-table th:nth-child(2),
+    .revenue-data-table td:nth-child(2) {
+        min-width: 130px;
+    }
+
+    .revenue-data-table th:nth-child(3),
+    .revenue-data-table td:nth-child(3) {
+        min-width: 120px;
+    }
+
+    .revenue-data-table-wrap {
+        overflow: auto;
+        max-height: 70vh;
+        position: relative;
+        --revenue-sticky-header-top: 0px;
+        --revenue-sticky-col-1-left: 0px;
+        --revenue-sticky-col-2-left: 60px;
+        --revenue-sticky-col-3-left: 260px;
+    }
+
+    .revenue-data-table thead th {
+        position: sticky;
+        top: var(--revenue-sticky-header-top);
+        z-index: 1015;
+        background-color: #212529;
+        color: #fff;
+    }
+
+    .revenue-data-table th:nth-child(1),
+    .revenue-data-table td:nth-child(1) {
+        position: sticky;
+        left: var(--revenue-sticky-col-1-left);
+    }
+
+    .revenue-data-table th:nth-child(2),
+    .revenue-data-table td:nth-child(2) {
+        position: sticky;
+        left: var(--revenue-sticky-col-2-left);
+    }
+
+    .revenue-data-table th:nth-child(3),
+    .revenue-data-table td:nth-child(3) {
+        position: sticky;
+        left: var(--revenue-sticky-col-3-left);
+    }
+
+    .revenue-data-table tbody td:nth-child(1),
+    .revenue-data-table tbody td:nth-child(2),
+    .revenue-data-table tbody td:nth-child(3) {
+        z-index: 1010;
+        box-shadow: 1px 0 0 #dee2e6;
+    }
+
+    .revenue-data-table tbody tr:nth-of-type(odd) td:nth-child(1),
+    .revenue-data-table tbody tr:nth-of-type(odd) td:nth-child(2),
+    .revenue-data-table tbody tr:nth-of-type(odd) td:nth-child(3) {
+        background-color: #f8f9fa;
+    }
+
+    .revenue-data-table tbody tr:nth-of-type(even) td:nth-child(1),
+    .revenue-data-table tbody tr:nth-of-type(even) td:nth-child(2),
+    .revenue-data-table tbody tr:nth-of-type(even) td:nth-child(3) {
+        background-color: #fff;
+    }
+
+    .revenue-data-table thead th:nth-child(1),
+    .revenue-data-table thead th:nth-child(2),
+    .revenue-data-table thead th:nth-child(3) {
+        z-index: 1025;
+        box-shadow: 1px 0 0 rgba(255, 255, 255, 0.2);
+    }
+
+    .revenue-field-list {
+        max-height: 260px;
+        overflow: auto;
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        padding: 0.75rem;
+        background: #f8f9fa;
+    }
+
+    .revenue-field-item {
+        min-width: 240px;
+    }
+
+    .revenue-adjust-preview-table th,
+    .revenue-adjust-preview-table td {
+        font-size: 0.8rem;
+    }
+</style>
+
+<div class="container-fluid mt-4">
+    <div class="row mb-3">
+        <div class="col">
+            <h1 class="mb-1">Check Revenue Data</h1>
+            <p class="text-muted mb-0">Display-only check of currency-type survey answers by selected TIN status.</p>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-12">
+            <form method="get" class="d-flex flex-wrap align-items-end gap-2">
+                <div>
+                    <label asp-for="SelectedTinStatus" class="form-label mb-1">TIN Status</label>
+                    <select asp-for="SelectedTinStatus" class="form-select" style="min-width: 200px;">
+                        @foreach (var option in Model.TinStatusOptions)
+                        {
+                            <option value="@option.Value">@option.Label</option>
+                        }
+                    </select>
+                </div>
+
+                <button class="btn btn-outline-primary" type="submit">Apply</button>
+            </form>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(Model.StatusMessage))
+    {
+        <div class="alert alert-success" role="alert">@Model.StatusMessage</div>
+    }
+
+    <div asp-validation-summary="ModelOnly" class="text-danger mb-2"></div>
+
+    <form id="revenueAdjustForm" method="post" class="requires-selection-form">
+        <input type="hidden" asp-for="SelectedTinStatus" />
+
+        <div class="card mb-3">
+            <div class="card-body py-2 d-flex flex-wrap align-items-end gap-3">
+                <div>
+                    <label asp-for="RevenueDecimalPlacesAdjustment" class="form-label mb-1">Decimal Points Adjustment</label>
+                    <input asp-for="RevenueDecimalPlacesAdjustment" type="number" step="1" class="form-control form-control-sm" style="max-width: 180px;" />
+                    <div class="form-text">Positive multiplies by 10^n. Negative divides by 10^|n|.</div>
+                </div>
+
+                <div class="ms-auto d-flex gap-2 flex-wrap">
+                    <button type="submit" asp-page-handler="PreviewAdjustSelectedRevenue" class="btn btn-outline-primary btn-sm">Preview</button>
+                    <button type="submit" asp-page-handler="ApplyAdjustSelectedRevenue" class="btn btn-primary btn-sm" onclick="return confirm('Apply selected revenue adjustments to the selected surveys?');">Apply</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <span>Fields to Update</span>
+                <div class="form-check mb-0">
+                    <input id="selectAllFields" type="checkbox" class="form-check-input" title="Select all fields" />
+                    <label for="selectAllFields" class="form-check-label">Select all</label>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="revenue-field-list">
+                    <div class="d-flex flex-wrap gap-3">
+                        @foreach (var column in Model.Columns)
+                        {
+                            <label class="form-check d-flex align-items-start gap-2 revenue-field-item mb-0">
+                                <input type="checkbox" class="form-check-input field-selector" name="SelectedQuestionIds" value="@column.QuestionId" checked="@Model.SelectedQuestionIds.Contains(column.QuestionId)" />
+                                <span>@column.Header</span>
+                            </label>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (Model.PreviewResult != null)
+        {
+            <div class="card mb-3">
+                <div class="card-header">Revenue Adjustment Preview</div>
+                <div class="card-body py-2">
+                    <div><strong>Selected Companies:</strong> @Model.PreviewResult.SelectedCompanyCount</div>
+                    <div><strong>Selected Fields:</strong> @Model.PreviewResult.SelectedQuestionCount</div>
+                    <div><strong>Decimal Point Adjustment:</strong> @Model.PreviewResult.DecimalPlacesAdjustment</div>
+                    <div><strong>Revenue Answers Changed:</strong> @Model.PreviewResult.ChangedCount</div>
+                    <div><strong>Preview Rows:</strong> @Model.PreviewResult.PreviewRows.Count (max 200 shown)</div>
+                </div>
+                @if (Model.PreviewResult.PreviewRows.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped mb-0 revenue-adjust-preview-table">
+                            <thead>
+                                <tr>
+                                    <th>Company</th>
+                                    <th>External ID</th>
+                                    <th>Survey Year</th>
+                                    <th>Field</th>
+                                    <th>Type</th>
+                                    <th>Old Value</th>
+                                    <th>New Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var row in Model.PreviewResult.PreviewRows)
+                                {
+                                    <tr>
+                                        <td>@row.CompanyName</td>
+                                        <td>@row.ExternalId</td>
+                                        <td>@row.SurveyYear</td>
+                                        <td>@row.QuestionTitle</td>
+                                        <td>@row.FieldType</td>
+                                        <td>@row.OldValue</td>
+                                        <td>@row.NewValue</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        }
+
+        <div class="alert alert-light border mb-3">
+            <strong>Companies:</strong> @Model.Records.Count
+            <span class="mx-2">|</span>
+            <strong>Currency Columns:</strong> @Model.Columns.Count
+        </div>
+
+        <div id="revenueDataTableWrap" class="revenue-data-table-wrap">
+            <table class="table table-sm table-striped table-hover align-middle revenue-data-table">
+                <thead class="table-dark">
+                    <tr>
+                        <th style="min-width:60px;">
+                            <input id="selectAllRows" type="checkbox" class="form-check-input" title="Select all visible rows" />
+                        </th>
+                        <th>Company Name</th>
+                        <th>External ID</th>
+                        <th>Latest Survey Year</th>
+                        @foreach (var column in Model.Columns)
+                        {
+                            <th>@column.Header</th>
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var row in Model.Records)
+                    {
+                        <tr>
+                            <td>
+                                <input type="checkbox" class="form-check-input record-selector" name="SelectedCompanyIds" value="@row.CompanyId" checked="@Model.SelectedCompanyIds.Contains(row.CompanyId)" />
+                            </td>
+                            <td>@row.CompanyName</td>
+                            <td>@row.ExternalId</td>
+                            <td>@(row.LatestSurveyYear?.ToString() ?? "-")</td>
+                            @foreach (var column in Model.Columns)
+                            {
+                                <td>@row.GetValue(column.QuestionId)</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+
+<script>
+    (function () {
+        var tableWrap = document.getElementById('revenueDataTableWrap');
+        var revenueTable = tableWrap ? tableWrap.querySelector('.revenue-data-table') : null;
+
+        function syncStickyColumnOffsets() {
+            if (!tableWrap || !revenueTable) {
+                return;
+            }
+
+            var headerCells = revenueTable.querySelectorAll('thead th');
+            if (!headerCells || headerCells.length < 3) {
+                return;
+            }
+
+            var col1Width = headerCells[0].offsetWidth;
+            var col2Width = headerCells[1].offsetWidth;
+
+            tableWrap.style.setProperty('--revenue-sticky-col-1-left', '0px');
+            tableWrap.style.setProperty('--revenue-sticky-col-2-left', col1Width + 'px');
+            tableWrap.style.setProperty('--revenue-sticky-col-3-left', (col1Width + col2Width) + 'px');
+        }
+
+        function getRowSelectors() {
+            return Array.from(document.querySelectorAll('.record-selector'));
+        }
+
+        function getFieldSelectors() {
+            return Array.from(document.querySelectorAll('.field-selector'));
+        }
+
+        function syncSelectAllState(selectAllId, selectorClass) {
+            var selectAll = document.getElementById(selectAllId);
+            var selectors = Array.from(document.querySelectorAll(selectorClass));
+
+            if (!selectAll || selectors.length === 0) {
+                return;
+            }
+
+            var selectedCount = selectors.filter(function (x) { return x.checked; }).length;
+            selectAll.checked = selectedCount === selectors.length;
+            selectAll.indeterminate = selectedCount > 0 && selectedCount < selectors.length;
+        }
+
+        if (tableWrap) {
+            window.addEventListener('resize', syncStickyColumnOffsets);
+            syncStickyColumnOffsets();
+        }
+
+        var selectAllRows = document.getElementById('selectAllRows');
+        if (selectAllRows) {
+            selectAllRows.addEventListener('change', function () {
+                var checked = selectAllRows.checked;
+                getRowSelectors().forEach(function (x) { x.checked = checked; });
+                syncSelectAllState('selectAllRows', '.record-selector');
+            });
+        }
+
+        var selectAllFields = document.getElementById('selectAllFields');
+        if (selectAllFields) {
+            selectAllFields.addEventListener('change', function () {
+                var checked = selectAllFields.checked;
+                getFieldSelectors().forEach(function (x) { x.checked = checked; });
+                syncSelectAllState('selectAllFields', '.field-selector');
+            });
+        }
+
+        getRowSelectors().forEach(function (x) {
+            x.addEventListener('change', function () {
+                syncSelectAllState('selectAllRows', '.record-selector');
+            });
+        });
+
+        getFieldSelectors().forEach(function (x) {
+            x.addEventListener('change', function () {
+                syncSelectAllState('selectAllFields', '.field-selector');
+            });
+        });
+
+        syncSelectAllState('selectAllRows', '.record-selector');
+        syncSelectAllState('selectAllFields', '.field-selector');
+    })();
+</script>
