@@ -117,6 +117,14 @@
             <ol>
                 <li><strong>Actual value</strong> for the target year → returned directly.</li>
                 <li>
+                    <strong>Company's own regional-share-of-employment ratio (active, takes priority over trend)</strong> — if the company has a known (actual or already-applied estimate) total employment value for the target year <em>and</em> at least 2 prior years of paired regional/total employment data, the average of the company's own regional-to-total-employment ratio (up to the last 5 paired years) is applied to that known target-year total employment:
+                    <div class="bg-light border rounded p-3 my-2 font-monospace small">
+                        ownRatio = average(regionalEmployment<sub>year</sub> / totalEmployment<sub>year</sub>) over up to 5 paired prior years<br />
+                        forecast = knownTargetYearTotalEmployment × ownRatio
+                    </div>
+                    This grounds the forecast in the already-known/estimated target-year total employment rather than extrapolating the region's own history, so it takes priority over the trend below.
+                </li>
+                <li>
                     <strong>Configured trend (minimum 2 positive points)</strong> — takes up to 5 recent prior-year positive values and applies the selected method.
                 </li>
                 <li>
@@ -139,6 +147,14 @@
                 <p class="mb-2">Uses the configured trend method (<strong>LogLinear</strong> or <strong>RecencyWeighted</strong>) with a higher minimum and an active sector-ratio fallback. Ratios are calculated from the primary sector using the last 5 years of wages-to-revenue data.</p>
             <ol>
                 <li><strong>Actual value</strong> for target year → returned directly.</li>
+                <li>
+                        <strong>Company's own wages-to-revenue ratio (active, takes priority over trend)</strong> — if the company has a known (actual or already-applied estimate) revenue value for the target year <em>and</em> at least 2 prior years of paired wages/revenue data, the average of the company's own wages-to-revenue ratio (up to the last 5 paired years) is applied to that known target-year revenue:
+                    <div class="bg-light border rounded p-3 my-2 font-monospace small">
+                        ownRatio = average(wages<sub>year</sub> / revenue<sub>year</sub>) over up to 5 paired prior years<br />
+                        forecast = knownTargetYearRevenue × ownRatio
+                    </div>
+                    This takes priority over the company's own trend below, since it grounds the forecast in the already-known/estimated target-year revenue rather than extrapolating the metric's own history.
+                </li>
                 <li>
                         <strong>Configured trend (&gt; 3 positive points)</strong> — same threshold as before, but uses the selected method on positive points and requires <strong>more than 3</strong> data points (i.e. ≥ 4).
                 </li>
@@ -163,6 +179,14 @@
             <ol>
                 <li><strong>Actual value</strong> for target year → returned directly.</li>
                     <li>
+                        <strong>Company's own R&amp;D-to-revenue ratio (active, takes priority over trend)</strong> — if the company has a known (actual or already-applied estimate) revenue value for the target year <em>and</em> at least 2 prior years of paired R&amp;D/revenue data, the average of the company's own R&amp;D-to-revenue ratio (up to the last 5 paired years) is applied to that known target-year revenue:
+                        <div class="bg-light border rounded p-3 my-2 font-monospace small">
+                            ownRatio = average(R&amp;D<sub>year</sub> / revenue<sub>year</sub>) over up to 5 paired prior years<br />
+                            forecast = knownTargetYearRevenue × ownRatio
+                        </div>
+                        This takes priority over the company's own trend below.
+                    </li>
+                    <li>
                         <strong>Configured trend (≥ 3 positive points)</strong> — uses the selected method across up to 5 prior years.
                     </li>
                     <li>
@@ -186,6 +210,14 @@
             <ol>
                 <li><strong>Actual value</strong> for target year → returned directly.</li>
                     <li>
+                        <strong>Company's own S&amp;M-to-revenue ratio (active, takes priority over trend)</strong> — if the company has a known (actual or already-applied estimate) revenue value for the target year <em>and</em> at least 2 prior years of paired S&amp;M/revenue data, the average of the company's own S&amp;M-to-revenue ratio (up to the last 5 paired years) is applied to that known target-year revenue:
+                        <div class="bg-light border rounded p-3 my-2 font-monospace small">
+                            ownRatio = average(S&amp;M<sub>year</sub> / revenue<sub>year</sub>) over up to 5 paired prior years<br />
+                            forecast = knownTargetYearRevenue × ownRatio
+                        </div>
+                        This takes priority over the company's own trend below.
+                    </li>
+                    <li>
                         <strong>Configured trend (≥ 3 positive points)</strong> — uses the selected method across up to 5 prior years.
                     </li>
                     <li>
@@ -208,6 +240,14 @@
             <p class="mb-2">EBITDA is kept on a <strong>LogLinear-first path</strong> (fixed behavior), with linear fallback only when needed.</p>
             <ol>
                 <li><strong>Actual value</strong> for target year → returned directly.</li>
+                <li>
+                    <strong>Company's own EBITDA-to-revenue ratio (active, takes priority over trend and sector fallback)</strong> — if the company has a known (actual or already-applied estimate) revenue value for the target year <em>and</em> at least 2 prior years of paired EBITDA/revenue data, the average of the company's own EBITDA-to-revenue ratio (up to the last 5 paired years) is applied to that known target-year revenue:
+                    <div class="bg-light border rounded p-3 my-2 font-monospace small">
+                        ownRatio = average(EBITDA<sub>year</sub> / revenue<sub>year</sub>) over up to 5 paired prior years<br />
+                        forecast = knownTargetYearRevenue × ownRatio
+                    </div>
+                    This is grounded in the already-known/estimated target-year revenue rather than extrapolating EBITDA's own trend, so it takes priority.
+                </li>
                 <li>
                     <strong>Sector-ratio fallback (active)</strong> — if ≤ 3 historical points are available, EBITDA is estimated as forecasted revenue multiplied by the primary-sector EBITDA/revenue ratio derived from the last 5 years across sector companies:
                     <div class="bg-light border rounded p-3 my-2 font-monospace small">
@@ -240,6 +280,14 @@
             <p class="mb-2">All 10 regional revenue metrics share the same configured trend method (<strong>LogLinear</strong> or <strong>RecencyWeighted</strong>) with a <em>lower</em> minimum threshold than the total revenue metric, plus an active sector-specific export-ratio fallback.</p>
             <ol>
                 <li><strong>Actual value</strong> for the target year → returned directly.</li>
+                <li>
+                    <strong>Company's own regional-share-of-revenue ratio (active, takes priority over trend)</strong> — if the company has a known (actual or already-applied estimate) total revenue value for the target year <em>and</em> at least 2 prior years of paired regional/total revenue data, the average of the company's own regional-to-total-revenue ratio (up to the last 5 paired years) is applied to that known target-year total revenue:
+                    <div class="bg-light border rounded p-3 my-2 font-monospace small">
+                        ownRatio = average(regionRevenue<sub>year</sub> / totalRevenue<sub>year</sub>) over up to 5 paired prior years<br />
+                        forecast = knownTargetYearTotalRevenue × ownRatio
+                    </div>
+                    This grounds the forecast in the already-known/estimated target-year total revenue rather than extrapolating the region's own history, so it takes priority over the trend below.
+                </li>
                 <li>
                     <strong>Configured trend (minimum 2 positive points)</strong> — takes up to the 5 most recent prior-year positive values and applies the selected method:
                     <div class="bg-light border rounded p-3 my-2 font-monospace small">

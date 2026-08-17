@@ -2023,6 +2023,9 @@ namespace TINWeb.Pages.CompanySurvey
             var forecastMethod = await GetRevenueForecastMethodAsync();
             var trend = TryCalculateConfiguredTrend(metricHistory, TargetFinancialYear, minimumTrendPoints, forecastMethod, out var trendDetail);
 
+            var ownRatioResult = TryCalculateCompanyOwnBaseRatioForecast(metricHistory, revenueHistory, TargetFinancialYear, metricLabel);
+            var ownRatioDetail = ownRatioResult?.Reason ?? "No known target-year revenue or insufficient paired company history (minimum 2 years) to compute an own ratio.";
+
             var primarySector = await GetCompanyPrimarySectorAsync(CompanyId, TargetFinancialYear);
             var sectorRatio = await sectorRatioFunc(primarySector, TargetFinancialYear);
             var revenueForecast = await CalculateForecastedRevenueWithSectorFallbackAsync(revenueHistory, TargetFinancialYear);
@@ -2045,7 +2048,9 @@ namespace TINWeb.Pages.CompanySurvey
                 "Trend",
                 trendDetail,
                 "Fallback",
-                fallbackDetail);
+                fallbackDetail,
+                ownRatio: ownRatioResult?.Value,
+                ownRatioDetail: ownRatioDetail);
 
             return (metricLabel, candidates);
         }
@@ -2083,6 +2088,9 @@ namespace TINWeb.Pages.CompanySurvey
                 trend = TryCalculateLinearTrend(ebitdaHistory, TargetFinancialYear, 4, out trendDetail);
             }
 
+            var ownRatioResult = TryCalculateCompanyOwnBaseRatioForecast(ebitdaHistory, revenueHistory, TargetFinancialYear, "EBITDA");
+            var ownRatioDetail = ownRatioResult?.Reason ?? "No known target-year revenue or insufficient paired company history (minimum 2 years) to compute an own ratio.";
+
             var primarySector = await GetCompanyPrimarySectorAsync(CompanyId, TargetFinancialYear);
             var sectorRatio = await CalculateSectorEbitdaRatioAsync(primarySector, TargetFinancialYear);
             var revenueForecast = await CalculateForecastedRevenueWithSectorFallbackAsync(revenueHistory, TargetFinancialYear);
@@ -2105,7 +2113,9 @@ namespace TINWeb.Pages.CompanySurvey
                 "Trend",
                 trendDetail,
                 "Fallback",
-                fallbackDetail);
+                fallbackDetail,
+                ownRatio: ownRatioResult?.Value,
+                ownRatioDetail: ownRatioDetail);
 
             return ("EBITDA", candidates);
         }
@@ -2118,6 +2128,9 @@ namespace TINWeb.Pages.CompanySurvey
             var actual = GetActualValueForTargetYear(regionalHistory, TargetFinancialYear);
             var forecastMethod = await GetRevenueForecastMethodAsync();
             var trend = TryCalculateConfiguredTrend(regionalHistory, TargetFinancialYear, 2, forecastMethod, out var trendDetail);
+
+            var ownRatioResult = TryCalculateCompanyOwnBaseRatioForecast(regionalHistory, revenueHistory, TargetFinancialYear, metricLabel);
+            var ownRatioDetail = ownRatioResult?.Reason ?? "No known target-year total revenue or insufficient paired company history (minimum 2 years) to compute an own ratio.";
 
             var primarySector = await GetCompanyPrimarySectorAsync(CompanyId, TargetFinancialYear);
             var sectorRatio = await CalculateSectorRegionalExportRatioAsync(primarySector, questionTitle, TargetFinancialYear);
@@ -2148,7 +2161,9 @@ namespace TINWeb.Pages.CompanySurvey
                 "Trend",
                 trendDetail,
                 "Fallback",
-                fallbackDetail);
+                fallbackDetail,
+                ownRatio: ownRatioResult?.Value,
+                ownRatioDetail: ownRatioDetail);
 
             return (metricLabel, candidates);
         }
@@ -2162,6 +2177,9 @@ namespace TINWeb.Pages.CompanySurvey
             var actual = GetActualValueForTargetYear(regionalHistory, TargetFinancialYear);
             var forecastMethod = await GetRevenueForecastMethodAsync();
             var trend = TryCalculateConfiguredTrend(regionalHistory, TargetFinancialYear, 2, forecastMethod, out var trendDetail);
+
+            var ownRatioResult = TryCalculateCompanyOwnBaseRatioForecast(regionalHistory, totalEmploymentHistory, TargetFinancialYear, metricLabel, "total employment");
+            var ownRatioDetail = ownRatioResult?.Reason ?? "No known target-year total employment or insufficient paired company history (minimum 2 years) to compute an own ratio.";
 
             var primarySector = await GetCompanyPrimarySectorAsync(CompanyId, TargetFinancialYear);
             var sectorRatio = await CalculateSectorRegionalEmploymentRatioAsync(primarySector, questionTitle, TargetFinancialYear);
@@ -2185,7 +2203,9 @@ namespace TINWeb.Pages.CompanySurvey
                 "Trend",
                 trendDetail,
                 "Fallback",
-                fallbackDetail);
+                fallbackDetail,
+                ownRatio: ownRatioResult?.Value,
+                ownRatioDetail: ownRatioDetail);
 
             return (metricLabel, candidates);
         }
@@ -2334,11 +2354,18 @@ namespace TINWeb.Pages.CompanySurvey
             string trendDetail,
             string fallbackStep,
             string fallbackDetail,
-            List<string>? fallbackFailureReasons = null)
+            List<string>? fallbackFailureReasons = null,
+            decimal? ownRatio = null,
+            string ownRatioStep = "Own Ratio",
+            string? ownRatioDetail = null)
         {
-            var usedStep = actual.HasValue ? actualStep : trend.HasValue ? trendStep : fallback.HasValue ? fallbackStep : string.Empty;
+            var usedStep = actual.HasValue ? actualStep
+                : ownRatio.HasValue ? ownRatioStep
+                : trend.HasValue ? trendStep
+                : fallback.HasValue ? fallbackStep
+                : string.Empty;
 
-            return new List<CalculationCandidate>
+            var candidates = new List<CalculationCandidate>
             {
                 new()
                 {
@@ -2346,23 +2373,37 @@ namespace TINWeb.Pages.CompanySurvey
                     Value = actual,
                     Details = actualDetail,
                     IsUsed = string.Equals(usedStep, actualStep, StringComparison.OrdinalIgnoreCase)
-                },
-                new()
-                {
-                    StepName = trendStep,
-                    Value = trend,
-                    Details = trendDetail,
-                    IsUsed = string.Equals(usedStep, trendStep, StringComparison.OrdinalIgnoreCase)
-                },
-                new()
-                {
-                    StepName = fallbackStep,
-                    Value = fallback,
-                    Details = fallbackDetail,
-                    FailureReasons = fallbackFailureReasons ?? new List<string>(),
-                    IsUsed = string.Equals(usedStep, fallbackStep, StringComparison.OrdinalIgnoreCase)
                 }
             };
+
+            if (ownRatioDetail != null)
+            {
+                candidates.Add(new()
+                {
+                    StepName = ownRatioStep,
+                    Value = ownRatio,
+                    Details = ownRatioDetail,
+                    IsUsed = string.Equals(usedStep, ownRatioStep, StringComparison.OrdinalIgnoreCase)
+                });
+            }
+
+            candidates.Add(new()
+            {
+                StepName = trendStep,
+                Value = trend,
+                Details = trendDetail,
+                IsUsed = string.Equals(usedStep, trendStep, StringComparison.OrdinalIgnoreCase)
+            });
+            candidates.Add(new()
+            {
+                StepName = fallbackStep,
+                Value = fallback,
+                Details = fallbackDetail,
+                FailureReasons = fallbackFailureReasons ?? new List<string>(),
+                IsUsed = string.Equals(usedStep, fallbackStep, StringComparison.OrdinalIgnoreCase)
+            });
+
+            return candidates;
         }
 
         private async Task<bool> LoadPageDataAsync()
@@ -3296,6 +3337,12 @@ namespace TINWeb.Pages.CompanySurvey
                 return (actual.Value, $"Using actual {regionLabel} for target financial year.");
             }
 
+            var ownRatioForecast = TryCalculateCompanyOwnBaseRatioForecast(regionalHistory, revenueHistory, targetYear, regionLabel);
+            if (ownRatioForecast.HasValue)
+            {
+                return ownRatioForecast.Value;
+            }
+
             var trendPoints = regionalHistory
                 .Where(x => x.FinancialYear < targetYear && x.Value.HasValue && x.Value.Value > 0)
                 .OrderByDescending(x => x.FinancialYear)
@@ -3505,6 +3552,12 @@ namespace TINWeb.Pages.CompanySurvey
                 return (actual.Value, $"Using actual Regional Employment {regionLabel} for target financial year.");
             }
 
+            var ownRatioForecast = TryCalculateCompanyOwnBaseRatioForecast(regionalEmploymentHistory, totalEmploymentHistory, targetYear, $"Regional Employment {regionLabel}", "total employment");
+            if (ownRatioForecast.HasValue)
+            {
+                return ownRatioForecast.Value;
+            }
+
             var trendPoints = regionalEmploymentHistory
                 .Where(x => x.FinancialYear < targetYear && x.Value.HasValue && x.Value.Value > 0)
                 .OrderByDescending(x => x.FinancialYear)
@@ -3602,6 +3655,56 @@ namespace TINWeb.Pages.CompanySurvey
             return Convert.ToDecimal(averageRatio);
         }
 
+        /// <summary>
+        /// Forecasts a metric from the company's own historical metric-to-base ratio (base is total revenue or
+        /// total employment) applied to a known (actual or already-applied) target-year base value. Returns null
+        /// if the target-year base value is unknown or there is insufficient paired history for this company.
+        /// </summary>
+        private static (decimal? Value, string Reason)? TryCalculateCompanyOwnBaseRatioForecast(
+            List<MetricHistoryRow> metricHistory,
+            List<MetricHistoryRow> baseHistory,
+            int targetYear,
+            string metricLabel,
+            string baseLabel = "revenue",
+            int minimumRatioPoints = 2)
+        {
+            var targetYearBaseValue = baseHistory
+                .Where(x => x.FinancialYear == targetYear && x.Value.HasValue && x.Value.Value > 0)
+                .OrderByDescending(x => x.CompanySurveyId)
+                .Select(x => x.Value!.Value)
+                .FirstOrDefault();
+
+            if (targetYearBaseValue <= 0)
+            {
+                return null;
+            }
+
+            var latestBaseValueByYear = baseHistory
+                .Where(x => x.Value.HasValue && x.Value.Value > 0)
+                .GroupBy(x => x.FinancialYear)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.CompanySurveyId).First().Value!.Value);
+
+            var ratioPoints = metricHistory
+                .Where(x => x.FinancialYear < targetYear && x.Value.HasValue && x.Value.Value > 0
+                    && latestBaseValueByYear.ContainsKey(x.FinancialYear))
+                .GroupBy(x => x.FinancialYear)
+                .Select(g => g.OrderByDescending(x => x.CompanySurveyId).First())
+                .OrderByDescending(x => x.FinancialYear)
+                .Take(5)
+                .Select(x => x.Value!.Value / latestBaseValueByYear[x.FinancialYear])
+                .ToList();
+
+            if (ratioPoints.Count < minimumRatioPoints)
+            {
+                return null;
+            }
+
+            var averageRatio = ratioPoints.Average();
+            var forecast = targetYearBaseValue * averageRatio;
+
+            return (forecast, $"Using company's own historical {metricLabel}-to-{baseLabel} ratio ({averageRatio:P2}, averaged over {ratioPoints.Count} year(s) of paired data) applied to the known target-year {baseLabel} of {targetYearBaseValue:N0}.");
+        }
+
         private async Task<(decimal? Value, string Reason)> CalculateForecastedEbitdaWithSectorFallbackAsync(
             List<MetricHistoryRow> ebitdaHistory,
             List<MetricHistoryRow> revenueHistory,
@@ -3617,6 +3720,12 @@ namespace TINWeb.Pages.CompanySurvey
             if (actual.HasValue)
             {
                 return (actual.Value, "Using actual EBITDA for target financial year.");
+            }
+
+            var ownRatioForecast = TryCalculateCompanyOwnBaseRatioForecast(ebitdaHistory, revenueHistory, targetYear, "EBITDA");
+            if (ownRatioForecast.HasValue)
+            {
+                return ownRatioForecast.Value;
             }
 
             var positiveTrendHistory = ebitdaHistory
@@ -3981,6 +4090,12 @@ namespace TINWeb.Pages.CompanySurvey
                 return (actual.Value, "Using actual research and development for target financial year.");
             }
 
+            var ownRatioForecast = TryCalculateCompanyOwnBaseRatioForecast(researchDevelopmentHistory, revenueHistory, targetYear, "R&D");
+            if (ownRatioForecast.HasValue)
+            {
+                return ownRatioForecast.Value;
+            }
+
             var trendPoints = researchDevelopmentHistory
                 .Where(x => x.FinancialYear < targetYear && x.Value.HasValue && x.Value.Value > 0)
                 .OrderByDescending(x => x.FinancialYear)
@@ -4043,6 +4158,12 @@ namespace TINWeb.Pages.CompanySurvey
             if (actual.HasValue)
             {
                 return (actual.Value, "Using actual sales and marketing for target financial year.");
+            }
+
+            var ownRatioForecast = TryCalculateCompanyOwnBaseRatioForecast(salesMarketingHistory, revenueHistory, targetYear, "Sales & Marketing");
+            if (ownRatioForecast.HasValue)
+            {
+                return ownRatioForecast.Value;
             }
 
             var trendPoints = salesMarketingHistory
@@ -4108,6 +4229,13 @@ namespace TINWeb.Pages.CompanySurvey
             {
                 reason = "Using actual wages and salaries for target financial year.";
                 return actual.Value;
+            }
+
+            var ownRatioForecast = TryCalculateCompanyOwnBaseRatioForecast(wagesHistory, revenueHistory, targetYear, "Wages & Salaries");
+            if (ownRatioForecast.HasValue)
+            {
+                reason = ownRatioForecast.Value.Reason;
+                return ownRatioForecast.Value.Value;
             }
 
             var trendPoints = wagesHistory
