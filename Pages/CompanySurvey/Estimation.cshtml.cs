@@ -2073,15 +2073,9 @@ namespace TINWeb.Pages.CompanySurvey
             string trendDetail;
             if (positiveTrendHistory.Count >= 4)
             {
-                trend = TryCalculateConfiguredTrend(positiveTrendHistory, TargetFinancialYear, 4, RevenueForecastMethodLogLinear, out trendDetail);
-                if (trend.HasValue)
-                {
-                    trendDetail = $"Log-linear trend fit from {positiveTrendHistory.Count} positive point(s) for EBITDA. {trendDetail}";
-                }
-                else
-                {
-                    trendDetail = $"Log-linear trend fit from {positiveTrendHistory.Count} positive point(s) for EBITDA. {trendDetail}";
-                }
+                var forecastMethod = await GetRevenueForecastMethodAsync();
+                trend = TryCalculateConfiguredTrend(positiveTrendHistory, TargetFinancialYear, 4, forecastMethod, out trendDetail);
+                trendDetail = $"{forecastMethod} trend fit from {positiveTrendHistory.Count} positive point(s) for EBITDA. {trendDetail}";
             }
             else
             {
@@ -3760,10 +3754,11 @@ namespace TINWeb.Pages.CompanySurvey
 
             if (positiveTrendHistory.Count >= 4)
             {
-                var logLinearTrend = TryCalculateConfiguredTrend(positiveTrendHistory, targetYear, 4, RevenueForecastMethodLogLinear, out var trendDetail);
-                if (logLinearTrend.HasValue)
+                var forecastMethod = await GetRevenueForecastMethodAsync();
+                var configuredTrend = TryCalculateConfiguredTrend(positiveTrendHistory, targetYear, 4, forecastMethod, out var trendDetail);
+                if (configuredTrend.HasValue)
                 {
-                    return (logLinearTrend, $"Log-linear trend fitted on {positiveTrendHistory.Count} historical positive data point(s) for EBITDA. {trendDetail}");
+                    return (configuredTrend, $"{forecastMethod} trend fitted on {positiveTrendHistory.Count} historical positive data point(s) for EBITDA. {trendDetail}");
                 }
             }
 

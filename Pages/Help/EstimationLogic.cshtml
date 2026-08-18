@@ -237,7 +237,7 @@
     <div class="card mb-4" id="ebitda">
         <div class="card-header fw-semibold">EBITDA</div>
         <div class="card-body">
-            <p class="mb-2">EBITDA is kept on a <strong>LogLinear-first path</strong> (fixed behavior), with linear fallback only when needed.</p>
+            <p class="mb-2">EBITDA now uses the configured trend method (<strong>LogLinear</strong> or <strong>RecencyWeighted</strong>), same as the other cost-structure metrics, with linear regression fallback only when the configured trend cannot be fit.</p>
             <ol>
                 <li><strong>Actual value</strong> for target year → returned directly.</li>
                 <li>
@@ -256,10 +256,10 @@
                     </div>
                 </li>
                 <li>
-                    <strong>Log-linear trend (≥ 4 positive points)</strong> — OLS on <code>ln(value)</code> vs financial year using positive points.
+                    <strong>Configured trend (≥ 4 positive points)</strong> — uses the selected method (<strong>LogLinear</strong>: OLS on <code>ln(value)</code> vs financial year; <strong>RecencyWeighted</strong>: recency-weighted log-linear trend) on positive points.
                 </li>
                 <li>
-                    <strong>Linear regression fallback (if log-linear cannot be fit)</strong> — OLS on raw values vs financial year across all prior-year non-null points:
+                    <strong>Linear regression fallback (if the configured trend cannot be fit)</strong> — OLS on raw values vs financial year across all prior-year non-null points:
                     <div class="bg-light border rounded p-3 my-2 font-monospace small">
                         slope = Σ[(year − avgYear) × (value − avgValue)] / Σ[(year − avgYear)²]<br />
                         intercept = avgValue − slope × avgYear<br />
