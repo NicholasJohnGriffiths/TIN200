@@ -25,7 +25,16 @@
                     }
                 </select>
             </div>
-            <div class="col-md-9 text-md-end">
+            <div class="col-md-3">
+                <label class="form-label" for="SelectedTinStatus">TIN Status</label>
+                <select asp-for="SelectedTinStatus" class="form-select" aria-label="TIN Status">
+                    @foreach (var option in Model.TinStatusOptions)
+                    {
+                        <option value="@option.Value" selected="@(Model.SelectedTinStatus == option.Value ? "selected" : null)">@option.Label</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-6 text-md-end">
                 <button type="submit" asp-page-handler="Preview" id="previewButton" class="btn btn-outline-primary me-2">Preview</button>
                 <button type="submit" asp-page-handler="Export" id="exportButton" class="btn btn-success">Export CSV</button>
             </div>

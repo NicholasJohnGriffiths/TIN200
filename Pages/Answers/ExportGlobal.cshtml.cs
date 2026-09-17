@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using TINWeb.Data;
+using TINWeb.Models;
 using TINWeb.Services;
 
 namespace TINWeb.Pages.Answers
@@ -24,8 +25,13 @@ namespace TINWeb.Pages.Answers
 
         public List<int> FinancialYears { get; set; } = new();
 
+        public List<(int Value, string Label)> TinStatusOptions { get; } = TinStatusHelper.DropdownOptions.ToList();
+
         [BindProperty]
         public int? SelectedFinancialYear { get; set; }
+
+        [BindProperty]
+        public int SelectedTinStatus { get; set; } = (int)TinStatus.Tin200;
 
         [BindProperty]
         public string HeaderList { get; set; } = string.Empty;
@@ -35,6 +41,7 @@ namespace TINWeb.Pages.Answers
         public async Task OnGetAsync(int? financialYear)
         {
             await LoadPageDefaultsAsync(financialYear);
+            SelectedTinStatus = NormalizeTinStatusFilter(SelectedTinStatus);
 
             if (string.IsNullOrWhiteSpace(HeaderList))
             {
@@ -45,6 +52,7 @@ namespace TINWeb.Pages.Answers
         public async Task<IActionResult> OnPostPreviewAsync()
         {
             await LoadPageDefaultsAsync(SelectedFinancialYear);
+            SelectedTinStatus = NormalizeTinStatusFilter(SelectedTinStatus);
             if (!ValidateYear())
             {
                 return Page();
@@ -62,13 +70,14 @@ namespace TINWeb.Pages.Answers
                 return Page();
             }
 
-            PreviewSummary = await BuildPreviewSummaryAsync(SelectedFinancialYear!.Value, headers, 10);
+            PreviewSummary = await BuildPreviewSummaryAsync(SelectedFinancialYear!.Value, SelectedTinStatus, headers, 10);
             return Page();
         }
 
         public async Task<IActionResult> OnPostExportAsync()
         {
             await LoadPageDefaultsAsync(SelectedFinancialYear);
+            SelectedTinStatus = NormalizeTinStatusFilter(SelectedTinStatus);
             if (!ValidateYear())
             {
                 return Page();
@@ -86,7 +95,7 @@ namespace TINWeb.Pages.Answers
                 return Page();
             }
 
-            var export = await BuildPreviewSummaryAsync(SelectedFinancialYear!.Value, headers, 0);
+            var export = await BuildPreviewSummaryAsync(SelectedFinancialYear!.Value, SelectedTinStatus, headers, 0);
             var csv = new StringBuilder();
             csv.AppendLine(string.Join(',', headers.Select(EscapeCsv)));
 
@@ -116,6 +125,18 @@ namespace TINWeb.Pages.Answers
             return true;
         }
 
+        private static int NormalizeTinStatusFilter(int tinStatus)
+        {
+            return tinStatus switch
+            {
+                (int)TinStatus.Tin200 => (int)TinStatus.Tin200,
+                (int)TinStatus.Tin200Potential => (int)TinStatus.Tin200Potential,
+                (int)TinStatus.Tin1000 => (int)TinStatus.Tin1000,
+                (int)TinStatus.TinTest => (int)TinStatus.TinTest,
+                _ => (int)TinStatus.Tin200
+            };
+        }
+
         private static List<string> ParseHeaders(string? rawHeaders)
         {
             if (string.IsNullOrWhiteSpace(rawHeaders))
@@ -132,7 +153,7 @@ namespace TINWeb.Pages.Answers
                 .ToList();
         }
 
-        private async Task<ExportPreviewSummary> BuildPreviewSummaryAsync(int financialYear, List<string> headers, int previewRowLimit)
+        private async Task<ExportPreviewSummary> BuildPreviewSummaryAsync(int financialYear, int tinStatus, List<string> headers, int previewRowLimit)
         {
             var builtInHeaders = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -204,7 +225,7 @@ namespace TINWeb.Pages.Answers
                 from companySurvey in _context.CompanySurvey.AsNoTracking()
                 join survey in _context.Survey.AsNoTracking() on companySurvey.SurveyId equals survey.Id
                 join company in _context.Tin200.AsNoTracking() on companySurvey.CompanyId equals company.Id
-                where survey.FinancialYear <= financialYear && survey.FinancialYear >= financialYear - 5
+                where survey.FinancialYear <= financialYear && survey.FinancialYear >= financialYear - 5 && company.TinStatus == tinStatus
                 select new
                 {
                     CompanySurveyId = companySurvey.Id,
