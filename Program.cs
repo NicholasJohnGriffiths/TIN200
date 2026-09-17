@@ -191,6 +191,19 @@ builder.Services.AddHttpClient<GravityFormsService>((sp, client) =>
     client.DefaultRequestHeaders.UserAgent.Clear();
     client.DefaultRequestHeaders.UserAgent.ParseAdd("TINWeb/1.0 (+https://survey.tin100.com)");
 });
+builder.Services.Configure<MailerLiteSettings>(builder.Configuration.GetSection("MailerLite"));
+builder.Services.AddHttpClient<MailerLiteService>((sp, client) =>
+{
+    var settings = sp.GetRequiredService<IOptions<MailerLiteSettings>>().Value;
+    client.BaseAddress = new Uri("https://connect.mailerlite.com/api/");
+    client.DefaultRequestHeaders.Accept.Clear();
+    client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+    if (!string.IsNullOrWhiteSpace(settings.ApiKey))
+    {
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", settings.ApiKey.Trim());
+    }
+});
 builder.Services.Configure<FormOptions>(options =>
 {
     options.ValueCountLimit = 20000;
