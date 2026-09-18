@@ -198,6 +198,8 @@ builder.Services.AddHttpClient<MailerLiteService>((sp, client) =>
     client.BaseAddress = new Uri("https://connect.mailerlite.com/api/");
     client.DefaultRequestHeaders.Accept.Clear();
     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+    client.DefaultRequestHeaders.UserAgent.Clear();
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("TINWeb/1.0 (+https://survey.tin100.com)");
 
     if (!string.IsNullOrWhiteSpace(settings.ApiKey))
     {
