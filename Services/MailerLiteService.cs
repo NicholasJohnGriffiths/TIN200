@@ -20,6 +20,7 @@ namespace TINWeb.Services
         public string Email { get; set; } = "";
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
+        public string? CompanyName { get; set; }
     }
 
     public class MailerLiteService
@@ -67,7 +68,7 @@ namespace TINWeb.Services
         public async Task<List<MailerLiteSubscriber>> GetGroupSubscribersAsync(string groupId, CancellationToken cancellationToken = default)
         {
             var subscribers = new List<MailerLiteSubscriber>();
-            string? nextUrl = $"subscribers?filter[group_id]={Uri.EscapeDataString(groupId)}&limit=200";
+            string? nextUrl = $"groups/{Uri.EscapeDataString(groupId)}/subscribers?limit=200";
 
             while (!string.IsNullOrWhiteSpace(nextUrl))
             {
@@ -84,18 +85,21 @@ namespace TINWeb.Services
                     {
                         string? firstName = null;
                         string? lastName = null;
+                        string? companyName = null;
 
                         if (item.TryGetProperty("fields", out var fieldsElement) && fieldsElement.ValueKind == JsonValueKind.Object)
                         {
                             firstName = GetString(fieldsElement, "name");
                             lastName = GetString(fieldsElement, "last_name");
+                            companyName = GetString(fieldsElement, "company");
                         }
 
                         subscribers.Add(new MailerLiteSubscriber
                         {
                             Email = GetString(item, "email") ?? "",
                             FirstName = firstName,
-                            LastName = lastName
+                            LastName = lastName,
+                            CompanyName = companyName
                         });
                     }
                 }

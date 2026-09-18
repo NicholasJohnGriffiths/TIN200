@@ -26,12 +26,21 @@ public class EditModel : PageModel
     [BindProperty]
     public IFormFile? EmailHeaderImageFile { get; set; }
 
+    [BindProperty]
+    public IFormFile? TinLogoLabelsImageFile { get; set; }
+
     public List<SelectListItem> EmailHeaderImageOptions { get; set; } = new();
     public List<SelectListItem> RevenueForecastMethodOptions { get; set; } = new();
     public string? EmailHeaderImageThumbnailUrl { get; set; }
     public string? EmailHeaderImageFileName { get; set; }
     public bool EmailHeaderImageMissing { get; set; }
     public string? EmailHeaderImageMissingMessage { get; set; }
+
+    public List<SelectListItem> TinLogoLabelsImageOptions { get; set; } = new();
+    public string? TinLogoLabelsImageThumbnailUrl { get; set; }
+    public string? TinLogoLabelsImageFileName { get; set; }
+    public bool TinLogoLabelsImageMissing { get; set; }
+    public string? TinLogoLabelsImageMissingMessage { get; set; }
 
     [TempData]
     public string? StatusMessage { get; set; }
@@ -53,8 +62,10 @@ public class EditModel : PageModel
         record.RevenueForecastMethod = NormalizeRevenueForecastMethod(record.RevenueForecastMethod);
         Record = record;
         await LoadEmailHeaderImageOptionsAsync();
+        await LoadTinLogoLabelsImageOptionsAsync();
         LoadRevenueForecastMethodOptions();
         await LoadEmailHeaderImagePreviewAsync();
+        await LoadTinLogoLabelsImagePreviewAsync();
         return Page();
     }
 
@@ -62,6 +73,29 @@ public class EditModel : PageModel
     {
         var config = await _context.AppConfig.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id);
         if (config?.EmailHeaderImageId != imageId)
+        {
+            return NotFound();
+        }
+
+        var image = await _context.Image.FirstOrDefaultAsync(x => x.Id == imageId);
+        if (image == null || string.IsNullOrWhiteSpace(image.FilePath))
+        {
+            return NotFound();
+        }
+
+        var stream = await _imageStorageService.OpenReadAsync(image.FilePath);
+        if (stream == null)
+        {
+            return NotFound();
+        }
+
+        return File(stream, GetContentTypeFromPath(image.FilePath));
+    }
+
+    public async Task<IActionResult> OnGetTinLogoLabelsImageAsync(int id, int imageId)
+    {
+        var config = await _context.AppConfig.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id);
+        if (config?.TinLogoLabelsImageId != imageId)
         {
             return NotFound();
         }
@@ -97,8 +131,10 @@ public class EditModel : PageModel
         if (!ModelState.IsValid)
         {
             await LoadEmailHeaderImageOptionsAsync();
+            await LoadTinLogoLabelsImageOptionsAsync();
             LoadRevenueForecastMethodOptions();
             await LoadEmailHeaderImagePreviewAsync();
+            await LoadTinLogoLabelsImagePreviewAsync();
             return Page();
         }
 
@@ -113,8 +149,14 @@ public class EditModel : PageModel
             Record.EmailHeaderImageId = await SaveEmailHeaderImageAsync(Record.Id, EmailHeaderImageFile);
         }
 
+        if (TinLogoLabelsImageFile != null && TinLogoLabelsImageFile.Length > 0)
+        {
+            Record.TinLogoLabelsImageId = await SaveTinLogoLabelsImageAsync(Record.Id, TinLogoLabelsImageFile);
+        }
+
         existing.AdminEmail = Record.AdminEmail;
         existing.EmailHeaderImageId = Record.EmailHeaderImageId;
+        existing.TinLogoLabelsImageId = Record.TinLogoLabelsImageId;
         existing.RevenueForecastMethod = NormalizeRevenueForecastMethod(Record.RevenueForecastMethod);
         await _context.SaveChangesAsync();
 
@@ -148,6 +190,32 @@ public class EditModel : PageModel
         return image.Id;
     }
 
+    private async Task<int?> SaveTinLogoLabelsImageAsync(int configId, IFormFile file)
+    {
+        var extension = Path.GetExtension(file.FileName);
+        if (string.IsNullOrWhiteSpace(extension))
+        {
+            extension = ".bin";
+        }
+
+        var storagePath = await _imageStorageService.SaveImageAsync(file, "config-tin-logo-labels", configId);
+
+        var image = new Image
+        {
+            EntityType = "config-tin-logo-labels",
+            EntityId = configId,
+            FileName = file.FileName,
+            FilePath = storagePath,
+            FileType = extension.TrimStart('.').ToLowerInvariant(),
+            FileSize = file.Length > int.MaxValue ? int.MaxValue : (int)file.Length,
+            CreatedDate = DateTime.UtcNow
+        };
+
+        _context.Image.Add(image);
+        await _context.SaveChangesAsync();
+        return image.Id;
+    }
+
     private async Task LoadEmailHeaderImageOptionsAsync()
     {
         var options = await _context.Image
@@ -166,6 +234,26 @@ public class EditModel : PageModel
         });
 
         EmailHeaderImageOptions = options;
+    }
+
+    private async Task LoadTinLogoLabelsImageOptionsAsync()
+    {
+        var options = await _context.Image
+            .OrderBy(x => x.Id)
+            .Select(x => new SelectListItem
+            {
+                Value = x.Id.ToString(),
+                Text = $"{x.Id} - {x.FileName}"
+            })
+            .ToListAsync();
+
+        options.Insert(0, new SelectListItem
+        {
+            Value = string.Empty,
+            Text = "-- None --"
+        });
+
+        TinLogoLabelsImageOptions = options;
     }
 
     private void LoadRevenueForecastMethodOptions()
@@ -222,6 +310,46 @@ public class EditModel : PageModel
 
         EmailHeaderImageFileName = image.FileName;
         EmailHeaderImageThumbnailUrl = Url.Page("./Edit", "EmailHeaderImage", new { id = Record.Id, imageId = image.Id });
+    }
+
+    private async Task LoadTinLogoLabelsImagePreviewAsync()
+    {
+        TinLogoLabelsImageThumbnailUrl = null;
+        TinLogoLabelsImageFileName = null;
+        TinLogoLabelsImageMissing = false;
+        TinLogoLabelsImageMissingMessage = null;
+
+        if (!Record.TinLogoLabelsImageId.HasValue)
+        {
+            return;
+        }
+
+        var image = await _context.Image.FirstOrDefaultAsync(x => x.Id == Record.TinLogoLabelsImageId.Value);
+        if (image == null)
+        {
+            TinLogoLabelsImageMissing = true;
+            TinLogoLabelsImageMissingMessage = "Selected TIN Logo - Labels image record is missing from Image table.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(image.FilePath))
+        {
+            TinLogoLabelsImageMissing = true;
+            TinLogoLabelsImageFileName = image.FileName;
+            TinLogoLabelsImageMissingMessage = "Selected TIN Logo - Labels image has no file path.";
+            return;
+        }
+
+        if (!await _imageStorageService.ExistsAsync(image.FilePath))
+        {
+            TinLogoLabelsImageMissing = true;
+            TinLogoLabelsImageFileName = image.FileName;
+            TinLogoLabelsImageMissingMessage = "Selected TIN Logo - Labels image file is missing from storage.";
+            return;
+        }
+
+        TinLogoLabelsImageFileName = image.FileName;
+        TinLogoLabelsImageThumbnailUrl = Url.Page("./Edit", "TinLogoLabelsImage", new { id = Record.Id, imageId = image.Id });
     }
 
     private static string GetContentTypeFromPath(string filePath)

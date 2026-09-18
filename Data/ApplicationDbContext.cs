@@ -741,6 +741,11 @@ namespace TINWeb.Data
                     .HasColumnType("int")
                     .IsRequired(false);
 
+                entity.Property(e => e.TinLogoLabelsImageId)
+                    .HasColumnName("TinLogoLabelsImageId")
+                    .HasColumnType("int")
+                    .IsRequired(false);
+
                 entity.Property(e => e.RevenueForecastMethod)
                     .HasColumnName("RevenueForecastMethod")
                     .HasColumnType("varchar(32)")
@@ -753,6 +758,12 @@ namespace TINWeb.Data
                     .HasForeignKey(e => e.EmailHeaderImageId)
                     .OnDelete(DeleteBehavior.SetNull)
                     .HasConstraintName("FK_Config_Image_EmailHeaderImageId");
+
+                entity.HasOne<Image>()
+                    .WithMany()
+                    .HasForeignKey(e => e.TinLogoLabelsImageId)
+                    .OnDelete(DeleteBehavior.SetNull)
+                    .HasConstraintName("FK_Config_Image_TinLogoLabelsImageId");
             });
 
             modelBuilder.Entity<EmailContent>(entity =>
