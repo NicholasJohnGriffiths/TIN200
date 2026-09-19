@@ -40,7 +40,7 @@ namespace TINWeb.Services
             while (!string.IsNullOrWhiteSpace(nextUrl))
             {
                 using var response = await _http.GetAsync(nextUrl, cancellationToken);
-                response.EnsureSuccessStatusCode();
+                await EnsureSuccessWithBodyAsync(response, cancellationToken);
 
                 using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
                 using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
@@ -73,7 +73,7 @@ namespace TINWeb.Services
             while (!string.IsNullOrWhiteSpace(nextUrl))
             {
                 using var response = await _http.GetAsync(nextUrl, cancellationToken);
-                response.EnsureSuccessStatusCode();
+                await EnsureSuccessWithBodyAsync(response, cancellationToken);
 
                 using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
                 using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
@@ -108,6 +108,18 @@ namespace TINWeb.Services
             }
 
             return subscribers.OrderBy(s => s.Email, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        // Surfaces MailerLite's actual error body (not just the status code) so failures are diagnosable from the UI.
+        private static async Task EnsureSuccessWithBodyAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+        {
+            if (response.IsSuccessStatusCode)
+            {
+                return;
+            }
+
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new HttpRequestException($"{(int)response.StatusCode} {response.ReasonPhrase}: {body}");
         }
 
         private static string? GetNextPageUrl(JsonElement root)
