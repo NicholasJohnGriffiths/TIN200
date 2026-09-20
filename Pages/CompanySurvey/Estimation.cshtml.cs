@@ -1391,7 +1391,8 @@ namespace TINWeb.Pages.CompanySurvey
             return null;
         }
 
-        private async Task<(string MetricLabel, List<CalculationCandidate> Candidates)> BuildCheckPreviewAsync(string metricKey, string? regionQuestionTitle)
+        // Internal so it can be reused by Pages/CompanySurvey/EstimationsBulk.cshtml.cs without duplicating preview logic.
+        internal async Task<(string MetricLabel, List<CalculationCandidate> Candidates)> BuildCheckPreviewAsync(string metricKey, string? regionQuestionTitle)
         {
             metricKey = (metricKey ?? string.Empty).Trim();
 
@@ -1492,7 +1493,8 @@ namespace TINWeb.Pages.CompanySurvey
             }
         }
 
-        private async Task<(string MetricLabel, List<MetricHistoryRow> History, decimal? Value, string Reason)> CalculateMetricByKeyAsync(string metricKey, string? regionQuestionTitle)
+        // Internal so it can be reused by Pages/CompanySurvey/EstimationsBulk.cshtml.cs without duplicating forecast logic.
+        internal async Task<(string MetricLabel, List<MetricHistoryRow> History, decimal? Value, string Reason)> CalculateMetricByKeyAsync(string metricKey, string? regionQuestionTitle)
         {
             metricKey = (metricKey ?? string.Empty).Trim();
 
@@ -1729,9 +1731,11 @@ namespace TINWeb.Pages.CompanySurvey
             }
         }
 
-        private async Task SaveAppliedAnswerAsync(string metricKey, string? regionQuestionTitle, decimal appliedValue, int targetFinancialYear)
+        // Internal so it can be reused by Pages/CompanySurvey/EstimationsBulk.cshtml.cs without duplicating save logic.
+        // Shared by SaveAppliedAnswerAsync and the bulk estimations page's preview/apply handlers.
+        internal string? GetQuestionTitleForMetricKey(string metricKey, string? regionQuestionTitle)
         {
-            string? questionTitle = metricKey switch
+            return metricKey switch
             {
                 "Revenue" => RevenueQuestionTitle,
                 "Employment" => EmploymentQuestionTitle,
@@ -1753,6 +1757,24 @@ namespace TINWeb.Pages.CompanySurvey
                 "GroupQuestion" => regionQuestionTitle,
                 _ => null
             };
+        }
+
+        // Returns the existing (already answered or previously applied) value for a metric in the current target year, or null.
+        internal async Task<decimal?> GetCurrentYearMetricValueAsync(string metricKey, string? regionQuestionTitle = null)
+        {
+            var questionTitle = GetQuestionTitleForMetricKey(metricKey, regionQuestionTitle);
+            if (string.IsNullOrWhiteSpace(questionTitle))
+            {
+                return null;
+            }
+
+            var history = await GetCompanyMetricHistoryAsync(CompanyId, questionTitle);
+            return history.FirstOrDefault(h => h.FinancialYear == TargetFinancialYear)?.Value;
+        }
+
+        internal async Task SaveAppliedAnswerAsync(string metricKey, string? regionQuestionTitle, decimal appliedValue, int targetFinancialYear)
+        {
+            var questionTitle = GetQuestionTitleForMetricKey(metricKey, regionQuestionTitle);
 
             if (string.IsNullOrWhiteSpace(questionTitle))
             {
@@ -2398,6 +2420,51 @@ namespace TINWeb.Pages.CompanySurvey
             });
 
             return candidates;
+        }
+
+        // Lightweight loader for the bulk estimations page: sets CompanyId/TargetFinancialYear/EstimateEnabled/IsLocked
+        // without loading the full set of regional revenue/employment history used by the single-company page.
+        internal async Task<bool> LoadForBulkEstimationAsync(int companySurveyId)
+        {
+            CompanySurveyId = companySurveyId;
+
+            var bulkContext = await (
+                from companySurvey in _context.CompanySurvey
+                join survey in _context.Survey on companySurvey.SurveyId equals survey.Id
+                join company in _context.Tin200 on companySurvey.CompanyId equals company.Id
+                where companySurvey.Id == CompanySurveyId
+                select new
+                {
+                    companySurvey.CompanyId,
+                    company.CompanyName,
+                    survey.FinancialYear,
+                    EstimateEnabled = companySurvey.Estimate ?? false,
+                    IsLocked = companySurvey.Locked ?? false
+                })
+                .FirstOrDefaultAsync();
+
+            if (bulkContext == null)
+            {
+                return false;
+            }
+
+            CompanyId = bulkContext.CompanyId;
+            CompanyName = bulkContext.CompanyName ?? string.Empty;
+            TargetFinancialYear = bulkContext.FinancialYear;
+            EstimateEnabled = bulkContext.EstimateEnabled;
+            IsLocked = bulkContext.IsLocked;
+            return true;
+        }
+
+        // Returns the actual (answered) current financial year Revenue and Employment values, or null if not yet answered.
+        internal async Task<(decimal? Revenue, decimal? Employment)> GetCurrentYearActualRevenueAndEmploymentAsync()
+        {
+            var revenueHistory = await GetCompanyMetricHistoryAsync(CompanyId, RevenueQuestionTitle);
+            var employmentHistory = await GetCompanyMetricHistoryAsync(CompanyId, EmploymentQuestionTitle, EmploymentQuestionTitleLegacy);
+
+            var revenue = revenueHistory.FirstOrDefault(h => h.FinancialYear == TargetFinancialYear)?.Value;
+            var employment = employmentHistory.FirstOrDefault(h => h.FinancialYear == TargetFinancialYear)?.Value;
+            return (revenue, employment);
         }
 
         private async Task<bool> LoadPageDataAsync()
