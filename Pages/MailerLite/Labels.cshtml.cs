@@ -18,11 +18,16 @@ namespace TINWeb.Pages.MailerLite
 
         public string? SelectedGroupId { get; set; }
 
+        public string SelectedLabelFormat { get; set; } = PrintLabelsModel.DefaultFormatId;
+
+        public List<LabelFormat> LabelFormats => PrintLabelsModel.Formats;
+
         public string? ErrorMessage { get; set; }
 
-        public async Task OnGetAsync(string? groupId)
+        public async Task OnGetAsync(string? groupId, string? labelFormat)
         {
             SelectedGroupId = groupId;
+            SelectedLabelFormat = PrintLabelsModel.Formats.Any(f => f.Id == labelFormat) ? labelFormat! : PrintLabelsModel.DefaultFormatId;
 
             try
             {

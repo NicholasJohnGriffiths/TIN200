@@ -8,13 +8,61 @@ using TINWeb.Services;
 
 namespace TINWeb.Pages.MailerLite
 {
+    // Physical dimensions/layout for a supported label sheet format.
+    public class LabelFormat
+    {
+        public string Id { get; init; } = "";
+        public string Name { get; init; } = "";
+        public int Columns { get; init; }
+        public int Rows { get; init; }
+        public double LabelWidthMm { get; init; }
+        public double LabelHeightMm { get; init; }
+        public double MarginMm { get; init; }
+        public double LogoWidthTargetMm { get; init; }
+        public double LogoMaxHeightMm { get; init; }
+        public double NameFontSize { get; init; }
+        public double CompanyFontSize { get; init; }
+
+        public int PerPage => Columns * Rows;
+    }
+
     public class PrintLabelsModel : PageModel
     {
         private const double MmToPt = 72.0 / 25.4;
-        private const double LabelWidthMm = 86.5;
-        private const double LabelHeightMm = 55.5;
-        private const int Columns = 2;
-        private const int Rows = 4;
+
+        public static readonly List<LabelFormat> Formats = new()
+        {
+            new LabelFormat
+            {
+                Id = "L7168",
+                Name = "L7168 (8 per page)",
+                Columns = 2,
+                Rows = 4,
+                LabelWidthMm = 86.5,
+                LabelHeightMm = 55.5,
+                MarginMm = 5,
+                LogoWidthTargetMm = 32,
+                LogoMaxHeightMm = 20,
+                NameFontSize = 13,
+                CompanyFontSize = 10
+            },
+            new LabelFormat
+            {
+                Id = "L7163",
+                Name = "L7163 (14 per page)",
+                Columns = 2,
+                Rows = 7,
+                LabelWidthMm = 99.1,
+                LabelHeightMm = 38.1,
+                MarginMm = 4,
+                LogoWidthTargetMm = 26,
+                LogoMaxHeightMm = 12,
+                NameFontSize = 11,
+                CompanyFontSize = 8
+            }
+        };
+
+        public const string DefaultFormatId = "L7168";
 
         private readonly MailerLiteService _mailerLiteService;
         private readonly ApplicationDbContext _context;
@@ -27,19 +75,21 @@ namespace TINWeb.Pages.MailerLite
             _imageStorageService = imageStorageService;
         }
 
-        public async Task<IActionResult> OnGetAsync(string? groupId)
+        public async Task<IActionResult> OnGetAsync(string? groupId, string? labelFormat)
         {
             if (string.IsNullOrWhiteSpace(groupId))
             {
                 return BadRequest("No MailerLite group selected.");
             }
 
+            var format = Formats.FirstOrDefault(f => f.Id == labelFormat) ?? Formats.First(f => f.Id == DefaultFormatId);
+
             var groups = await _mailerLiteService.GetGroupsAsync();
             var groupName = groups.FirstOrDefault(g => g.Id == groupId)?.Name ?? groupId;
             var subscribers = await _mailerLiteService.GetGroupSubscribersAsync(groupId);
             var logoBytes = await LoadLogoBytesAsync();
 
-            var pdfBytes = GenerateLabelsPdf(groupName, subscribers, logoBytes);
+            var pdfBytes = GenerateLabelsPdf(groupName, subscribers, logoBytes, format);
             return File(pdfBytes, "application/pdf");
         }
 
@@ -68,33 +118,32 @@ namespace TINWeb.Pages.MailerLite
             return memoryStream.ToArray();
         }
 
-        private static byte[] GenerateLabelsPdf(string groupName, List<MailerLiteSubscriber> subscribers, byte[]? logoBytes)
+        private static byte[] GenerateLabelsPdf(string groupName, List<MailerLiteSubscriber> subscribers, byte[]? logoBytes, LabelFormat format)
         {
             using var document = new PdfDocument();
             document.Info.Title = $"Labels - {groupName}";
 
-            var nameFont = new XFont("Arial", 13, XFontStyle.Bold);
-            var companyFont = new XFont("Arial", 10, XFontStyle.Regular);
+            var nameFont = new XFont("Arial", format.NameFontSize, XFontStyle.Bold);
+            var companyFont = new XFont("Arial", format.CompanyFontSize, XFontStyle.Regular);
             var brush = XBrushes.Black;
 
             XImage? logoImage = logoBytes is { Length: > 0 }
                 ? XImage.FromStream(() => new MemoryStream(logoBytes))
                 : null;
 
-            const int perPage = Columns * Rows;
-            var pages = subscribers.Chunk(perPage).ToList();
+            var pages = subscribers.Chunk(format.PerPage).ToList();
             if (pages.Count == 0)
             {
                 pages.Add(Array.Empty<MailerLiteSubscriber>());
             }
 
-            double labelWidth = LabelWidthMm * MmToPt;
-            double labelHeight = LabelHeightMm * MmToPt;
+            double labelWidth = format.LabelWidthMm * MmToPt;
+            double labelHeight = format.LabelHeightMm * MmToPt;
 
             // Consistent internal margin applied identically in both label columns.
-            double margin = 5 * MmToPt;
-            double logoWidthTarget = 32 * MmToPt;
-            double logoMaxHeight = 20 * MmToPt;
+            double margin = format.MarginMm * MmToPt;
+            double logoWidthTarget = format.LogoWidthTargetMm * MmToPt;
+            double logoMaxHeight = format.LogoMaxHeightMm * MmToPt;
             double nameLineHeight = nameFont.Size * 1.2;
             double companyLineHeight = companyFont.Size * 1.2;
             double lineGap = 2 * MmToPt;
@@ -107,16 +156,16 @@ namespace TINWeb.Pages.MailerLite
                 page.Orientation = PdfSharpCore.PageOrientation.Portrait;
                 using var gfx = XGraphics.FromPdfPage(page);
 
-                double contentWidth = labelWidth * Columns;
-                double contentHeight = labelHeight * Rows;
+                double contentWidth = labelWidth * format.Columns;
+                double contentHeight = labelHeight * format.Rows;
                 double marginX = (page.Width - contentWidth) / 2;
                 double marginY = (page.Height - contentHeight) / 2;
 
                 for (var i = 0; i < pageSubscribers.Length; i++)
                 {
                     var subscriber = pageSubscribers[i];
-                    var col = i % Columns;
-                    var row = i / Columns;
+                    var col = i % format.Columns;
+                    var row = i / format.Columns;
                     double x = marginX + (col * labelWidth);
                     double y = marginY + (row * labelHeight);
 
@@ -137,7 +186,7 @@ namespace TINWeb.Pages.MailerLite
                     }
 
                     // Name/company block is centred within the lower portion of the label, below the logo.
-                    double lowerRegionTop = Math.Max(y + (LabelHeightMm * MmToPt * 0.4), logoBottom + (2 * MmToPt));
+                    double lowerRegionTop = Math.Max(y + (labelHeight * 0.4), logoBottom + (2 * MmToPt));
                     double lowerRegionBottom = y + labelHeight - margin;
                     double blockTop = lowerRegionTop + ((lowerRegionBottom - lowerRegionTop - textBlockHeight) / 2);
 
