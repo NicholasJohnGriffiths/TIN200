@@ -16,6 +16,7 @@ namespace TINWeb.Pages.CompanySurvey
         private readonly ISurveyLinkTokenService _surveyLinkTokenService;
         private readonly SurveyLinkSettings _surveyLinkSettings;
         private readonly IWebHostEnvironment _environment;
+        private readonly EditableSurveyPdfService _editableSurveyPdfService;
 
         public List<CompanySurveyService.CompanySurveyListRow> Records { get; set; } = new();
         public List<int> FinancialYears { get; set; } = new();
@@ -51,18 +52,32 @@ namespace TINWeb.Pages.CompanySurvey
             ApplicationDbContext context,
             ISurveyLinkTokenService surveyLinkTokenService,
             IOptions<SurveyLinkSettings> surveyLinkSettings,
-            IWebHostEnvironment environment)
+            IWebHostEnvironment environment,
+            EditableSurveyPdfService editableSurveyPdfService)
         {
             _service = service;
             _context = context;
             _surveyLinkTokenService = surveyLinkTokenService;
             _surveyLinkSettings = surveyLinkSettings.Value;
             _environment = environment;
+            _editableSurveyPdfService = editableSurveyPdfService;
         }
 
         public async Task OnGetAsync(int? financialYear, string? sortBy, string? sortDir, string? companySearch, string? surveyEmailSentFilter, string? tin200Filter, int? tinStatus, DateTime? selectedLinkExpiryDateUtc)
         {
             await LoadPageDataAsync(financialYear, sortBy, sortDir, companySearch, surveyEmailSentFilter, tin200Filter, tinStatus, selectedLinkExpiryDateUtc);
+        }
+
+        public async Task<IActionResult> OnGetPdfAsync(int id)
+        {
+            var pdf = await _editableSurveyPdfService.GenerateAsync(id);
+            if (pdf == null)
+            {
+                return NotFound();
+            }
+
+            Response.Headers.ContentDisposition = $"inline; filename=\"{pdf.FileName}\"";
+            return File(pdf.Content, "application/pdf");
         }
 
         public async Task<IActionResult> OnPostBulkSubmitWithAnswersAsync(int? financialYear, string? companySearch, string? surveyEmailSentFilter, string? tin200Filter, int? tinStatus = null)

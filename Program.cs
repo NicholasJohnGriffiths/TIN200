@@ -73,6 +73,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddScoped<CompanyService>();
 builder.Services.AddScoped<SurveyService>();
 builder.Services.AddScoped<CompanySurveyService>();
+builder.Services.AddScoped<EditableSurveyPdfService>();
 builder.Services.AddScoped<AnswerService>();
 builder.Services.AddScoped<QuestionService>();
 builder.Services.AddScoped<QuestionGroupService>();
