@@ -146,8 +146,8 @@ namespace TINWeb.Pages.MailerLite
             double logoMaxHeight = format.LogoMaxHeightMm * MmToPt;
             double nameLineHeight = nameFont.Size * 1.2;
             double companyLineHeight = companyFont.Size * 1.2;
-            double lineGap = 2 * MmToPt;
-            double textBlockHeight = nameLineHeight + lineGap + companyLineHeight;
+            double lineGap = MmToPt;
+            double textWidth = labelWidth - (margin * 2);
 
             foreach (var pageSubscribers in pages)
             {
@@ -169,41 +169,101 @@ namespace TINWeb.Pages.MailerLite
                     double x = marginX + (col * labelWidth);
                     double y = marginY + (row * labelHeight);
 
-                    double logoBottom = y + margin;
+                    var nameText = $"{subscriber.FirstName} {subscriber.LastName}".Trim();
+                    var companyLines = WrapText(gfx, subscriber.CompanyName ?? "", companyFont, textWidth);
+                    double textBlockHeight = nameLineHeight
+                        + (companyLines.Count > 0 ? lineGap + (companyLines.Count * companyLineHeight) : 0);
+
+                    double availableLogoHeight = labelHeight - (2 * margin) - textBlockHeight - (companyLines.Count > 0 ? lineGap : 0);
+                    double logoHeight = 0;
+                    double logoWidth = 0;
                     if (logoImage != null)
                     {
-                        double logoWidth = logoWidthTarget;
-                        double logoHeight = logoWidth * (logoImage.PixelHeight / (double)logoImage.PixelWidth);
-                        if (logoHeight > logoMaxHeight)
+                        var imageAspectRatio = logoImage.PixelHeight / (double)logoImage.PixelWidth;
+                        logoWidth = Math.Min(logoWidthTarget, Math.Min(logoMaxHeight / imageAspectRatio, Math.Max(0, availableLogoHeight) / imageAspectRatio));
+                        logoHeight = logoWidth * imageAspectRatio;
+                        if (logoHeight > 0)
                         {
-                            logoHeight = logoMaxHeight;
-                            logoWidth = logoMaxHeight * (logoImage.PixelWidth / (double)logoImage.PixelHeight);
+                            // Keep the logo inset at the top-right while making room for wrapped text.
+                            gfx.DrawImage(logoImage, x + labelWidth - margin - logoWidth, y + margin, logoWidth, logoHeight);
                         }
-
-                        // Top-right, inset by the same margin used elsewhere so it isn't flush with the edge.
-                        gfx.DrawImage(logoImage, x + labelWidth - margin - logoWidth, y + margin, logoWidth, logoHeight);
-                        logoBottom = y + margin + logoHeight;
                     }
 
-                    // Name/company block is centred within the lower portion of the label, below the logo.
-                    double lowerRegionTop = Math.Max(y + (labelHeight * 0.4), logoBottom + (2 * MmToPt));
+                    double lowerRegionTop = y + margin + logoHeight + (logoHeight > 0 && textBlockHeight > 0 ? lineGap : 0);
                     double lowerRegionBottom = y + labelHeight - margin;
                     double blockTop = lowerRegionTop + ((lowerRegionBottom - lowerRegionTop - textBlockHeight) / 2);
 
-                    var textWidth = labelWidth - (margin * 2);
-
-                    var nameText = $"{subscriber.FirstName} {subscriber.LastName}".Trim();
                     var nameRect = new XRect(x + margin, blockTop, textWidth, nameLineHeight);
                     gfx.DrawString(nameText, nameFont, brush, nameRect, XStringFormats.TopCenter);
 
-                    var companyRect = new XRect(x + margin, blockTop + nameLineHeight + lineGap, textWidth, companyLineHeight);
-                    gfx.DrawString(subscriber.CompanyName ?? "", companyFont, brush, companyRect, XStringFormats.TopCenter);
+                    for (var lineIndex = 0; lineIndex < companyLines.Count; lineIndex++)
+                    {
+                        var companyRect = new XRect(
+                            x + margin,
+                            blockTop + nameLineHeight + lineGap + (lineIndex * companyLineHeight),
+                            textWidth,
+                            companyLineHeight);
+                        gfx.DrawString(companyLines[lineIndex], companyFont, brush, companyRect, XStringFormats.TopCenter);
+                    }
                 }
             }
 
             using var outputStream = new MemoryStream();
             document.Save(outputStream, false);
             return outputStream.ToArray();
+        }
+
+        private static List<string> WrapText(XGraphics graphics, string text, XFont font, double width)
+        {
+            var words = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+            var lines = new List<string>();
+            var currentLine = string.Empty;
+
+            foreach (var word in words)
+            {
+                var candidate = currentLine.Length == 0 ? word : $"{currentLine} {word}";
+                if (graphics.MeasureString(candidate, font).Width <= width)
+                {
+                    currentLine = candidate;
+                    continue;
+                }
+
+                if (currentLine.Length > 0)
+                {
+                    lines.Add(currentLine);
+                    currentLine = string.Empty;
+                }
+
+                if (graphics.MeasureString(word, font).Width <= width)
+                {
+                    currentLine = word;
+                    continue;
+                }
+
+                var wordPart = string.Empty;
+                foreach (var character in word)
+                {
+                    var nextPart = wordPart + character;
+                    if (wordPart.Length > 0 && graphics.MeasureString(nextPart, font).Width > width)
+                    {
+                        lines.Add(wordPart);
+                        wordPart = character.ToString();
+                    }
+                    else
+                    {
+                        wordPart = nextPart;
+                    }
+                }
+
+                currentLine = wordPart;
+            }
+
+            if (currentLine.Length > 0)
+            {
+                lines.Add(currentLine);
+            }
+
+            return lines;
         }
     }
 }
