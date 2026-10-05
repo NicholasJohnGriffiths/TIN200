@@ -43,8 +43,8 @@ namespace TINWeb.Pages.MailerLite
                 MarginMm = 5,
                 LogoWidthTargetMm = 32,
                 LogoMaxHeightMm = 20,
-                NameFontSize = 13,
-                CompanyFontSize = 10
+                NameFontSize = 18,
+                CompanyFontSize = 16
             },
             new LabelFormat
             {
@@ -57,8 +57,8 @@ namespace TINWeb.Pages.MailerLite
                 MarginMm = 4,
                 LogoWidthTargetMm = 26,
                 LogoMaxHeightMm = 12,
-                NameFontSize = 11,
-                CompanyFontSize = 8
+                NameFontSize = 18,
+                CompanyFontSize = 16
             }
         };
 
@@ -194,10 +194,10 @@ namespace TINWeb.Pages.MailerLite
 
                     var nameText = $"{subscriber.FirstName} {subscriber.LastName}".Trim();
                     var nameRect = new XRect(x + margin, blockTop, textWidth, nameLineHeight);
-                    gfx.DrawString(nameText, nameFont, brush, nameRect, XStringFormats.TopLeft);
+                    gfx.DrawString(nameText, nameFont, brush, nameRect, XStringFormats.TopCenter);
 
                     var companyRect = new XRect(x + margin, blockTop + nameLineHeight + lineGap, textWidth, companyLineHeight);
-                    gfx.DrawString(subscriber.CompanyName ?? "", companyFont, brush, companyRect, XStringFormats.TopLeft);
+                    gfx.DrawString(subscriber.CompanyName ?? "", companyFont, brush, companyRect, XStringFormats.TopCenter);
                 }
             }
 
@@ -207,4 +207,3 @@ namespace TINWeb.Pages.MailerLite
         }
     }
 }
-
