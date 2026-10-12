@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
+using ClosedXML.Excel;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,11 @@ namespace TINWeb.Pages.Answers
 {
     public class ExportGlobalModel : PageModel
     {
+        public const string FallbackColour = "#fff3cd";
+        public const string DifferenceColour = "#cff4fc";
+        public const string FallbackLegend = "Older survey data was used because the selected-year survey was not submitted, or its prior-year answer or question mapping was blank/missing.";
+        public const string DifferenceLegend = "The completed selected-year survey's prior-year value differs from the value recorded in that year's own survey.";
+
         private const string DefaultHeaderList = @"ID,Name,Description,Formation,Ownership,Primary Sector,Secondary Sector,Deeptech,Maori,Official Region,Region,CY TIN200 Rank Formatted,CY TIN200 Rank,CY-1 TIN200 Rank,Ranking Difference,CY Requested Estimate?,CEO Gender,CY Revenue,CY-1 Revenue,CY-2 Revenue,CY-3 Revenue,CY-4 Revenue,CY-5 Revenue,CY Rev Estimated?,CY-1 Rev Estimated?,CY-2 Rev Estimated?,CY EmpTTL,CY-1 EmpTTL,CY-2 EmpTTL,CY-3 EmpTTL,CY-4 EmpTTL,CY-5 EmpTTL,CY W&S,CY-1 W&S,CY-2 W&S,CY-3 W&S,CY-4 W&S,CY-5 W&S,CY R&D,CY-1 R&D,CY-2 R&D,CY-3 R&D,CY-4 R&D,CY-5 R&D,CY S&M,CY-1 S&M,CY-2 S&M,CY-3 S&M,CY-4 S&M,CY-5 S&M,CY EBITDA,CY-1 EBITDA,CY-2 EBITDA,CY-3 EBITDA,CY-4 EBITDA,CY-5 EBITDA,CY New Zealand,CY-1 New Zealand,CY-2 New Zealand,CY-3 New Zealand,CY-4 New Zealand,CY-5 New Zealand,CY Australia,CY-1 Australia,CY-2 Australia,CY-3 Australia,CY-4 Australia,CY-5 Australia,CY China,CY-1 China,CY-2 China,CY-3 China,CY-4 China,CY-5 China,CY Rest of Asia,CY-1 Rest of Asia,CY-2 Rest of Asia,CY-3 Rest of Asia,CY-4 Rest of Asia,CY-5 Rest of Asia,CY North America,CY-1 North America,CY-2 North America,CY-3 North America,CY-4 North America,CY-5 North America,CY Europe,CY-1 Europe,CY-2 Europe,CY-3 Europe,CY-4 Europe,CY-5 Europe,CY Middle East,CY-1 Middle East,CY-2 Middle East,CY-3 Middle East,CY-4 Middle East,CY-5 Middle East,CY Latin America,CY-1 Latin America,CY-2 Latin America,CY-3 Latin America,CY-4 Latin America,CY-5 Latin America,CY Africa,CY-1 Africa,CY-2 Africa,CY-3 Africa,CY-4 Africa,CY-5 Africa,CY Other,CY-1 Other,CY-2 Other,CY-3 Other,CY-4 Other,CY-5 Other,CY Total Exports,CY-1 Total Exports,CY Total Exports Growth,CY EmpNZ,CY-1 EmpNZ,CY-2 EmpNZ,CY-3 EmpNZ,CY-4 EmpNZ,CY-5 EmpNZ,CY EmpAus,CY-1 EmpAus,CY-2 EmpAus,CY-3 EmpAus,CY-4 EmpAus,CY-5 EmpAus,CY EmpChina,CY-1 EmpChina,CY-2 EmpChina,CY-3 EmpChina,CY-4 EmpChina,CY-5 EmpChina,CY EmpRestAsia,CY-1 EmpRestAsia,CY-2 EmpRestAsia,CY-3 EmpRestAsia,CY-4 EmpRestAsia,CY-5 EmpRestAsia,CY EmpNthAM,CY-1 EmpNthAM,CY-2 EmpNthAM,CY-3 EmpNthAM,CY-4 EmpNthAM,CY-5 EmpNthAM,CY EmpLA,CY-1 EmpLA,CY-2 EmpLA,CY-3 EmpLA,CY-4 EmpLA,CY-5 EmpLA,CY EmpEurope,CY-1 EmpEurope,CY-2 EmpEurope,CY-3 EmpEurope,CY-4 EmpEurope,CY-5 EmpEurope,CY EmpME,CY-1 EmpME,CY-2 EmpME,CY-3 EmpME,CY-4 EmpME,CY-5 EmpME,CY EmpOther,CY-1 EmpOther,CY-2 EmpOther,CY-3 EmpOther,CY-4 EmpOther,CY-5 EmpOther,CY EmpNorthland,CY-1 EmpNorthland,CY-2 EmpNorthland,CY-3 EmpNorthland,CY-4 EmpNorthland,CY-5 EmpNorthland,CY EmpAuckland,CY-1 EmpAuckland,CY-2 EmpAuckland,CY-3 EmpAuckland,CY-4 EmpAuckland,CY-5 EmpAuckland,CY EmpWaikato,CY-1 EmpWaikato,CY-2 EmpWaikato,CY-3 EmpWaikato,CY-4 EmpWaikato,CY-5 EmpWaikato,CY EmpBOP,CY-1 EmpBOP,CY-2 EmpBOP,CY-3 EmpBOP,CY-4 EmpBOP,CY-5 EmpBOP,CY EmpGisborne,CY-1 EmpGisborne,CY-2 EmpGisborne,CY-3 EmpGisborne,CY-4 EmpGisborne,CY-5 EmpGisborne,CY EmpHB,CY-1 EmpHB,CY-2 EmpHB,CY-3 EmpHB,CY-4 EmpHB,CY-5 EmpHB,CY EmpTaranaki,CY-1 EmpTaranaki,CY-2 EmpTaranaki,CY-3 EmpTaranaki,CY-4 EmpTaranaki,CY-5 EmpTaranaki,CY EmpWanganui,CY-1 EmpWanganui,CY-2 EmpWanganui,CY-3 EmpWanganui,CY-4 EmpWanganui,CY-5 EmpWanganui,CY EmpWgtn,CY-1 EmpWgtn,CY-2 EmpWgtn,CY-3 EmpWgtn,CY-4 EmpWgtn,CY-5 EmpWgtn,CY EmpManawatu,CY-1 EmpManawatu,CY-2 EmpManawatu,CY-3 EmpManawatu,CY-4 EmpManawatu,CY-5 EmpManawatu,CY EmpNelson,CY-1 EmpNelson,CY-2 EmpNelson,CY-3 EmpNelson,CY-4 EmpNelson,CY-5 EmpNelson,CY EmpMarlborough,CY-1 EmpMarlborough,CY-2 EmpMarlborough,CY-3 EmpMarlborough,CY-4 EmpMarlborough,CY-5 EmpMarlborough,CY EmpCanterbury,CY-1 EmpCanterbury,CY-2 EmpCanterbury,CY-3 EmpCanterbury,CY-4 EmpCanterbury,CY-5 EmpCanterbury,CY EmpWestCoast,CY-1 EmpWestCoast,CY-2 EmpWestCoast,CY-3 EmpWestCoast,CY-4 EmpWestCoast,CY-5 EmpWestCoast,CY EmpOtago,CY-1 EmpOtago,CY-2 EmpOtago,CY-3 EmpOtago,CY-4 EmpOtago,CY-5 EmpOtago,CY EmpSouthland,CY-1 EmpSouthland,CY-2 EmpSouthland,CY-3 EmpSouthland,CY-4 EmpSouthland,CY-5 EmpSouthland";
 
         private readonly AnswerService _answerService;
@@ -35,6 +41,9 @@ namespace TINWeb.Pages.Answers
 
         [BindProperty]
         public string HeaderList { get; set; } = string.Empty;
+
+        [BindProperty]
+        public bool UseLatestSurveyForPriorYears { get; set; } = true;
 
         public ExportPreviewSummary? PreviewSummary { get; set; }
 
@@ -74,7 +83,11 @@ namespace TINWeb.Pages.Answers
             return Page();
         }
 
-        public async Task<IActionResult> OnPostExportAsync()
+        public Task<IActionResult> OnPostExportAsync() => ExportAsync(asExcel: false);
+
+        public Task<IActionResult> OnPostExportExcelAsync() => ExportAsync(asExcel: true);
+
+        private async Task<IActionResult> ExportAsync(bool asExcel)
         {
             await LoadPageDefaultsAsync(SelectedFinancialYear);
             SelectedTinStatus = NormalizeTinStatusFilter(SelectedTinStatus);
@@ -96,6 +109,52 @@ namespace TINWeb.Pages.Answers
             }
 
             var export = await BuildPreviewSummaryAsync(SelectedFinancialYear!.Value, SelectedTinStatus, headers, 0);
+            var fileName = $"answers-global-export-fy-{SelectedFinancialYear.Value}-{DateTime.UtcNow:yyyyMMdd-HHmmss}";
+            if (asExcel)
+            {
+                using var workbook = new XLWorkbook();
+                var worksheet = workbook.AddWorksheet("Global Data");
+                for (var column = 0; column < headers.Count; column++)
+                {
+                    worksheet.Cell(1, column + 1).Value = headers[column];
+                }
+
+                for (var rowIndex = 0; rowIndex < export.AllRows.Count; rowIndex++)
+                {
+                    var row = export.AllRows[rowIndex];
+                    for (var column = 0; column < row.Values.Count; column++)
+                    {
+                        var cell = worksheet.Cell(rowIndex + 2, column + 1);
+                        cell.Value = row.Values[column];
+                        if (row.FallbackReasons[column] is string reason)
+                        {
+                            cell.Style.Fill.BackgroundColor = XLColor.FromHtml(FallbackColour);
+                            cell.GetComment().AddText(reason);
+                        }
+                        else if (row.DifferenceReasons[column] is string differenceReason)
+                        {
+                            cell.Style.Fill.BackgroundColor = XLColor.FromHtml(DifferenceColour);
+                            cell.GetComment().AddText(differenceReason);
+                        }
+                    }
+                }
+
+                worksheet.Row(1).Style.Font.Bold = true;
+                worksheet.SheetView.FreezeRows(1);
+                WriteColourKey(worksheet, export.AllRows.Count + 4, Math.Max(2, headers.Count));
+                var notes = workbook.AddWorksheet("Export Notes");
+                WriteColourKey(notes, 1, 2);
+                notes.Cell(6, 1).Value = "Selected survey year";
+                notes.Cell(6, 2).Value = SelectedFinancialYear.Value;
+                notes.Cell(7, 1).Value = "Use latest survey for prior years";
+                notes.Cell(7, 2).Value = UseLatestSurveyForPriorYears ? "Yes" : "No";
+                notes.Column(1).Width = 34;
+                notes.Column(2).Width = 100;
+                using var stream = new MemoryStream();
+                workbook.SaveAs(stream);
+                return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", $"{fileName}.xlsx");
+            }
+
             var csv = new StringBuilder();
             csv.AppendLine(string.Join(',', headers.Select(EscapeCsv)));
 
@@ -104,8 +163,37 @@ namespace TINWeb.Pages.Answers
                 csv.AppendLine(string.Join(',', row.Values.Select(EscapeCsv)));
             }
 
-            var fileName = $"answers-global-export-fy-{SelectedFinancialYear.Value}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.csv";
-            return File(Encoding.UTF8.GetBytes(csv.ToString()), "text/csv; charset=utf-8", fileName);
+            return File(Encoding.UTF8.GetBytes(csv.ToString()), "text/csv; charset=utf-8", $"{fileName}.csv");
+        }
+
+        private static void WriteColourKey(IXLWorksheet worksheet, int startRow, int lastColumn)
+        {
+            worksheet.Cell(startRow, 1).Value = "Colour key (not data rows)";
+            worksheet.Cell(startRow, 1).Style.Font.Bold = true;
+            var entries = new[]
+            {
+                ("Pale yellow", FallbackLegend, FallbackColour),
+                ("Pale blue", DifferenceLegend, DifferenceColour),
+                ("No highlight", "No fallback or differing older-survey value identified. Blank/missing older values are not compared. Colours are disabled when the latest-survey option is unchecked.", (string?)null)
+            };
+            for (var index = 0; index < entries.Length; index++)
+            {
+                var (label, description, colour) = entries[index];
+                var row = startRow + index + 1;
+                worksheet.Cell(row, 1).Value = label;
+                if (colour != null)
+                {
+                    worksheet.Cell(row, 1).Style.Fill.BackgroundColor = XLColor.FromHtml(colour);
+                }
+                var descriptionRange = worksheet.Range(row, 2, row, lastColumn);
+                if (lastColumn > 2)
+                {
+                    descriptionRange.Merge();
+                }
+                descriptionRange.FirstCell().Value = description;
+                descriptionRange.Style.Alignment.WrapText = true;
+                worksheet.Row(row).Height = 45;
+            }
         }
 
         private async Task LoadPageDefaultsAsync(int? financialYear)
@@ -188,6 +276,28 @@ namespace TINWeb.Pages.Answers
                 .GroupBy(x => x.ImportAlt, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.Select(x => x.Id).Distinct().ToList(), StringComparer.OrdinalIgnoreCase);
 
+            foreach (var header in headerMappings)
+            {
+                if (!UseLatestSurveyForPriorYears || header.YearOffset is not (1 or 2)
+                    || !(header.BaseHeader.Equals("CY Revenue", StringComparison.OrdinalIgnoreCase)
+                        || header.BaseHeader.StartsWith("CY Emp", StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+
+                header.PreferLatestSurvey = true;
+                header.LatestSurveyQuestionIds = questionMap
+                    .Where(q =>
+                    {
+                        var mapping = ResolveHeaderMapping(q.ImportAlt);
+                        return mapping.YearOffset == header.YearOffset
+                            && mapping.BaseHeader.Equals(header.BaseHeader, StringComparison.OrdinalIgnoreCase);
+                    })
+                    .Select(q => q.Id)
+                    .Distinct()
+                    .ToList();
+            }
+
             var questionMetadataById = await _context.Question
                 .AsNoTracking()
                 .Where(q => questionMap.Select(x => x.Id).Contains(q.Id))
@@ -212,12 +322,12 @@ namespace TINWeb.Pages.Answers
                     });
 
             var matchedHeaders = headerMappings
-                .Where(h => builtInHeaders.Contains(h.Header) || questionIdsByImportAlt.ContainsKey(h.BaseHeader))
+                .Where(h => builtInHeaders.Contains(h.Header) || questionIdsByImportAlt.ContainsKey(h.BaseHeader) || h.LatestSurveyQuestionIds.Any())
                 .Select(h => h.Header)
                 .ToList();
 
             var unmatchedHeaders = headerMappings
-                .Where(h => !builtInHeaders.Contains(h.Header) && !questionIdsByImportAlt.ContainsKey(h.BaseHeader))
+                .Where(h => !builtInHeaders.Contains(h.Header) && !questionIdsByImportAlt.ContainsKey(h.BaseHeader) && !h.LatestSurveyQuestionIds.Any())
                 .Select(h => h.Header)
                 .ToList();
 
@@ -231,6 +341,7 @@ namespace TINWeb.Pages.Answers
                     CompanySurveyId = companySurvey.Id,
                     CompanyId = company.Id,
                     SurveyYear = survey.FinancialYear,
+                    companySurvey.Submitted,
                     company.CompanyName,
                     company.ExternalId,
                     company.Email
@@ -260,23 +371,14 @@ namespace TINWeb.Pages.Answers
                 .ToList();
 
             var matchedQuestionIds = headerMappings
-                .Where(h => questionIdsByImportAlt.ContainsKey(h.BaseHeader))
-                .SelectMany(h => questionIdsByImportAlt[h.BaseHeader])
+                .SelectMany(h => (questionIdsByImportAlt.TryGetValue(h.BaseHeader, out var ids) ? ids : new List<int>())
+                    .Concat(h.LatestSurveyQuestionIds))
                 .Distinct()
                 .ToList();
 
             var answers = await _context.Answer
                 .AsNoTracking()
                 .Where(a => companySurveyIds.Contains(a.CompanySurveyId) && matchedQuestionIds.Contains(a.QuestionId))
-                .Select(a => new
-                {
-                    a.Id,
-                    a.CompanySurveyId,
-                    a.QuestionId,
-                    a.AnswerText,
-                    a.AnswerCurrency,
-                    a.AnswerNumber
-                })
                 .ToListAsync();
 
             var latestAnswerBySurveyAndQuestion = answers
@@ -285,14 +387,39 @@ namespace TINWeb.Pages.Answers
                     g => (g.Key.CompanySurveyId, g.Key.QuestionId),
                     g => g.OrderByDescending(x => x.Id).First());
 
+            Answer? FindAnswer(int companySurveyId, IEnumerable<int> questionIds, bool requireValue = false)
+            {
+                return questionIds
+                    .Select(questionId => latestAnswerBySurveyAndQuestion.TryGetValue((companySurveyId, questionId), out var answer) ? answer : null)
+                    .Where(answer => answer != null && (!requireValue
+                        || !string.IsNullOrWhiteSpace(answer.AnswerText)
+                        || answer.AnswerCurrency.HasValue
+                        || answer.AnswerNumber.HasValue))
+                    .OrderByDescending(answer => answer!.Id)
+                    .FirstOrDefault();
+            }
+
+            string FormatExportAnswer(Answer? answer, string header)
+            {
+                var metadata = answer != null && questionMetadataById.TryGetValue(answer.QuestionId, out var resolvedMetadata)
+                    ? resolvedMetadata
+                    : null;
+                return FormatAnswer(answer?.AnswerText, answer?.AnswerCurrency, answer?.AnswerNumber,
+                    metadata?.AnswerType, metadata?.ChoiceOptions, header);
+            }
+
             var allRows = new List<ExportPreviewRow>(companyRows.Count);
 
             foreach (var company in companyRows)
             {
                 var values = new List<string>(headers.Count);
+                var fallbackReasons = new List<string?>(headers.Count);
+                var differenceReasons = new List<string?>(headers.Count);
 
                 foreach (var header in headerMappings)
                 {
+                    fallbackReasons.Add(null);
+                    differenceReasons.Add(null);
                     if (string.Equals(header.Header, "ID", StringComparison.OrdinalIgnoreCase))
                     {
                         values.Add(company.ExternalId ?? string.Empty);
@@ -305,36 +432,40 @@ namespace TINWeb.Pages.Answers
                         continue;
                     }
 
-                    if (!questionIdsByImportAlt.TryGetValue(header.BaseHeader, out var questionIds))
+                    Answer? bestAnswer = null;
+                    if (company.Submitted && header.LatestSurveyQuestionIds.Any())
                     {
-                        values.Add(string.Empty);
-                        continue;
+                        bestAnswer = FindAnswer(company.CompanySurveyId, header.LatestSurveyQuestionIds, requireValue: true);
                     }
 
-                    var targetYear = financialYear - header.YearOffset;
-                    if (!companySurveyIdByCompanyAndYear.TryGetValue((company.CompanyId, targetYear), out var targetCompanySurveyId))
+                    var usedLatestSurvey = bestAnswer != null;
+                    Answer? olderAnswer = null;
+                    if (questionIdsByImportAlt.TryGetValue(header.BaseHeader, out var questionIds)
+                        && companySurveyIdByCompanyAndYear.TryGetValue((company.CompanyId, financialYear - header.YearOffset), out var targetCompanySurveyId))
                     {
-                        values.Add(string.Empty);
-                        continue;
+                        olderAnswer = FindAnswer(targetCompanySurveyId, questionIds);
                     }
+                    bestAnswer ??= olderAnswer;
 
-                    var bestAnswer = questionIds
-                        .Select(questionId => latestAnswerBySurveyAndQuestion.TryGetValue((targetCompanySurveyId, questionId), out var answer) ? answer : null)
-                        .Where(answer => answer != null)
-                        .OrderByDescending(answer => answer!.Id)
-                        .FirstOrDefault();
-
-                    var metadata = bestAnswer != null && questionMetadataById.TryGetValue(bestAnswer.QuestionId, out var resolvedMetadata)
-                        ? resolvedMetadata
-                        : null;
-
-                    values.Add(FormatAnswer(
-                        bestAnswer?.AnswerText,
-                        bestAnswer?.AnswerCurrency,
-                        bestAnswer?.AnswerNumber,
-                        metadata?.AnswerType,
-                        metadata?.ChoiceOptions,
-                        header.Header));
+                    var value = FormatExportAnswer(bestAnswer, header.Header);
+                    values.Add(value);
+                    if (header.PreferLatestSurvey && !usedLatestSurvey && !string.IsNullOrWhiteSpace(value))
+                    {
+                        var reason = !company.Submitted
+                            ? $"The {financialYear} survey has not been submitted."
+                            : !header.LatestSurveyQuestionIds.Any()
+                                ? $"The {financialYear} survey has no question mapping for '{header.Header}'."
+                                : $"The {financialYear} survey's answer for '{header.Header}' is blank or missing.";
+                        fallbackReasons[^1] = $"Used the {financialYear - header.YearOffset} survey. {reason}";
+                    }
+                    else if (usedLatestSurvey)
+                    {
+                        var olderValue = FormatExportAnswer(olderAnswer, header.Header);
+                        if (!string.IsNullOrWhiteSpace(olderValue) && !ExportValuesMatch(value, olderValue))
+                        {
+                            differenceReasons[^1] = $"Used the completed {financialYear} survey's value for {financialYear - header.YearOffset}: {value}. The {financialYear - header.YearOffset} survey recorded: {olderValue}.";
+                        }
+                    }
                 }
 
                 allRows.Add(new ExportPreviewRow
@@ -342,7 +473,9 @@ namespace TINWeb.Pages.Answers
                     CompanySurveyId = company.CompanySurveyId,
                     CompanyName = company.CompanyName,
                     ExternalId = company.ExternalId,
-                    Values = values
+                    Values = values,
+                    FallbackReasons = fallbackReasons,
+                    DifferenceReasons = differenceReasons
                 });
             }
 
@@ -357,6 +490,17 @@ namespace TINWeb.Pages.Answers
                 PreviewRows = previewRowLimit > 0 ? allRows.Take(previewRowLimit).ToList() : new List<ExportPreviewRow>(),
                 AllRows = allRows
             };
+        }
+
+        private static bool ExportValuesMatch(string value, string olderValue)
+        {
+            if (decimal.TryParse(value, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var number)
+                && decimal.TryParse(olderValue, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var olderNumber))
+            {
+                return number == olderNumber;
+            }
+
+            return string.Equals(value.Trim(), olderValue.Trim(), StringComparison.OrdinalIgnoreCase);
         }
 
         private static (string BaseHeader, int YearOffset) ResolveHeaderMapping(string header)
@@ -481,6 +625,8 @@ namespace TINWeb.Pages.Answers
             public string Header { get; set; } = string.Empty;
             public string BaseHeader { get; set; } = string.Empty;
             public int YearOffset { get; set; }
+            public bool PreferLatestSurvey { get; set; }
+            public List<int> LatestSurveyQuestionIds { get; set; } = new();
         }
 
         private static string EscapeCsv(string? value)
@@ -512,6 +658,8 @@ namespace TINWeb.Pages.Answers
             public string? CompanyName { get; set; }
             public string? ExternalId { get; set; }
             public List<string> Values { get; set; } = new();
+            public List<string?> FallbackReasons { get; set; } = new();
+            public List<string?> DifferenceReasons { get; set; } = new();
         }
     }
 }

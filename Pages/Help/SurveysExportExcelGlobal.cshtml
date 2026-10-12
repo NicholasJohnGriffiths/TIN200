@@ -9,15 +9,16 @@
     <p class="text-muted">Explains the Export Excel - Global page under Surveys.</p>
 
     <div class="alert alert-info">
-        This feature builds a global-format answers export. You paste a list of column headers, the system resolves each header to a built-in field or a question via <strong>ImportColumnNameAlt</strong>, and exports the result as CSV.
+        This feature builds a global-format answers export. You paste a list of column headers, the system resolves each header to a built-in field or a question via <strong>ImportColumnNameAlt</strong>, and exports the result as Excel (.xlsx) or CSV.
     </div>
 
     <h2 class="h5 mt-4">How it works</h2>
     <ol>
         <li>Choose a <strong>Financial Year</strong>.</li>
+        <li>Choose whether to use the selected year's completed survey for the two prior-year revenue and employee figures (checked by default).</li>
         <li>Paste the column headers you want in the output (comma or newline separated).</li>
         <li>Click <strong>Preview</strong> to see matched/unmatched headers and sample rows.</li>
-        <li>Click <strong>Export</strong> to download the CSV.</li>
+        <li>Click <strong>Export Excel</strong> for a workbook with fallback colours and comments, or <strong>Export CSV</strong> for a plain CSV.</li>
     </ol>
 
     <h2 class="h5 mt-4">Built-in headers</h2>
@@ -56,9 +57,21 @@
     <ol>
         <li>Strip any trailing <code>-N</code> year offset (e.g. <code>CY-1 Revenue</code> → base <code>CY Revenue</code>, offset 1).</li>
         <li>Match the base against <code>ImportColumnNameAlt</code> values — case-insensitive, exact string (after trimming).</li>
-        <li>Retrieve the answer for that question from the financial year <strong>minus the offset</strong> (e.g. offset 1 → prior year).</li>
+        <li>Normally retrieve the answer for that question from the financial year <strong>minus the offset</strong> (e.g. offset 1 → prior year). The completed-survey option below can override this for prior-year revenue and employee figures.</li>
     </ol>
     <p class="text-muted small">The year-offset pattern is <code>-N</code> where N is 1–5, appearing as a word-bounded suffix in the header (e.g. <code>CY-1 Revenue</code>, <code>CY-2 Revenue</code>). Headers without an offset use the selected financial year directly.</p>
+
+    <h2 class="h5 mt-4">Use latest survey for prior-year figures</h2>
+    <p>This checkbox is <strong>checked by default</strong>, and its label shows the selected financial year and the two prior years (for example, use the 2026 survey for 2025 and 2024).</p>
+    <ul>
+        <li>For each company whose selected-year survey is <strong>submitted</strong>, <code>CY-1 Revenue</code>, <code>CY-2 Revenue</code>, and <code>CY-1 Emp...</code>/<code>CY-2 Emp...</code> use answers from that survey's corresponding prior-year questions, matched by <code>ImportColumnNameAlt</code>. This includes total, geographic, and regional employee figures.</li>
+        <li>Blank or missing answers, missing question mappings, and surveys that have not been submitted fall back to the corresponding older survey's answer.</li>
+        <li>Unchecking the option restores the older-survey source for these figures. Current-year columns, offsets 3–5, and other fields are unchanged.</li>
+        <li>The same option applies to Preview, Export Excel, and Export CSV. It does not modify any survey answers.</li>
+        <li><strong>Pale yellow cells</strong> identify non-blank fallback values in Preview and Excel. Hover over a highlighted preview cell or read its Excel cell comment for the reason. The page heading includes a colour legend, and the workbook has an <strong>Export Notes</strong> worksheet. CSV cannot retain colours or comments. When the option is unchecked, older surveys are the requested source and values are not highlighted.</li>
+        <li><strong>Pale blue cells</strong> identify figures taken from the completed selected-year survey that differ from the corresponding older survey's value. The tooltip or Excel comment includes both values. Numerically equal values (such as 100 and 100.00) are not marked as different; blank/missing older values are not compared.</li>
+        <li>A <strong>colour key below the data rows</strong> explains yellow, blue, and unhighlighted cells in both Preview and the Excel data worksheet. The Excel key is separated from the company rows by blank rows and labelled as not data. CSV contains only the data, without the key.</li>
+    </ul>
 
     <h2 class="h5 mt-4">Year offset examples</h2>
     <table class="table table-sm table-bordered w-auto">
@@ -80,7 +93,7 @@
     </ul>
 
     <h2 class="h5 mt-4">Export result</h2>
-    <p>A CSV file is downloaded with exactly the columns you pasted, in the same order, filled with built-in values and mapped answers for the selected year range.</p>
+    <p>The Excel data worksheet and CSV have exactly the columns you pasted, in the same order, filled with built-in values and mapped answers for the selected year range. Excel keeps headers in row 1 of the first worksheet and includes a separate Export Notes worksheet.</p>
 
     <h2 class="h5 mt-4">Configuring questions for this export</h2>
     <p>Go to <strong>Questions → Edit</strong> for each question and set <strong>Import Column Name Alt</strong> to the base header name used in the global file (e.g. <code>CY Revenue</code>). Leave it blank to exclude the question entirely.</p>

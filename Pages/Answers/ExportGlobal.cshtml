@@ -8,8 +8,14 @@
     <div class="row mb-3">
         <div class="col-md-9">
             <h1>Export Excel - Global</h1>
-            <p class="text-muted mb-0">Paste column headers, preview matched/unmatched fields by <code>Question.ImportColumnNameAlt</code>, then export CSV.</p>
+            <p class="text-muted mb-0">Paste column headers, preview matched/unmatched fields by <code>Question.ImportColumnNameAlt</code>, then export Excel or CSV.</p>
         </div>
+    </div>
+
+    <div class="alert alert-warning py-2">
+        <strong>Pale yellow cells = fallback data.</strong> @ExportGlobalModel.FallbackLegend
+        <strong>Pale blue cells = changed figures.</strong> @ExportGlobalModel.DifferenceLegend
+        Colours appear in the preview and Excel download; hover over a highlighted preview cell or read its Excel comment for the reason. CSV does not retain colours or comments. When the latest-survey option is unchecked, older data is the requested source and is not highlighted.
     </div>
 
     <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
@@ -36,8 +42,17 @@
             </div>
             <div class="col-md-6 text-md-end">
                 <button type="submit" asp-page-handler="Preview" id="previewButton" class="btn btn-outline-primary me-2">Preview</button>
+                <button type="submit" asp-page-handler="ExportExcel" id="exportExcelButton" class="btn btn-success me-2">Export Excel</button>
                 <button type="submit" asp-page-handler="Export" id="exportButton" class="btn btn-success">Export CSV</button>
             </div>
+        </div>
+
+        <div class="form-check mb-3">
+            <input asp-for="UseLatestSurveyForPriorYears" class="form-check-input" />
+            <label asp-for="UseLatestSurveyForPriorYears" class="form-check-label" id="latestSurveyLabel">
+                Use latest survey for @(Model.SelectedFinancialYear - 1), @(Model.SelectedFinancialYear - 2) where @(Model.SelectedFinancialYear) survey completed
+            </label>
+            <div class="form-text">Uses the selected year's submitted survey for prior-year revenue and employee figures. Blank or missing answers fall back to the corresponding older survey. Uncheck to use only older surveys.</div>
         </div>
 
         <div class="mb-3">
@@ -138,12 +153,20 @@
                                     <td>@row.ExternalId</td>
                                     @for (var i = 0; i < row.Values.Count; i++)
                                     {
-                                        <td>@row.Values[i]</td>
+                                        <td class="@(row.FallbackReasons[i] != null ? "table-warning" : row.DifferenceReasons[i] != null ? "table-info" : null)" title="@(row.FallbackReasons[i] ?? row.DifferenceReasons[i])">@row.Values[i]</td>
                                     }
                                 </tr>
                             }
                         </tbody>
                     </table>
+                </div>
+                <div class="card-footer">
+                    <strong>Colour key</strong>
+                    <ul class="list-unstyled mb-0 mt-2">
+                        <li class="mb-1"><span class="badge bg-warning-subtle text-dark border">Pale yellow</span> @ExportGlobalModel.FallbackLegend</li>
+                        <li class="mb-1"><span class="badge bg-info-subtle text-dark border">Pale blue</span> @ExportGlobalModel.DifferenceLegend</li>
+                        <li><strong>No highlight:</strong> No fallback or differing older-survey value identified. Blank/missing older values are not compared. Colours are disabled when the latest-survey option is unchecked.</li>
+                    </ul>
                 </div>
             </div>
         }
@@ -153,6 +176,15 @@
 @section Scripts {
     <script>
         (function () {
+            const yearSelect = document.getElementById('SelectedFinancialYear');
+            const latestSurveyLabel = document.getElementById('latestSurveyLabel');
+            function updateLatestSurveyLabel() {
+                const year = Number(yearSelect.value);
+                latestSurveyLabel.textContent = `Use latest survey for ${year - 1}, ${year - 2} where ${year} survey completed`;
+            }
+            yearSelect.addEventListener('change', updateLatestSurveyLabel);
+            updateLatestSurveyLabel();
+
             const form = document.getElementById('globalExportForm');
             const previewButton = document.getElementById('previewButton');
             const exportButton = document.getElementById('exportButton');
@@ -207,6 +239,10 @@
 
                 if (event.submitter.id === 'exportButton') {
                     startProgress('Exporting global CSV...');
+                }
+
+                if (event.submitter.id === 'exportExcelButton') {
+                    startProgress('Exporting global Excel workbook...');
                 }
             });
         })();

@@ -76,8 +76,8 @@
                             External ID Column <span class="text-danger">*</span>
                         </label>
                         <input asp-for="ExternalIdColumnName" id="ExternalIdColumnName"
-                               class="form-control" placeholder="e.g. External ID" required />
-                        <div class="form-text">Header in Excel that contains the Company External ID</div>
+                               class="form-control" placeholder="e.g. ID or External ID" required />
+                        <div class="form-text">Company External ID header in row 1 of the first worksheet. ID, External ID and ExternalID are accepted; the entered header takes priority when both ID and External ID exist. For a custom header, enter its name.</div>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-semibold mb-1">

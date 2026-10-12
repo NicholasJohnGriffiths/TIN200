@@ -609,6 +609,12 @@ namespace TINWeb.Pages.Testing.SurveyDataCheck
             }
 
             var extIdColNum = FindCol(ExternalIdColumnName);
+            var normalizedExternalIdColumnName = NormalizeCol(ExternalIdColumnName);
+            if (extIdColNum < 0 && normalizedExternalIdColumnName is "externalid" or "id")
+            {
+                extIdColNum = FindCol(normalizedExternalIdColumnName == "externalid" ? "ID" : "External ID");
+            }
+
             if (extIdColNum < 0)
             {
                 var available = colNumToName.Values.Take(25);
