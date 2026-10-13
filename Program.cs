@@ -7,9 +7,12 @@ using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.Options;
 using Stripe;
+using PdfSharpCore.Fonts;
 using TINWeb.Data;
 using TINWeb.Filters;
 using TINWeb.Services;
+
+GlobalFontSettings.FontResolver = new PdfFontResolver();
 
 var builder = WebApplication.CreateBuilder(args);
 
