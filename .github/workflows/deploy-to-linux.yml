@@ -87,14 +87,38 @@ jobs:
             exit 1
           fi
 
-          login_status=$(curl -s -o /dev/null -w "%{http_code}" "$LOGIN_URL" || true)
-          if [ "$login_status" != "200" ]; then
-            echo "Login endpoint check failed with HTTP $login_status"
+          login_ok=false
+          for i in {1..12}; do
+            login_status=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" "$LOGIN_URL" || true)
+            if [ "$login_status" = "200" ]; then
+              echo "Login endpoint check passed."
+              login_ok=true
+              break
+            fi
+
+            echo "Login attempt $i/12 failed with HTTP $login_status. Retrying in 10s..."
+            sleep 10
+          done
+
+          if [ "$login_ok" != "true" ]; then
+            echo "Login endpoint check failed after 12 attempts with HTTP $login_status"
             exit 1
           fi
 
-          email_events_status=$(curl -s -o /dev/null -w "%{http_code}" "$EMAIL_EVENTS_URL" || true)
-          if [ "$email_events_status" != "302" ]; then
+          email_events_ok=false
+          for i in {1..6}; do
+            email_events_status=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" "$EMAIL_EVENTS_URL" || true)
+            if [ "$email_events_status" = "302" ]; then
+              echo "Email Events anonymous redirect check passed."
+              email_events_ok=true
+              break
+            fi
+
+            echo "Email events attempt $i/6 failed with HTTP $email_events_status. Retrying in 5s..."
+            sleep 5
+          done
+
+          if [ "$email_events_ok" != "true" ]; then
             echo "Email Events anonymous redirect check failed with HTTP $email_events_status"
             exit 1
           fi
