@@ -180,7 +180,7 @@ namespace TINWeb.Pages.MailerLite
                     if (logoImage != null)
                     {
                         var imageAspectRatio = logoImage.PixelHeight / (double)logoImage.PixelWidth;
-                        logoWidth = Math.Min(logoWidthTarget, Math.Min(logoMaxHeight / imageAspectRatio, Math.Max(0, availableLogoHeight) / imageAspectRatio));
+                        logoWidth = Math.Min(logoWidthTarget, Math.Min(logoMaxHeight / imageAspectRatio, Math.Max(0, availableLogoHeight) / imageAspectRatio)) * 0.5;
                         logoHeight = logoWidth * imageAspectRatio;
                         if (logoHeight > 0)
                         {
