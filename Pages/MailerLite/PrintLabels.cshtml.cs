@@ -75,8 +75,23 @@ namespace TINWeb.Pages.MailerLite
             _imageStorageService = imageStorageService;
         }
 
-        public async Task<IActionResult> OnGetAsync(string? groupId, string? labelFormat)
+        public async Task<IActionResult> OnGetAsync(
+            string? groupId,
+            string? labelFormat,
+            MailerLiteSubscriberOrder orderBy = MailerLiteSubscriberOrder.Date,
+            DateOnly? dateAddedFrom = null,
+            DateOnly? dateAddedTo = null)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            if (dateAddedFrom.HasValue && dateAddedTo.HasValue && dateAddedFrom.Value > dateAddedTo.Value)
+            {
+                return BadRequest("Date Added From must be on or before Date Added To.");
+            }
+
             if (string.IsNullOrWhiteSpace(groupId))
             {
                 return BadRequest("No MailerLite group selected.");
@@ -86,7 +101,7 @@ namespace TINWeb.Pages.MailerLite
 
             var groups = await _mailerLiteService.GetGroupsAsync();
             var groupName = groups.FirstOrDefault(g => g.Id == groupId)?.Name ?? groupId;
-            var subscribers = await _mailerLiteService.GetGroupSubscribersAsync(groupId);
+            var subscribers = await _mailerLiteService.GetGroupSubscribersAsync(groupId, orderBy, dateAddedFrom, dateAddedTo);
             var logoBytes = await LoadLogoBytesAsync();
 
             var pdfBytes = GenerateLabelsPdf(groupName, subscribers, logoBytes, format);

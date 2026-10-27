@@ -17,10 +17,12 @@
         <div class="alert alert-danger" role="alert">@Model.ErrorMessage</div>
     }
 
-    <form method="get" class="row g-3 align-items-end mb-3">
-        <div class="col-md-4">
+    <form method="get" class="card card-body mb-3">
+        <div asp-validation-summary="All" class="text-danger"></div>
+        <div class="row g-3">
+        <div class="col-md-8">
             <label class="form-label" for="groupId">MailerLite Group</label>
-            <select name="groupId" id="groupId" class="form-select" onchange="this.form.submit()">
+            <select name="groupId" id="groupId" class="form-select" onchange="this.form.requestSubmit()">
                 <option value="">-- Select a group --</option>
                 @foreach (var group in Model.Groups)
                 {
@@ -37,9 +39,35 @@
                 }
             </select>
         </div>
-        <div class="col-md-2">
-            <button type="submit" class="btn btn-outline-primary">Apply</button>
         </div>
+        <div class="row g-3 mt-1 align-items-end">
+        <div class="col-md-6 col-xl-3">
+            <label asp-for="DateAddedFrom" class="form-label">Date Added From (UTC)</label>
+            <input asp-for="DateAddedFrom" type="date" class="form-control" onchange="this.form.requestSubmit()" />
+        </div>
+        <div class="col-md-6 col-xl-3">
+            <label asp-for="DateAddedTo" class="form-label">Date Added To (UTC)</label>
+            <input asp-for="DateAddedTo" type="date" class="form-control" onchange="this.form.requestSubmit()" />
+        </div>
+        <fieldset class="col-md-8 col-xl-4 mb-0">
+            <legend class="form-label fs-6 mb-2">Order by</legend>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="orderBy" id="orderByDate" value="Date"
+                       checked="@(Model.SelectedOrderBy == TINWeb.Services.MailerLiteSubscriberOrder.Date)" onchange="this.form.requestSubmit()" />
+                <label class="form-check-label" for="orderByDate">Order by Date (descending)</label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="orderBy" id="orderByName" value="Name"
+                       checked="@(Model.SelectedOrderBy == TINWeb.Services.MailerLiteSubscriberOrder.Name)" onchange="this.form.requestSubmit()" />
+                <label class="form-check-label" for="orderByName">Order by Email</label>
+            </div>
+        </fieldset>
+        <div class="col-md-4 col-xl-2 d-flex gap-2 flex-wrap">
+            <button type="submit" class="btn btn-outline-primary">Apply</button>
+            <a class="btn btn-outline-secondary" asp-page="./Labels" asp-route-groupId="@Model.SelectedGroupId" asp-route-labelFormat="@Model.SelectedLabelFormat" asp-route-orderBy="@Model.SelectedOrderBy">Clear Dates</a>
+        </div>
+        </div>
+        <p class="form-text mb-0 mt-3">Dates filter automatically and include both days (UTC). Leave a date blank for an open-ended range. The same filters and order apply to printed labels.</p>
     </form>
 
     @if (!string.IsNullOrWhiteSpace(Model.SelectedGroupId))
@@ -47,7 +75,10 @@
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
                 <span>Subscribers (@Model.Subscribers.Count)</span>
-                <a class="btn btn-sm btn-outline-secondary" asp-page="./PrintLabels" asp-route-groupId="@Model.SelectedGroupId" asp-route-labelFormat="@Model.SelectedLabelFormat" target="_blank">Preview / Print Labels</a>
+                @if (ViewData.ModelState.IsValid)
+                {
+                    <a class="btn btn-sm btn-outline-secondary" asp-page="./PrintLabels" asp-route-groupId="@Model.SelectedGroupId" asp-route-labelFormat="@Model.SelectedLabelFormat" asp-route-orderBy="@Model.SelectedOrderBy" asp-route-dateAddedFrom="@(Model.DateAddedFrom?.ToString("yyyy-MM-dd"))" asp-route-dateAddedTo="@(Model.DateAddedTo?.ToString("yyyy-MM-dd"))" target="_blank">Preview / Print Labels</a>
+                }
             </div>
             <div class="table-responsive">
                 <table class="table table-sm table-striped mb-0">
@@ -57,6 +88,7 @@
                             <th>First Name</th>
                             <th>Surname</th>
                             <th>Company Name</th>
+                            <th>MailerLite Date Added (UTC)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -67,6 +99,7 @@
                                 <td>@subscriber.FirstName</td>
                                 <td>@subscriber.LastName</td>
                                 <td>@subscriber.CompanyName</td>
+                                <td>@(subscriber.AddedAt?.UtcDateTime.ToString("dd/MM/yyyy HH:mm") ?? "-")</td>
                             </tr>
                         }
                     </tbody>

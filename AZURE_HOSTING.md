@@ -2,6 +2,18 @@
 
 This guide deploys the app to your Azure account and connects it to Azure SQL.
 
+## Local development
+
+Run `dotnet build` and `dotnet run` from the workspace root. Debug builds use
+the .NET host directly rather than generating `TINWeb.exe`, avoiding the
+Windows apphost copy failure. Release publishing retains the default apphost
+behavior. Stop the running app before rebuilding to avoid locking `TINWeb.dll`.
+
+In VS Code, select **Debug TINWeb** in Run and Debug and press **F5**.
+This profile launches the .NET app under the debugger and opens its local URL.
+Use **Shift+F5** (Stop Debugging) to stop the app. Running `dotnet run` in a
+terminal is independent of the debugger; stop that instance with **Ctrl+C**.
+
 ## 1) Prerequisites
 
 - Azure subscription

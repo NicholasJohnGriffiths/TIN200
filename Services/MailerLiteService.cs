@@ -1,4 +1,5 @@
 using System.Net.Http.Headers;
+using System.Globalization;
 using System.Text.Json;
 
 namespace TINWeb.Services
@@ -21,6 +22,13 @@ namespace TINWeb.Services
         public string? FirstName { get; set; }
         public string? LastName { get; set; }
         public string? CompanyName { get; set; }
+        public DateTimeOffset? AddedAt { get; set; }
+    }
+
+    public enum MailerLiteSubscriberOrder
+    {
+        Date,
+        Name
     }
 
     public class MailerLiteService
@@ -65,8 +73,18 @@ namespace TINWeb.Services
             return groups.OrderBy(g => g.Name, StringComparer.OrdinalIgnoreCase).ToList();
         }
 
-        public async Task<List<MailerLiteSubscriber>> GetGroupSubscribersAsync(string groupId, CancellationToken cancellationToken = default)
+        public async Task<List<MailerLiteSubscriber>> GetGroupSubscribersAsync(
+            string groupId,
+            MailerLiteSubscriberOrder orderBy = MailerLiteSubscriberOrder.Date,
+            DateOnly? dateAddedFrom = null,
+            DateOnly? dateAddedTo = null,
+            CancellationToken cancellationToken = default)
         {
+            if (dateAddedFrom.HasValue && dateAddedTo.HasValue && dateAddedFrom.Value > dateAddedTo.Value)
+            {
+                throw new ArgumentException("Date Added From must be on or before Date Added To.");
+            }
+
             var subscribers = new List<MailerLiteSubscriber>();
             string? nextUrl = $"groups/{Uri.EscapeDataString(groupId)}/subscribers?limit=200";
 
@@ -99,7 +117,10 @@ namespace TINWeb.Services
                             Email = GetString(item, "email") ?? "",
                             FirstName = firstName,
                             LastName = lastName,
-                            CompanyName = companyName
+                            CompanyName = companyName,
+                            AddedAt = GetString(item, "created_at") is { } createdAt
+                                ? DateTimeOffset.Parse(createdAt, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal)
+                                : null
                         });
                     }
                 }
@@ -107,7 +128,17 @@ namespace TINWeb.Services
                 nextUrl = GetNextPageUrl(root);
             }
 
-            return subscribers.OrderBy(s => s.Email, StringComparer.OrdinalIgnoreCase).ToList();
+            var filtered = subscribers.Where(s =>
+                (!dateAddedFrom.HasValue && !dateAddedTo.HasValue)
+                || (s.AddedAt.HasValue
+                    && (!dateAddedFrom.HasValue || DateOnly.FromDateTime(s.AddedAt.Value.UtcDateTime) >= dateAddedFrom.Value)
+                    && (!dateAddedTo.HasValue || DateOnly.FromDateTime(s.AddedAt.Value.UtcDateTime) <= dateAddedTo.Value)));
+
+            return orderBy == MailerLiteSubscriberOrder.Name
+                ? filtered.OrderBy(s => s.Email, StringComparer.OrdinalIgnoreCase).ToList()
+                : filtered.OrderByDescending(s => s.AddedAt)
+                    .ThenBy(s => s.Email, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
         }
 
         // Surfaces MailerLite's actual error body (not just the status code) so failures are diagnosable from the UI.
